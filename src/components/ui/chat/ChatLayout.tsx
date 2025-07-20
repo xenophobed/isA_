@@ -64,6 +64,18 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
     await chatActions.sendMessage(content, client, metadata);
     console.log('✅ ChatLayout: chatActions.sendMessage completed');
   };
+
+  // Create multimodal wrapper for file uploads
+  const sendMultimodalMessage = async (content: string, files: File[], metadata?: Record<string, any>) => {
+    console.log('📨 ChatLayout: sendMultimodalMessage called with:', content, files.length, 'files');
+    if (!client) {
+      console.error('❌ ChatLayout: No AI client available');
+      return;
+    }
+    console.log('📨 ChatLayout: Calling chatActions.sendMultimodalMessage');
+    await chatActions.sendMultimodalMessage(content, files, client, metadata);
+    console.log('✅ ChatLayout: chatActions.sendMultimodalMessage completed');
+  };
   
   // Handle exclusive sidebar logic
   const actualShowLeftSidebar = sidebarMode === 'exclusive' ? 
@@ -145,8 +157,8 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
             onError={inputProps.onError}
             onFileSelect={inputProps.onFileSelect}
             onSend={sendMessage}
+            onSendMultimodal={sendMultimodalMessage}
             suggestionsContent={inputSuggestionsContent}
-            className="isa-chat-input-area"
             config={inputProps.config ? { components: inputProps.config } : undefined}
           />
         </div>

@@ -1,11 +1,10 @@
 import React from 'react';
 import { DreamSidebar } from '../../sidebars/dream_sidebar';
 import { HuntSidebar } from '../../sidebars/hunt_sidebar';
-import { DigitalHubSidebar } from '../../sidebars/digitalhub_sidebar';
 import { AssistantSidebar } from '../../sidebars/assistant_sidebar';
 import { OmniSidebar } from '../../sidebars/omni_sidebar';
 import { DataScientistSidebar } from '../../sidebars/data_scientist_sidebar';
-import { DocSidebar } from '../../sidebars/doc_sidebar';
+import { KnowledgeSidebar } from '../../sidebars/knowledge_sidebar';
 import { logger, LogCategory } from '../../utils/logger';
 
 interface SidebarManagerProps {
@@ -15,6 +14,7 @@ interface SidebarManagerProps {
   dreamGeneratedImage: string | null;
   onCloseApp: () => void;
   onDreamImageGenerated?: (imageUrl: string, prompt: string) => void;
+  onAppSelect?: (appId: string) => void;
 }
 
 /**
@@ -27,7 +27,8 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({
   triggeredAppInput,
   dreamGeneratedImage,
   onCloseApp,
-  onDreamImageGenerated
+  onDreamImageGenerated,
+  onAppSelect
 }) => {
   logger.trackComponentRender('SidebarManager', { 
     currentApp, 
@@ -53,11 +54,6 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({
         icon: '🔍', 
         component: HuntSidebar 
       },
-      digitalhub: { 
-        title: 'Digital Hub', 
-        icon: '📁', 
-        component: DigitalHubSidebar 
-      },
       assistant: { 
         title: 'AI Assistant', 
         icon: '🤖', 
@@ -73,10 +69,10 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({
         icon: '📊', 
         component: DataScientistSidebar 
       },
-      doc: { 
-        title: 'DocIntell AI', 
-        icon: '📄', 
-        component: DocSidebar 
+      knowledge: { 
+        title: 'Knowledge Hub', 
+        icon: '🧠', 
+        component: KnowledgeSidebar 
       }
     };
 
@@ -149,8 +145,47 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({
         </button>
       </div>
       
-      <div className="text-white/60 text-center">
-        <p>Select an app to get started</p>
+      <div className="space-y-4">
+        <p className="text-white/60 text-sm mb-4">Choose an AI app to get started:</p>
+        
+        <div className="grid gap-3">
+          {Object.entries({
+            dream: { title: 'DreamForge AI', icon: '🎨', desc: 'AI-powered image generation' },
+            hunt: { title: 'HuntAI', icon: '🔍', desc: 'Product search and comparison' },
+            assistant: { title: 'AI Assistant', icon: '🤖', desc: 'General AI assistance' },
+            omni: { title: 'Omni Content', icon: '⚡', desc: 'Multi-purpose content creation' },
+            'data-scientist': { title: 'DataWise Analytics', icon: '📊', desc: 'Data analysis and insights' },
+            knowledge: { title: 'Knowledge Hub', icon: '🧠', desc: 'Advanced document analysis with vector and graph RAG' }
+          }).map(([appId, app]) => (
+            <button
+              key={appId}
+              onClick={() => {
+                logger.trackSidebarInteraction('app_selected_from_list', appId);
+                console.log('🚀 App selected:', appId);
+                onAppSelect?.(appId);
+              }}
+              className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg transition-all text-left group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="text-2xl">{app.icon}</div>
+                <div className="flex-1">
+                  <div className="text-white font-medium text-sm">{app.title}</div>
+                  <div className="text-white/60 text-xs mt-1">{app.desc}</div>
+                </div>
+                <div className="text-white/40 group-hover:text-white/60 transition-colors">
+                  →
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+        
+        <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+          <div className="text-blue-300 text-sm font-medium mb-2">💡 Pro Tip</div>
+          <div className="text-blue-200/80 text-xs">
+            You can also trigger apps by typing keywords like "create image", "search product", or "organize files" in the chat!
+          </div>
+        </div>
       </div>
     </div>
   );

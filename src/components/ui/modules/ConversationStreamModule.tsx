@@ -118,15 +118,38 @@ export const ConversationStreamModule: React.FC<ConversationStreamModuleProps> =
             )}
             
             <div className="bg-gray-700 text-white border border-gray-600 p-3 rounded-lg">
+              {/* Status indicator */}
+              {streamingMessage.status && streamingMessage.status !== 'streaming' && (
+                <div className="text-xs text-blue-300 mb-2 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                  {streamingMessage.status}
+                </div>
+              )}
+              
               <div className="whitespace-pre-wrap">
                 {streamingMessage.content}
-                <span className="inline-block w-2 h-4 bg-blue-400 ml-1 animate-pulse"></span>
+                {streamingMessage.content && <span className="inline-block w-2 h-4 bg-blue-400 ml-1 animate-pulse"></span>}
               </div>
+              
+              {/* Show if no content but there's status */}
+              {!streamingMessage.content && streamingMessage.status && (
+                <div className="text-gray-400 italic">
+                  {streamingMessage.status}...
+                </div>
+              )}
             </div>
             
             {showTimestamps && (
               <div className="text-xs text-gray-500 mt-1">
-                Streaming... • {streamingMessage.status}
+                <div className="flex items-center gap-2">
+                  <span>正在处理</span>
+                  {streamingMessage.status && (
+                    <>
+                      <span>•</span>
+                      <span>{streamingMessage.status}</span>
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>

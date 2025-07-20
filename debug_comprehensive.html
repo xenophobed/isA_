@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive CSS Debugging - InputAreaLayout</title>
+    <style>
+        /* SCENARIO 1: Exact Tailwind Preflight CSS Reset */
+        /* This mimics @tailwind base; which includes Preflight */
+        *, ::before, ::after {
+            box-sizing: border-box;
+            border-width: 0;
+            border-style: solid;
+            border-color: #e5e7eb;
+        }
+        
+        ::before, ::after {
+            --tw-content: '';
+        }
+        
+        html {
+            line-height: 1.5;
+            -webkit-text-size-adjust: 100%;
+            -moz-tab-size: 4;
+            tab-size: 4;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            font-feature-settings: normal;
+            font-variation-settings: normal;
+        }
+        
+        body {
+            margin: 0;
+            line-height: inherit;
+        }
+        
+        button, input, optgroup, select, textarea {
+            font-family: inherit;
+            font-size: 100%;
+            font-weight: inherit;
+            line-height: inherit;
+            color: inherit;
+            margin: 0;
+            padding: 0;
+        }
+        
+        button, select {
+            text-transform: none;
+        }
+        
+        button, [type='button'], [type='reset'], [type='submit'] {
+            -webkit-appearance: button;
+            background-color: transparent;
+            background-image: none;
+        }
+        
+        :-moz-focusring {
+            outline: auto;
+        }
+        
+        :-moz-ui-invalid {
+            box-shadow: none;
+        }
+        
+        progress {
+            vertical-align: baseline;
+        }
+        
+        ::-webkit-inner-spin-button, ::-webkit-outer-spin-button {
+            height: auto;
+        }
+        
+        [type='search'] {
+            -webkit-appearance: textfield;
+            outline-offset: -2px;
+        }
+        
+        ::-webkit-search-decoration {
+            -webkit-appearance: none;
+        }
+        
+        ::-webkit-file-upload-button {
+            -webkit-appearance: button;
+            font: inherit;
+        }
+        
+        summary {
+            display: list-item;
+        }
+        
+        blockquote, dl, dd, h1, h2, h3, h4, h5, h6, hr, figure, p, pre {
+            margin: 0;
+        }
+        
+        fieldset {
+            margin: 0;
+            padding: 0;
+        }
+        
+        legend {
+            padding: 0;
+        }
+        
+        ol, ul, menu {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        dialog {
+            padding: 0;
+        }
+        
+        textarea {
+            resize: vertical;
+        }
+        
+        input::placeholder, textarea::placeholder {
+            opacity: 1;
+            color: #9ca3af;
+        }
+        
+        button, [role="button"] {
+            cursor: pointer;
+        }
+        
+        :disabled {
+            cursor: default;
+        }
+        
+        img, svg, video, canvas, audio, iframe, embed, object {
+            display: block;
+            vertical-align: middle;
+        }
+        
+        img, video {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        [hidden] {
+            display: none;
+        }
+        
+        /* SCENARIO 2: Tailwind Base Styles that might conflict */
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .flex-1 { flex: 1 1 0%; }
+        .h-screen { height: 100vh; }
+        .text-white { --tw-text-opacity: 1; color: rgb(255 255 255 / var(--tw-text-opacity)); }
+        .overflow-hidden { overflow: hidden; }
+        .bg-black\/20 { background-color: rgb(0 0 0 / 0.2); }
+        .backdrop-blur-xl { --tw-backdrop-blur: blur(24px); backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia); }
+        .border-b { border-bottom-width: 1px; }
+        .border-white\/10 { border-color: rgb(255 255 255 / 0.1); }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .z-10 { z-index: 10; }
+        
+        /* SCENARIO 3: Our Custom CSS with varying specificity levels */
+        /* Level 1: Basic selector (should be overridden) */
+        .input-area-container {
+            padding: 12px;
+            background: red;
+            border: 2px solid yellow;
+        }
+        
+        /* Level 2: Class selector with specificity (should be overridden) */
+        div.input-area-container {
+            padding: 16px !important;
+            background: orange !important;
+            border: 1px solid blue !important;
+        }
+        
+        /* Level 3: Our actual CSS with full specificity */
+        div.input-area-container {
+            padding: min(6vw, 24px) !important;
+            background: rgba(0, 0, 0, 0.4) !important;
+            backdrop-filter: blur(20px) saturate(120%) !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-left: none !important;
+            border-right: none !important;
+            border-bottom: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 16px !important;
+            min-height: max(80px, 10vh) !important;
+            position: relative !important;
+        }
+        
+        /* SCENARIO 4: Test different button scenarios */
+        button {
+            background: inherit;
+            border: inherit;
+            color: inherit;
+            padding: inherit;
+            margin: inherit;
+        }
+        
+        /* Our specific button styles */
+        div.input-area-container button.upload-button {
+            width: max(40px, 10vw) !important;
+            height: max(40px, 10vw) !important;
+            max-width: 48px !important;
+            max-height: 48px !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+            backdrop-filter: blur(10px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 12px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-shrink: 0 !important;
+            cursor: pointer !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            color: white !important;
+            font-family: inherit !important;
+            font-size: inherit !important;
+            text-decoration: none !important;
+            box-sizing: border-box !important;
+            outline: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background-image: none !important;
+            text-transform: none !important;
+            letter-spacing: normal !important;
+            word-spacing: normal !important;
+            line-height: normal !important;
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+            appearance: none !important;
+        }
+        
+        /* SCENARIO 5: CSS Variables that might be interfering */
+        :root {
+            --tw-border-spacing-x: 0;
+            --tw-border-spacing-y: 0;
+            --tw-translate-x: 0;
+            --tw-translate-y: 0;
+            --tw-rotate: 0;
+            --tw-skew-x: 0;
+            --tw-skew-y: 0;
+            --tw-scale-x: 1;
+            --tw-scale-y: 1;
+            --tw-pan-x: ;
+            --tw-pan-y: ;
+            --tw-pinch-zoom: ;
+            --tw-scroll-snap-strictness: proximity;
+            --tw-gradient-from-position: ;
+            --tw-gradient-via-position: ;
+            --tw-gradient-to-position: ;
+            --tw-ordinal: ;
+            --tw-slashed-zero: ;
+            --tw-numeric-figure: ;
+            --tw-numeric-spacing: ;
+            --tw-numeric-fraction: ;
+            --tw-ring-inset: ;
+            --tw-ring-offset-width: 0px;
+            --tw-ring-offset-color: #fff;
+            --tw-ring-color: rgb(59 130 246 / 0.5);
+            --tw-ring-offset-shadow: 0 0 #0000;
+            --tw-ring-shadow: 0 0 #0000;
+            --tw-shadow: 0 0 #0000;
+            --tw-shadow-colored: 0 0 #0000;
+            --tw-blur: ;
+            --tw-brightness: ;
+            --tw-contrast: ;
+            --tw-grayscale: ;
+            --tw-hue-rotate: ;
+            --tw-invert: ;
+            --tw-saturate: ;
+            --tw-sepia: ;
+            --tw-drop-shadow: ;
+            --tw-backdrop-blur: ;
+            --tw-backdrop-brightness: ;
+            --tw-backdrop-contrast: ;
+            --tw-backdrop-grayscale: ;
+            --tw-backdrop-hue-rotate: ;
+            --tw-backdrop-invert: ;
+            --tw-backdrop-opacity: ;
+            --tw-backdrop-saturate: ;
+            --tw-backdrop-sepia: ;
+        }
+        
+        /* Base body styling */
+        body {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 20px;
+        }
+        
+        .debug-scenario {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #333;
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border-radius: 12px;
+        }
+        
+        .debug-title {
+            color: #60a5fa;
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        
+        .debug-info {
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        
+        /* Test all other CSS rules */
+        .suggestions-content {
+            margin-bottom: 16px;
+        }
+        
+        .input-controls {
+            position: relative;
+        }
+        
+        .input-row {
+            display: flex;
+            gap: min(3vw, 12px);
+            align-items: flex-end;
+        }
+        
+        div.input-area-container div.suggestions-button {
+            width: max(40px, 10vw) !important;
+            height: max(40px, 10vw) !important;
+            max-width: 48px !important;
+            max-height: 48px !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+            backdrop-filter: blur(10px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 12px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            flex-shrink: 0 !important;
+            color: white !important;
+            box-sizing: border-box !important;
+        }
+        
+        .input-container {
+            flex: 1;
+            position: relative;
+            min-width: 0;
+        }
+        
+        div.input-area-container textarea.chat-input {
+            width: 100% !important;
+            resize: none !important;
+            padding: min(4vw, 16px) !important;
+            padding-right: min(12vw, 48px) !important;
+            background: rgba(255, 255, 255, 0.08) !important;
+            backdrop-filter: blur(10px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-radius: 16px !important;
+            color: white !important;
+            font-size: max(14px, 4vw) !important;
+            font-family: inherit !important;
+            line-height: 1.5 !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            outline: none !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+        }
+        
+        div.input-area-container button.send-button {
+            position: absolute !important;
+            right: 8px !important;
+            bottom: 8px !important;
+            width: max(28px, 7vw) !important;
+            height: max(28px, 7vw) !important;
+            max-width: 32px !important;
+            max-height: 32px !important;
+            border-radius: 8px !important;
+            border: none !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: white !important;
+            box-sizing: border-box !important;
+        }
+        
+        div.input-area-container button.send-button.active {
+            background: #10b981 !important;
+            cursor: pointer !important;
+            opacity: 1 !important;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Comprehensive CSS Debugging Report</h1>
+    
+    <div class="debug-scenario">
+        <div class="debug-title">🎯 Test 1: Basic InputAreaLayout with All Conflicting Styles</div>
+        <div class="input-area-container">
+            <div class="input-controls">
+                <div class="input-row">
+                    <button class="upload-button">📎</button>
+                    <div class="suggestions-button">⚙️</div>
+                    <div class="input-container">
+                        <textarea class="chat-input" placeholder="Type your message..."></textarea>
+                        <button class="send-button active">▶</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="debug-info">
+            Expected: Dark glassmorphism container with properly styled buttons and textarea
+        </div>
+    </div>
+    
+    <div class="debug-scenario">
+        <div class="debug-title">🔬 Test 2: With ChatLayout Tailwind Classes Applied</div>
+        <div class="input-area-container flex flex-col h-screen text-white overflow-hidden">
+            <div class="input-controls">
+                <div class="input-row">
+                    <button class="upload-button">📎</button>
+                    <div class="suggestions-button">⚙️</div>
+                    <div class="input-container">
+                        <textarea class="chat-input" placeholder="With Tailwind classes..."></textarea>
+                        <button class="send-button active">▶</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="debug-info">
+            Expected: Same as Test 1, Tailwind utilities should not interfere due to !important
+        </div>
+    </div>
+    
+    <div class="debug-scenario">
+        <div class="debug-title">🧪 Test 3: CSS Specificity Analysis</div>
+        <div style="font-family: monospace; font-size: 14px; line-height: 1.6;">
+            <div style="color: #22c55e;">✅ div.input-area-container (specificity: 0,0,1,1)</div>
+            <div style="color: #22c55e;">✅ div.input-area-container button.upload-button (specificity: 0,0,2,2)</div>
+            <div style="color: #22c55e;">✅ div.input-area-container textarea.chat-input (specificity: 0,0,2,2)</div>
+            <div style="color: #fbbf24;">⚠️ Tailwind utilities (specificity: 0,0,1,0) - should be overridden</div>
+            <div style="color: #f87171;">❌ If styles aren't applying, check browser dev tools</div>
+        </div>
+    </div>
+    
+    <div class="debug-scenario">
+        <div class="debug-title">⚡ Test 4: Runtime CSS Inspection</div>
+        <div id="css-analysis" style="font-family: monospace; font-size: 12px; background: #000; color: #0f0; padding: 10px; border-radius: 8px;">
+            Loading CSS analysis...
+        </div>
+    </div>
+    
+    <div class="debug-scenario">
+        <div class="debug-title">🚨 Critical Issues to Check</div>
+        <div style="color: #f87171; line-height: 1.8;">
+            <div>1. ❓ Is globals.css actually loading in the browser?</div>
+            <div>2. ❓ Are there any CSS syntax errors preventing the rules from parsing?</div>
+            <div>3. ❓ Is CSS being loaded after the component renders?</div>
+            <div>4. ❓ Are there any CSP (Content Security Policy) issues?</div>
+            <div>5. ❓ Is the CSS being purged by Tailwind's production build?</div>
+            <div>6. ❓ Are there any Next.js specific CSS loading issues?</div>
+        </div>
+    </div>
+    
+    <script>
+        // Comprehensive CSS debugging script
+        function debugCSS() {
+            const results = [];
+            
+            // Test 1: Check if our CSS rules exist
+            const styleSheets = Array.from(document.styleSheets);
+            let foundOurRules = false;
+            
+            styleSheets.forEach((sheet, index) => {
+                try {
+                    const rules = Array.from(sheet.cssRules || sheet.rules || []);
+                    rules.forEach(rule => {
+                        if (rule.selectorText && rule.selectorText.includes('input-area-container')) {
+                            foundOurRules = true;
+                            results.push(`✅ Found rule: ${rule.selectorText}`);
+                        }
+                    });
+                } catch (e) {
+                    results.push(`⚠️ Cannot access stylesheet ${index}: ${e.message}`);
+                }
+            });
+            
+            if (!foundOurRules) {
+                results.push('❌ No input-area-container rules found in any stylesheet!');
+            }
+            
+            // Test 2: Check computed styles
+            const container = document.querySelector('.input-area-container');
+            if (container) {
+                const styles = window.getComputedStyle(container);
+                results.push(`\n📊 Computed styles for .input-area-container:`);
+                results.push(`- padding: ${styles.padding}`);
+                results.push(`- background: ${styles.background}`);
+                results.push(`- backdrop-filter: ${styles.backdropFilter}`);
+                results.push(`- border: ${styles.border}`);
+                results.push(`- display: ${styles.display}`);
+                results.push(`- flex-direction: ${styles.flexDirection}`);
+                results.push(`- gap: ${styles.gap}`);
+                
+                // Check if our styles are actually applied
+                if (styles.background.includes('rgba(0, 0, 0, 0.4)')) {
+                    results.push('✅ Background style is correctly applied!');
+                } else {
+                    results.push('❌ Background style is NOT applied correctly!');
+                    results.push(`   Expected: rgba(0, 0, 0, 0.4), Got: ${styles.background}`);
+                }
+                
+                if (styles.padding.includes('24px') || styles.padding.includes('min(6vw, 24px)')) {
+                    results.push('✅ Padding style is correctly applied!');
+                } else {
+                    results.push('❌ Padding style is NOT applied correctly!');
+                    results.push(`   Expected: min(6vw, 24px), Got: ${styles.padding}`);
+                }
+            } else {
+                results.push('❌ No .input-area-container element found!');
+            }
+            
+            // Test 3: Check buttons
+            const uploadButton = document.querySelector('.upload-button');
+            if (uploadButton) {
+                const buttonStyles = window.getComputedStyle(uploadButton);
+                results.push(`\n📊 Computed styles for .upload-button:`);
+                results.push(`- width: ${buttonStyles.width}`);
+                results.push(`- height: ${buttonStyles.height}`);
+                results.push(`- background: ${buttonStyles.background}`);
+                results.push(`- border: ${buttonStyles.border}`);
+                results.push(`- border-radius: ${buttonStyles.borderRadius}`);
+                
+                if (buttonStyles.background.includes('rgba(255, 255, 255, 0.1)')) {
+                    results.push('✅ Button background is correctly applied!');
+                } else {
+                    results.push('❌ Button background is NOT applied correctly!');
+                }
+            }
+            
+            // Test 4: Check textarea
+            const textarea = document.querySelector('.chat-input');
+            if (textarea) {
+                const textareaStyles = window.getComputedStyle(textarea);
+                results.push(`\n📊 Computed styles for .chat-input:`);
+                results.push(`- width: ${textareaStyles.width}`);
+                results.push(`- padding: ${textareaStyles.padding}`);
+                results.push(`- background: ${textareaStyles.background}`);
+                results.push(`- border: ${textareaStyles.border}`);
+                results.push(`- color: ${textareaStyles.color}`);
+                
+                if (textareaStyles.background.includes('rgba(255, 255, 255, 0.08)')) {
+                    results.push('✅ Textarea background is correctly applied!');
+                } else {
+                    results.push('❌ Textarea background is NOT applied correctly!');
+                }
+            }
+            
+            // Test 5: Check for CSS loading issues
+            results.push(`\n📋 General Information:`);
+            results.push(`- Total stylesheets: ${styleSheets.length}`);
+            results.push(`- Document ready state: ${document.readyState}`);
+            results.push(`- Window loaded: ${window.performance ? 'Yes' : 'No'}`);
+            
+            return results.join('\n');
+        }
+        
+        // Run analysis when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                setTimeout(() => {
+                    document.getElementById('css-analysis').textContent = debugCSS();
+                }, 100);
+            });
+        } else {
+            setTimeout(() => {
+                document.getElementById('css-analysis').textContent = debugCSS();
+            }, 100);
+        }
+        
+        // Log to console as well
+        console.log('=== COMPREHENSIVE CSS DEBUG ANALYSIS ===');
+        setTimeout(() => {
+            console.log(debugCSS());
+        }, 100);
+    </script>
+</body>
+</html>

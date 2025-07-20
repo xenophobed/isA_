@@ -1,55 +1,147 @@
 import React, { useState } from 'react';
-import { useSimpleAI } from '../providers/SimpleAIProvider';
+import { SimpleAIClient } from '../services/SimpleAIClient';
 import { useAppStore } from '../stores/useAppStore';
 import { logger, LogCategory } from '../utils/logger';
 
 interface DreamSidebarProps {
   triggeredInput?: string;
   generatedImage?: string | null;
-  onImageGenerated?: (imageUrl: string, prompt: string) => void; // 通知main_app
+  onImageGenerated?: (imageUrl: string, prompt: string) => void;
 }
 
-// AI intelligent analysis of user requirements
-const analyzeUserInput = (input: string) => {
-  const videoKeywords = ['video', 'animation', 'clip', 'movie', 'motion', 'animated'];
-  const styleKeywords = ['cyberpunk', 'anime', 'realistic', 'fantasy', 'sci-fi', 'cartoon'];
-  const formatKeywords = ['portrait', 'landscape', 'square', 'vertical', 'horizontal'];
-  
+// Atomic Image Intelligence Service modes
+interface ImageMode {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  cost: string;
+  estimatedTime: string;
+  useCase: string;
+  keywords: string[];
+  requiresImage: boolean;
+}
+
+const imageModes: ImageMode[] = [
+  {
+    id: 'text_to_image',
+    name: 'Create from Text',
+    description: 'Generate entirely new images from your description',
+    icon: '✨',
+    cost: '$3/1000 images',
+    estimatedTime: '10-15 seconds',
+    useCase: 'Perfect for: Artwork, concepts, creative ideas',
+    keywords: ['create', 'generate', 'new', 'imagine', 'design', 'art'],
+    requiresImage: false
+  },
+  {
+    id: 'image_to_image',
+    name: 'Transform Image',
+    description: 'Modify an existing image based on your description',
+    icon: '🔄',
+    cost: '$0.04/image',
+    estimatedTime: '15-20 seconds',
+    useCase: 'Perfect for: Editing, variations, improvements',
+    keywords: ['modify', 'change', 'edit', 'transform', 'improve'],
+    requiresImage: true
+  },
+  {
+    id: 'style_transfer',
+    name: 'Change Style',
+    description: 'Apply artistic styles to your images',
+    icon: '🎨',
+    cost: '$0.04/image',
+    estimatedTime: '15-20 seconds',
+    useCase: 'Perfect for: Artistic effects, style matching',
+    keywords: ['style', 'artistic', 'painting', 'effect', 'filter'],
+    requiresImage: true
+  },
+  {
+    id: 'sticker_generation',
+    name: 'Make Stickers',
+    description: 'Create fun stickers from images or text',
+    icon: '🏷️',
+    cost: '$0.0024/image',
+    estimatedTime: '10 seconds',
+    useCase: 'Perfect for: Chat stickers, emojis, fun graphics',
+    keywords: ['sticker', 'emoji', 'cute', 'cartoon', 'fun'],
+    requiresImage: false
+  },
+  {
+    id: 'face_swap',
+    name: 'Swap Faces',
+    description: 'Replace faces in images naturally',
+    icon: '👥',
+    cost: '$0.04/image',
+    estimatedTime: '20-25 seconds',
+    useCase: 'Perfect for: Fun photos, character changes',
+    keywords: ['face', 'swap', 'replace', 'person', 'character'],
+    requiresImage: true
+  },
+  {
+    id: 'professional_headshot',
+    name: 'Pro Headshots',
+    description: 'Create professional headshots from casual photos',
+    icon: '👔',
+    cost: '$0.04/image',
+    estimatedTime: '20-25 seconds',
+    useCase: 'Perfect for: LinkedIn, resumes, business cards',
+    keywords: ['professional', 'headshot', 'business', 'linkedin', 'formal'],
+    requiresImage: true
+  },
+  {
+    id: 'photo_inpainting',
+    name: 'Remove Objects',
+    description: 'Remove unwanted objects or fill in missing parts',
+    icon: '🔧',
+    cost: '$0.04/image',
+    estimatedTime: '15-20 seconds',
+    useCase: 'Perfect for: Photo cleanup, object removal',
+    keywords: ['remove', 'erase', 'clean', 'fix', 'repair', 'fill'],
+    requiresImage: true
+  },
+  {
+    id: 'photo_outpainting',
+    name: 'Extend Images',
+    description: 'Expand image boundaries with AI-generated content',
+    icon: '📐',
+    cost: '$0.04/image',
+    estimatedTime: '20-25 seconds',
+    useCase: 'Perfect for: Expanding scenes, changing aspect ratios',
+    keywords: ['extend', 'expand', 'widen', 'enlarge', 'border'],
+    requiresImage: true
+  },
+  {
+    id: 'emoji_generation',
+    name: 'Custom Emojis',
+    description: 'Generate custom emoji-style images',
+    icon: '😊',
+    cost: '$0.0024/image',
+    estimatedTime: '8-10 seconds',
+    useCase: 'Perfect for: Custom reactions, brand emojis',
+    keywords: ['emoji', 'reaction', 'expression', 'custom', 'face'],
+    requiresImage: false
+  }
+];
+
+// Smart mode detection based on user input
+const detectBestMode = (input: string, hasImage: boolean): ImageMode => {
   const lowerInput = input.toLowerCase();
   
-  // Detect video requirements
-  const needsVideo = videoKeywords.some(keyword => lowerInput.includes(keyword));
+  // Find modes that match keywords and image requirements
+  const possibleModes = imageModes.filter(mode => {
+    const keywordMatch = mode.keywords.some(keyword => lowerInput.includes(keyword));
+    const imageRequirementMet = !mode.requiresImage || hasImage;
+    return keywordMatch && imageRequirementMet;
+  });
   
-  // Detect style
-  let detectedStyle = 'photorealistic';
-  if (lowerInput.includes('cyberpunk') || lowerInput.includes('sci-fi')) detectedStyle = 'cyberpunk';
-  if (lowerInput.includes('anime') || lowerInput.includes('cartoon')) detectedStyle = 'anime';
-  if (lowerInput.includes('painting') || lowerInput.includes('artistic')) detectedStyle = 'oil-painting';
-  if (lowerInput.includes('cosmic') || lowerInput.includes('space')) detectedStyle = 'cosmic';
-  
-  // Smart workflow recommendation
-  if (needsVideo) {
-    return {
-      type: 'video_creation',
-      workflow: ['text_to_image', 'style_transfer', 'video_generation'],
-      estimatedTime: '2-3 minutes',
-      detectedStyle,
-      description: 'Video creation workflow detected'
-    };
-  } else {
-    return {
-      type: 'simple_image',
-      workflow: ['text_to_image'],
-      estimatedTime: '10-15 seconds',
-      detectedStyle,
-      description: 'Quick image generation'
-    };
-  }
+  // Return best match or default to text-to-image
+  return possibleModes[0] || imageModes[0];
 };
 
 /**
- * Dream Agent - Multimodal Creation Workshop
- * Based on powerful backend capabilities: 9 image processing + voice + video
+ * Atomic Image Intelligence - Professional Image Processing
+ * 9 specialized modes for every image creation and editing need
  */
 export const DreamSidebar: React.FC<DreamSidebarProps> = ({ 
   triggeredInput, 
@@ -61,8 +153,8 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
     hasGeneratedImage: !!generatedImage
   });
 
-  // Use simple AI client
-  const client = useSimpleAI();
+  // Use dedicated AI client for Dream sidebar (independent from main app)
+  const [client] = useState(() => new SimpleAIClient('http://localhost:8080'));
   
   // Use app store for state management
   const { 
@@ -72,16 +164,16 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
     setDreamGeneratedImage,
     setDreamGenerating
   } = useAppStore();
+  
+  // Modern state management
   const [prompt, setPrompt] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [mode, setMode] = useState<'intelligent' | 'quick'>('intelligent');
-  const [analysis, setAnalysis] = useState<any>(null);
-  const [progress, setProgress] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<ImageMode>(imageModes[0]);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [localGeneratedImage, setLocalGeneratedImage] = useState<string | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<string>('');
 
-  // 自动填充、智能分析，并可选择自动发起专业请求
+  // Auto-fill input and smart mode detection
   React.useEffect(() => {
     if (triggeredInput && triggeredInput !== prompt) {
       logger.info(LogCategory.USER_INPUT, 'Dream sidebar received triggered input', {
@@ -89,191 +181,223 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
         previousPrompt: prompt
       });
       setPrompt(triggeredInput);
-      const aiAnalysis = analyzeUserInput(triggeredInput);
-      logger.debug(LogCategory.AI_MESSAGE, 'AI analysis completed', {
-        analysisType: aiAnalysis.type,
-        detectedStyle: aiAnalysis.detectedStyle,
-        workflow: aiAnalysis.workflow,
-        estimatedTime: aiAnalysis.estimatedTime
-      });
-      setAnalysis(aiAnalysis);
       
-      // Note: 不自动发起请求，让用户在专业界面中主动选择
-      console.log('🎨 Dream app ready for user interaction with pre-filled prompt');
-    }
-  }, [triggeredInput, prompt]);
-
-  // 实时智能分析
-  React.useEffect(() => {
-    if (prompt && mode === 'intelligent') {
-      logger.debug(LogCategory.USER_INPUT, 'Analyzing user prompt in intelligent mode', {
-        promptLength: prompt.length,
-        mode
+      // Smart mode detection based on input and available images
+      const bestMode = detectBestMode(triggeredInput, !!uploadedImage);
+      setSelectedMode(bestMode);
+      
+      logger.debug(LogCategory.AI_MESSAGE, 'Smart mode detected', {
+        modeId: bestMode.id,
+        modeName: bestMode.name,
+        hasImage: !!uploadedImage
       });
-      const aiAnalysis = analyzeUserInput(prompt);
-      logger.debug(LogCategory.AI_MESSAGE, 'Real-time analysis updated', {
-        analysisType: aiAnalysis.type,
-        workflowSteps: aiAnalysis.workflow.length
-      });
-      setAnalysis(aiAnalysis);
+      
+      console.log('🎨 Atomic Image Intelligence ready with smart mode:', bestMode.name);
     }
-  }, [prompt, mode]);
+  }, [triggeredInput, prompt, uploadedImage]);
 
-  // 监听centralized store的Dream state变化
+  // Restore generated image from global state when component mounts or reopens
   React.useEffect(() => {
-    // 当Dream state中有新的生成图片时，更新本地状态
-    if (dreamState.generatedImage && dreamState.generatedImage !== localGeneratedImage && isGenerating) {
-      console.log('🎨 DreamSidebar: Received generated image from centralized store:', dreamState.generatedImage);
+    if (dreamState.generatedImage && !localGeneratedImage) {
+      console.log('🎨 Restoring generated image from global state:', dreamState.generatedImage);
       setLocalGeneratedImage(dreamState.generatedImage);
-      
-      // 通知 main_app 生成完成
-      if (onImageGenerated) {
-        onImageGenerated(dreamState.generatedImage, prompt);
-      }
-      
-      // 停止生成状态
-      setIsGenerating(false);
-      setCurrentStep(0);
-      setProgress(100);
     }
-  }, [dreamState.generatedImage, localGeneratedImage, isGenerating]);
+  }, [dreamState.generatedImage, localGeneratedImage]);
 
-  // 停止生成（保留原有逻辑作为备用）
+  // Real-time mode recommendations
   React.useEffect(() => {
-    if (generatedImage && isGenerating) {
-      setIsGenerating(false);
-      setCurrentStep(0);
-      setProgress(0);
-      setLocalGeneratedImage(generatedImage);
-    }
-  }, [generatedImage, isGenerating]);
-
-  // Quick style options
-  const quickStyles = [
-    { id: 'photorealistic', name: 'Realistic', icon: '📸' },
-    { id: 'anime', name: 'Anime', icon: '🎨' },
-    { id: 'oil-painting', name: 'Artistic', icon: '🖼️' },
-    { id: 'cosmic', name: 'Sci-Fi', icon: '🌌' }
-  ];
-
-  // Intelligent creation processing
-  const handleIntelligentCreation = async () => {
-    if (!prompt.trim() || !client || isGenerating || !analysis) return;
-
-    const traceId = logger.startTrace('INTELLIGENT_CREATION');
-    logger.info(LogCategory.USER_INPUT, 'Starting intelligent creation', {
-      promptLength: prompt.length,
-      analysisType: analysis.type,
-      workflowSteps: analysis.workflow.length,
-      hasUploadedImage: !!uploadedImage
-    });
-
-    setIsGenerating(true);
-    setCurrentStep(0);
-    setProgress(0);
-
-    try {
-      const { workflow, type } = analysis;
-      
-      for (let i = 0; i < workflow.length; i++) {
-        logger.info(LogCategory.STATE_CHANGE, `Intelligent creation step ${i + 1}`, {
-          step: i + 1,
-          totalSteps: workflow.length,
-          workflowStep: workflow[i]
+    if (prompt.trim()) {
+      const bestMode = detectBestMode(prompt, !!uploadedImage);
+      if (bestMode.id !== selectedMode.id) {
+        setSelectedMode(bestMode);
+        logger.debug(LogCategory.USER_INPUT, 'Mode recommendation updated', {
+          newMode: bestMode.id,
+          previousMode: selectedMode.id
         });
+      }
+    }
+  }, [prompt, uploadedImage, selectedMode.id]);
+
+  // Listen for Atomic Image Intelligence responses
+  React.useEffect(() => {
+    if (!client) return;
+
+    const handleImageResponse = (message: any) => {
+      // Since we use a dedicated client, all responses are for this Dream app
+      if (message.role === 'assistant' && isProcessing) {
+        console.log('🎨 AtomicImageIntelligence: Received response:', message);
         
-        setCurrentStep(i);
-        setProgress(((i + 1) / workflow.length) * 100);
-        
-        // Simulate processing steps
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        if (i === 0) {
-          // First step: Basic generation
-          const requestId = `dream-intelligent-${Date.now()}`;
-          const messageData = {
-            sender: 'dream-app', 
-            app: 'dream',
-            requestId,
-            workflow: 'intelligent',
-            step: i + 1,
-            totalSteps: workflow.length,
-            style: analysis.detectedStyle,
-            hasImage: !!uploadedImage,
-            imageData: uploadedImage,
-            original_prompt: prompt
-          };
+        // Extract image URL from response content (markdown with JSON code block)
+        let imageUrl = null;
+        try {
+          if (message.content) {
+            // Extract JSON from markdown code block ```json ... ```
+            const jsonMatch = message.content.match(/```json\s*\n([\s\S]*?)\n```/);
+            if (jsonMatch) {
+              const jsonContent = jsonMatch[1];
+              const parsed = JSON.parse(jsonContent);
+              
+              if (parsed.media_items && parsed.media_items.length > 0) {
+                const imageItem = parsed.media_items.find((item: any) => item.type === 'image');
+                if (imageItem && imageItem.url) {
+                  imageUrl = imageItem.url;
+                  console.log('🖼️ AtomicImageIntelligence: Image URL extracted from markdown JSON:', imageUrl);
+                }
+              }
+            } else {
+              // Fallback: try parsing content directly as JSON
+              const parsed = JSON.parse(message.content);
+              if (parsed.media_items && parsed.media_items.length > 0) {
+                const imageItem = parsed.media_items.find((item: any) => item.type === 'image');
+                if (imageItem && imageItem.url) {
+                  imageUrl = imageItem.url;
+                  console.log('🖼️ AtomicImageIntelligence: Image URL extracted from direct JSON:', imageUrl);
+                }
+              }
+            }
+          }
           
-          logger.trackAPICall('sendMessage', 'POST', messageData);
+          // Fallback: check metadata for media_items (old format)
+          if (!imageUrl && message.metadata?.media_items) {
+            const imageItem = message.metadata.media_items.find((item: any) => item.type === 'image');
+            if (imageItem && imageItem.url) {
+              imageUrl = imageItem.url;
+              console.log('🖼️ AtomicImageIntelligence: Image URL found in metadata:', imageUrl);
+            }
+          }
+        } catch (e) {
+          console.log('🔍 Failed to parse content, checking metadata for image URL');
+          // Fallback: check metadata for media_items
+          if (message.metadata?.media_items) {
+            const imageItem = message.metadata.media_items.find((item: any) => item.type === 'image');
+            if (imageItem && imageItem.url) {
+              imageUrl = imageItem.url;
+              console.log('🖼️ AtomicImageIntelligence: Image URL found in metadata:', imageUrl);
+            }
+          }
+        }
+        
+        if (imageUrl) {
+          // Update local state
+          setLocalGeneratedImage(imageUrl);
+          setIsProcessing(false);
+          setProcessingStatus('');
           
-          // 发送消息到共享的 AI 后端 - let centralized store handle response
-          await client.sendMessage(prompt, messageData);
+          // Update centralized store
+          setDreamGeneratedImage(imageUrl);
+          
+          // Notify main_app to create artifact
+          if (onImageGenerated) {
+            onImageGenerated(imageUrl, prompt);
+          }
+          
+          console.log('✅ AtomicImageIntelligence: Processing complete');
         }
       }
-    } catch (error) {
-      logger.error(LogCategory.API_CALL, 'Intelligent creation failed', { error: error instanceof Error ? error.message : String(error) });
-      console.error('Intelligent creation failed:', error);
-      setIsGenerating(false);
-      setCurrentStep(0);
-      setProgress(0);
+    };
+
+    // Listen for processing status updates
+    const handleProcessingStatus = (data: any) => {
+      if (isProcessing && data.status) {
+        console.log('📊 AtomicImageIntelligence: Status update:', data.status);
+        setProcessingStatus(data.status);
+      }
+    };
+
+    const unsubscribeMessage = client.on('message:received', handleImageResponse);
+    const unsubscribeStatus = client.on('streaming:status', handleProcessingStatus);
+    
+    return () => {
+      unsubscribeMessage?.();
+      unsubscribeStatus?.();
+    };
+  }, [client, isProcessing, prompt, onImageGenerated, setDreamGeneratedImage]);
+
+  // Handle external image updates
+  React.useEffect(() => {
+    if (generatedImage && isProcessing) {
+      setIsProcessing(false);
+      setProcessingStatus('');
+      setLocalGeneratedImage(generatedImage);
     }
-    
-    logger.endTrace();
-  };
+  }, [generatedImage, isProcessing]);
 
-  // Quick generation processing
-  const handleQuickGeneration = async (style?: string) => {
-    if (!prompt.trim() || !client || isGenerating) return;
-
-    const traceId = logger.startTrace('QUICK_GENERATION');
-    const selectedStyle = style || 'photorealistic';
+  // Handle image processing with Atomic Image Intelligence
+  const handleImageProcessing = async () => {
+    if (!prompt.trim() || !client || isProcessing) return;
     
-    logger.info(LogCategory.USER_INPUT, 'Starting quick generation', {
+    // Check if mode requires image but none is uploaded
+    if (selectedMode.requiresImage && !uploadedImage) {
+      alert(`${selectedMode.name} requires an uploaded image. Please upload an image first.`);
+      return;
+    }
+
+    logger.startTrace('ATOMIC_IMAGE_PROCESSING');
+    logger.info(LogCategory.USER_INPUT, 'Starting Atomic Image Intelligence processing', {
       promptLength: prompt.length,
-      selectedStyle,
-      hasUploadedImage: !!uploadedImage
+      modeId: selectedMode.id,
+      modeName: selectedMode.name,
+      hasUploadedImage: !!uploadedImage,
+      estimatedCost: selectedMode.cost
     });
 
-    setIsGenerating(true);
+    setIsProcessing(true);
+    setProcessingStatus(`Processing with ${selectedMode.name}...`);
     
     try {
-      const requestId = `dream-quick-${Date.now()}`;
+      const requestId = `atomic-image-${Date.now()}`;
+      
+      // Map mode to template_id (prompt name)
+      const templateId = `${selectedMode.id}_prompt`;
+      
       const messageData = {
-        sender: 'dream-app', 
-        app: 'dream',
-        requestId,
-        workflow: 'quick',
-        style: selectedStyle,
-        hasImage: !!uploadedImage,
-        imageData: uploadedImage,
-        original_prompt: prompt
+        message: prompt,
+        template_parameters: {
+          app_id: "dream",
+          template_id: templateId,
+          prompt_args: {
+            prompt: prompt,
+            input_image: uploadedImage || null,
+            quality: 'high',
+            style_preset: 'auto',
+            mode: selectedMode.id
+          }
+        },
+        // Keep metadata for tracking
+        metadata: {
+          sender: 'atomic-image-app',
+          app: 'dream', 
+          requestId,
+          processing_mode: selectedMode.id,
+          estimated_time: selectedMode.estimatedTime,
+          estimated_cost: selectedMode.cost
+        }
       };
       
       logger.trackAPICall('sendMessage', 'POST', messageData);
       
-      // 发送消息到共享的 AI 后端 - let centralized store handle response
+      // Send request to Atomic Image Intelligence Service with new template structure
       await client.sendMessage(prompt, messageData);
+      
+      console.log('🚀 AtomicImageIntelligence: Request sent with mode:', selectedMode.name);
     } catch (error) {
-      logger.error(LogCategory.API_CALL, 'Quick generation failed', { error: error instanceof Error ? error.message : String(error) });
-      console.error('Quick generation failed:', error);
-      setIsGenerating(false);
+      logger.error(LogCategory.API_CALL, 'Atomic Image Intelligence processing failed', { 
+        error: error instanceof Error ? error.message : String(error),
+        mode: selectedMode.id
+      });
+      console.error('Atomic Image Intelligence processing failed:', error);
+      setIsProcessing(false);
+      setProcessingStatus('');
     }
     
     logger.endTrace();
   };
 
-  const workflowSteps = [
-    { name: 'Base Scene Generation', icon: '🎨' },
-    { name: 'Style Enhancement', icon: '✨' },
-    { name: 'Video Animation', icon: '🎬' },
-    { name: 'Audio Synthesis', icon: '🎤' }
-  ];
-
-  // Handle file upload
+  // Handle file upload with smart mode detection
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      logger.info(LogCategory.USER_INPUT, 'Image file uploaded', {
+      logger.info(LogCategory.USER_INPUT, 'Image file uploaded for Atomic Image Intelligence', {
         fileName: file.name,
         fileSize: file.size,
         fileType: file.type
@@ -282,53 +406,43 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
-        logger.debug(LogCategory.STATE_CHANGE, 'Image uploaded and processed', {
-          dataLength: result.length
-        });
         setUploadedImage(result);
+        
+        // Update mode recommendation based on having an image
+        if (prompt.trim()) {
+          const bestMode = detectBestMode(prompt, true);
+          setSelectedMode(bestMode);
+          logger.debug(LogCategory.AI_MESSAGE, 'Mode updated after image upload', {
+            newMode: bestMode.id,
+            modeName: bestMode.name
+          });
+        }
+        
+        logger.debug(LogCategory.STATE_CHANGE, 'Image uploaded and mode updated', {
+          dataLength: result.length,
+          selectedMode: selectedMode.id
+        });
       };
       reader.readAsDataURL(file);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Mode Toggle */}
-      <div className="flex bg-white/5 rounded-lg p-1">
-        <button
-          onClick={() => {
-            logger.info(LogCategory.SIDEBAR_INTERACTION, 'Mode switched to intelligent', { previousMode: mode });
-            setMode('intelligent');
-          }}
-          className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
-            mode === 'intelligent'
-              ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
-              : 'text-white/70 hover:text-white/90'
-          }`}
-        >
-          🧠 Intelligent
-        </button>
-        <button
-          onClick={() => {
-            logger.info(LogCategory.SIDEBAR_INTERACTION, 'Mode switched to quick', { previousMode: mode });
-            setMode('quick');
-          }}
-          className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
-            mode === 'quick'
-              ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white'
-              : 'text-white/70 hover:text-white/90'
-          }`}
-        >
-          ⚡ Quick
-        </button>
+    <div className="space-y-4">
+      {/* Compact Mode Header */}
+      <div className="flex items-center gap-3 p-2 bg-purple-500/10 rounded border border-purple-500/20">
+        <span className="text-lg">{selectedMode.icon}</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-white truncate">{selectedMode.name}</div>
+          <div className="flex gap-3 text-xs text-white/50">
+            <span>{selectedMode.cost}</span>
+            <span>{selectedMode.estimatedTime}</span>
+          </div>
+        </div>
       </div>
 
-      {/* Main Input Area */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-medium text-white/80">
-          {mode === 'intelligent' ? '🎯 Creative Request (AI Analysis)' : '💭 Image Description'}
-        </h3>
-        
+      {/* Compact Input Area */}
+      <div className="space-y-3">
         <textarea
           value={prompt}
           onChange={(e) => {
@@ -337,19 +451,19 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
               logger.debug(LogCategory.USER_INPUT, 'Prompt text changed', {
                 oldLength: prompt.length,
                 newLength: newValue.length,
-                mode
+                selectedMode: selectedMode.id
               });
             }
             setPrompt(newValue);
           }}
-          placeholder={mode === 'intelligent' 
-            ? "Create a cyberpunk city promotional video with futuristic effects..." 
-            : "A mystical forest with glowing mushrooms and fireflies..."}
-          className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none"
-          rows={3}
+          placeholder={selectedMode.requiresImage 
+            ? `Describe changes for ${selectedMode.name.toLowerCase()}...`
+            : "Describe what you want to create..."}
+          className="w-full p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
+          rows={2}
         />
 
-        {/* Upload Area - Simplified */}
+        {/* Compact Upload */}
         <input
           type="file"
           accept="image/*"
@@ -359,207 +473,231 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
         />
         <label
           htmlFor="image-upload"
-          className="flex items-center justify-center w-full p-3 border border-dashed border-white/20 rounded-lg cursor-pointer hover:border-white/40 transition-all hover:bg-white/5"
+          className={`flex items-center gap-2 w-full p-2 border border-dashed rounded cursor-pointer transition-all text-sm ${
+            selectedMode.requiresImage 
+              ? 'border-orange-500/50 bg-orange-500/5 hover:border-orange-500' 
+              : 'border-white/20 hover:border-white/40'
+          }`}
         >
           {uploadedImage ? (
-            <div className="flex items-center gap-3">
-              <img src={uploadedImage} alt="Uploaded" className="w-8 h-8 object-cover rounded" />
-              <span className="text-white/70 text-sm">Image uploaded - Click to change</span>
-            </div>
+            <>
+              <img src={uploadedImage} alt="Uploaded" className="w-6 h-6 object-cover rounded" />
+              <span className="text-white/70 text-xs">Image uploaded</span>
+            </>
           ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-lg">📷</span>
-              <span className="text-white/60 text-sm">Upload image (optional)</span>
-            </div>
+            <>
+              <span>📷</span>
+              <span className={selectedMode.requiresImage ? 'text-orange-300' : 'text-white/60'}>
+                {selectedMode.requiresImage ? 'Required' : 'Optional'}
+              </span>
+            </>
           )}
         </label>
       </div>
 
-      {/* Intelligent Mode - AI Analysis Results */}
-      {mode === 'intelligent' && analysis && (
-        <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-lg">🤖</span>
-            <span className="text-sm font-medium text-white/90">AI Analysis</span>
-          </div>
-          
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-blue-400">📊</span>
-              <span className="text-white/80">{analysis.description}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-yellow-400">⏱️</span>
-              <span className="text-white/80">Estimated Time: {analysis.estimatedTime}</span>
-            </div>
-          </div>
-
-          {/* Smart Workflow - Simplified */}
-          {analysis.workflow.length > 1 && (
-            <div className="mt-3">
-              <div className="flex items-center gap-2 text-sm text-white/70">
-                <span>🔄</span>
-                <span>Multi-step workflow: {analysis.workflow.length} stages</span>
-                {isGenerating && (
-                  <span className="text-blue-400">
-                    ({currentStep + 1}/{analysis.workflow.length})
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
+      {/* Compact Mode Selector */}
+      <div>
+        <div className="text-xs text-white/60 mb-2">🎯 Modes</div>
+        <div className="grid grid-cols-3 gap-1 max-h-48 overflow-y-auto">
+          {imageModes.map((mode) => (
+            <button
+              key={mode.id}
+              onClick={() => {
+                setSelectedMode(mode);
+                logger.info(LogCategory.SIDEBAR_INTERACTION, 'Mode selected', { 
+                  modeId: mode.id,
+                  modeName: mode.name,
+                  requiresImage: mode.requiresImage
+                });
+              }}
+              disabled={mode.requiresImage && !uploadedImage}
+              className={`p-2 rounded border transition-all text-center ${
+                selectedMode.id === mode.id
+                  ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+                  : mode.requiresImage && !uploadedImage
+                    ? 'bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed opacity-50'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
+              }`}
+              title={`${mode.name} - ${mode.description} (${mode.cost}, ${mode.estimatedTime})`}
+            >
+              <div className="text-sm mb-1">{mode.icon}</div>
+              <div className="text-xs font-medium truncate">{mode.name}</div>
+              <div className="text-xs text-white/40">{mode.cost}</div>
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
-      {/* Quick Mode - Style Selection */}
-      {mode === 'quick' && (
-        <div>
-          <h3 className="text-sm font-medium text-white/80 mb-3">🎨 Quick Styles</h3>
-          <div className="flex flex-wrap gap-2">
-            {quickStyles.map((style) => (
-              <button
-                key={style.id}
-                onClick={() => handleQuickGeneration(style.id)}
-                disabled={isGenerating}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
-              >
-                <span>{style.icon}</span>
-                <span>{style.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Generate Button */}
+      {/* Compact Process Button */}
       <button
-        onClick={mode === 'intelligent' ? handleIntelligentCreation : () => handleQuickGeneration()}
-        disabled={isGenerating || !prompt.trim() || (mode === 'intelligent' && !analysis)}
-        className={`w-full p-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg text-white font-medium transition-all hover:from-blue-600 hover:to-purple-600 flex items-center justify-center gap-2 ${
-          isGenerating ? 'animate-pulse' : ''
+        onClick={handleImageProcessing}
+        disabled={isProcessing || !prompt.trim() || (selectedMode.requiresImage && !uploadedImage)}
+        className={`w-full p-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded text-white font-medium transition-all hover:from-purple-600 hover:to-blue-600 flex items-center justify-center gap-2 text-sm ${
+          isProcessing ? 'animate-pulse' : ''
         } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
-        {isGenerating ? (
+        {isProcessing ? (
           <>
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-            {mode === 'intelligent' ? 
-              `Creating... ${progress.toFixed(0)}%` : 
-              'Generating...'
-            }
+            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            Processing...
           </>
         ) : (
           <>
-            <span>{mode === 'intelligent' ? '🚀' : '⚡'}</span>
-            {mode === 'intelligent' ? 'Start Creating' : 'Quick Generate'}
+            <span>{selectedMode.icon}</span>
+            Start
           </>
         )}
       </button>
 
-      {/* Generation Progress */}
-      {isGenerating && mode === 'intelligent' && progress > 0 && (
-        <div className="bg-white/5 rounded-lg p-3">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-white/80">Creation Progress</span>
-            <span className="text-sm text-white/60">{progress.toFixed(0)}%</span>
-          </div>
-          <div className="w-full bg-white/10 rounded-full h-2">
-            <div 
-              className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            ></div>
+      {/* Compact Processing Status */}
+      {isProcessing && (
+        <div className="bg-purple-500/10 border border-purple-500/20 rounded p-2">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin"></div>
+            <span className="text-xs text-purple-300">Processing {selectedMode.name}...</span>
           </div>
         </div>
       )}
 
-      {/* Creation Status */}
-      {isGenerating && (
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
-            <span className="text-sm text-blue-300">Creating your content...</span>
-          </div>
-          <p className="text-xs text-white/60">Results will appear here when ready</p>
-        </div>
-      )}
-
-      {/* Generated Image Display */}
+      {/* Generated Image Display with Actions */}
       {localGeneratedImage && (
-        <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-lg">🎨</span>
-            <span className="text-sm font-medium text-white/90">Generated Image</span>
+        <div className="bg-white/5 border border-white/10 rounded p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span>{selectedMode.icon}</span>
+              <span className="text-xs text-white/80">{selectedMode.name} Result</span>
+            </div>
+            <button 
+              onClick={() => setLocalGeneratedImage(null)}
+              className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/10"
+            >
+              ✕
+            </button>
           </div>
-          <div className="rounded-lg overflow-hidden">
+          
+          {/* Smaller Image Preview */}
+          <div className="rounded overflow-hidden mb-3">
             <img 
               src={localGeneratedImage} 
-              alt="Generated content" 
-              className="w-full h-auto rounded-lg"
+              alt="Generated Result" 
+              className="w-20 h-20 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => window.open(localGeneratedImage, '_blank')}
               onError={(e) => {
                 console.error('Failed to load generated image:', localGeneratedImage);
                 e.currentTarget.style.display = 'none';
               }}
             />
           </div>
-          <div className="flex gap-2 mt-3">
-            <button className="flex-1 py-2 px-3 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-sm rounded transition-all">
-              💾 Save
-            </button>
-            <button className="flex-1 py-2 px-3 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-sm rounded transition-all">
+          
+          {/* Image-to-Image Actions */}
+          <div className="space-y-2 mb-3">
+            <div className="text-xs text-white/60 mb-1">✨ Transform this image:</div>
+            <div className="grid grid-cols-2 gap-1">
+              <button 
+                onClick={() => {
+                  setSelectedMode(imageModes.find(m => m.id === 'image_to_image') || imageModes[1]);
+                  setUploadedImage(localGeneratedImage);
+                  setPrompt('Transform this image into a different style');
+                }}
+                className="py-1 px-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs rounded transition-all"
+                title="Transform this image"
+              >
+                🔄 Transform
+              </button>
+              <button 
+                onClick={() => {
+                  setSelectedMode(imageModes.find(m => m.id === 'style_transfer') || imageModes[2]);
+                  setUploadedImage(localGeneratedImage);
+                  setPrompt('Change the style of this image');
+                }}
+                className="py-1 px-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-xs rounded transition-all"
+                title="Change style"
+              >
+                🎨 Style
+              </button>
+              <button 
+                onClick={() => {
+                  setSelectedMode(imageModes.find(m => m.id === 'photo_inpainting') || imageModes[6]);
+                  setUploadedImage(localGeneratedImage);
+                  setPrompt('Remove unwanted objects from this image');
+                }}
+                className="py-1 px-2 bg-green-500/20 hover:bg-green-500/30 text-green-300 text-xs rounded transition-all"
+                title="Remove objects"
+              >
+                🔧 Edit
+              </button>
+              <button 
+                onClick={() => {
+                  setSelectedMode(imageModes.find(m => m.id === 'photo_outpainting') || imageModes[7]);
+                  setUploadedImage(localGeneratedImage);
+                  setPrompt('Extend the boundaries of this image');
+                }}
+                className="py-1 px-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 text-xs rounded transition-all"
+                title="Extend image"
+              >
+                📐 Extend
+              </button>
+            </div>
+          </div>
+          
+          {/* Primary Actions */}
+          <div className="flex gap-1">
+            <button 
+              onClick={() => {
+                handleImageProcessing();
+              }}
+              className="flex-1 py-2 px-3 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-xs rounded transition-all flex items-center justify-center gap-1"
+              title="Generate another with same prompt"
+            >
               🔄 Regenerate
+            </button>
+            <button 
+              onClick={() => {
+                const link = document.createElement('a');
+                link.href = localGeneratedImage;
+                link.download = `dream-${Date.now()}.jpg`;
+                link.click();
+              }}
+              className="flex-1 py-2 px-3 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs rounded transition-all flex items-center justify-center gap-1"
+              title="Download image"
+            >
+              💾 Save
             </button>
           </div>
         </div>
       )}
 
-      {/* Quick Suggestions & Tips */}
-      <div className="space-y-4">
-        <div>
-          <h4 className="text-sm font-medium text-white/80 mb-3">⚡ Quick Start</h4>
-          <div className="flex flex-wrap gap-2">
-            <button 
-              onClick={() => {
-                const newPrompt = "generate image of a cute cat";
-                logger.info(LogCategory.SIDEBAR_INTERACTION, 'Quick prompt selected', { 
-                  selectedPrompt: newPrompt,
-                  previousPrompt: prompt
-                });
-                setPrompt(newPrompt);
-              }}
-              className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-xs text-white/70 hover:text-white transition-all"
-            >
-              🐱 Cute cat
-            </button>
-            <button 
-              onClick={() => {
-                const newPrompt = "cyberpunk city at night with neon lights";
-                logger.info(LogCategory.SIDEBAR_INTERACTION, 'Quick prompt selected', { 
-                  selectedPrompt: newPrompt,
-                  previousPrompt: prompt
-                });
-                setPrompt(newPrompt);
-              }}
-              className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-xs text-white/70 hover:text-white transition-all"
-            >
-              🌃 Cyberpunk city
-            </button>
-            <button 
-              onClick={() => {
-                const newPrompt = "mystical forest with glowing mushrooms and fireflies";
-                logger.info(LogCategory.SIDEBAR_INTERACTION, 'Quick prompt selected', { 
-                  selectedPrompt: newPrompt,
-                  previousPrompt: prompt
-                });
-                setPrompt(newPrompt);
-              }}
-              className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-xs text-white/70 hover:text-white transition-all"
-            >
-              🍄 Mystical forest
-            </button>
-          </div>
-        </div>
-        
-        <div className="text-xs text-white/50">
-          💡 {mode === 'intelligent' ? 'AI automatically selects optimal processing workflow' : 'Quick generation of single images'} • Results appear in chat
+      {/* Compact Quick Ideas */}
+      <div>
+        <div className="text-xs text-white/60 mb-2">💡 Quick Ideas</div>
+        <div className="grid grid-cols-1 gap-1">
+          <button 
+            onClick={() => {
+              setPrompt("A majestic mountain landscape at golden hour");
+              setSelectedMode(imageModes[0]);
+            }}
+            className="p-1 bg-white/5 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition-all text-left"
+          >
+            🏔️ Mountain landscape
+          </button>
+          <button 
+            onClick={() => {
+              setPrompt("Transform this into a cyberpunk style");
+              setSelectedMode(imageModes[2]);
+            }}
+            className="p-1 bg-white/5 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition-all text-left"
+          >
+            🌃 Cyberpunk style
+          </button>
+          <button 
+            onClick={() => {
+              setPrompt("Make this look professional for LinkedIn");
+              setSelectedMode(imageModes[5]);
+            }}
+            className="p-1 bg-white/5 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition-all text-left"
+          >
+            👔 Professional headshot
+          </button>
         </div>
       </div>
     </div>

@@ -62,41 +62,90 @@ const MainAppContent: React.FC = () => {
 
     const handleStreamingStart = (data: any) => {
       console.log('🎬 STREAMING: Started', data);
-      setStreamingMessage({
-        id: `streaming-${Date.now()}`,
-        content: '',
-        status: 'starting'
-      });
+      // Only show streaming in chat if no app is currently handling the request
+      if (!showRightSidebar || !currentApp) {
+        setStreamingMessage({
+          id: `streaming-${Date.now()}`,
+          content: '',
+          status: 'starting'
+        });
+      }
     };
 
     const handleStreamingToken = (data: any) => {
       console.log('🔤 STREAMING: Token received', data);
-      appendToStreamingMessage(data.content || '');
+      // Only show streaming tokens in chat if no app is currently handling the request
+      if (!showRightSidebar || !currentApp) {
+        appendToStreamingMessage(data.content || '');
+      }
+    };
+
+    const handleCustomEvent = (data: any) => {
+      console.log('🔧 CUSTOM EVENT:', data);
+      
+      // Only process if no app is handling the request
+      if (!showRightSidebar || !currentApp) {
+        // Handle response_token events
+        try {
+          if (data.content && data.content.includes('response_token')) {
+            const match = data.content.match(/'response_token':\s*{[^}]*'token':\s*'([^']*)'}/);
+            if (match && match[1]) {
+              const token = match[1];
+              console.log('🔤 CUSTOM TOKEN:', token);
+              appendToStreamingMessage(token);
+            }
+          }
+          
+          // Handle tool calls and status updates
+          if (data.content && (data.content.includes('tool_call') || data.content.includes('function_call'))) {
+            console.log('🔧 TOOL CALL detected in custom event');
+            updateStreamingStatus('调用工具中');
+          }
+          
+          if (data.content && data.content.includes('status')) {
+            const statusMatch = data.content.match(/'status':\s*'([^']+)'/);
+            if (statusMatch && statusMatch[1]) {
+              console.log('📊 STATUS UPDATE from custom event:', statusMatch[1]);
+              updateStreamingStatus(statusMatch[1]);
+            }
+          }
+        } catch (e) {
+          console.log('Failed to parse custom event:', e);
+        }
+      }
     };
 
     const handleStreamingStatus = (data: any) => {
       console.log('📊 STREAMING: Status update', data);
-      updateStreamingStatus(data.status || 'processing');
+      // Only show streaming status in chat if no app is currently handling the request
+      if (!showRightSidebar || !currentApp) {
+        const status = data.status || data.message || 'processing';
+        console.log('📊 Updating streaming status:', status);
+        updateStreamingStatus(status);
+      }
     };
 
     const handleStreamingEnd = (data: any) => {
       console.log('🏁 STREAMING: Ended', data);
+      // Always clear streaming message
       setStreamingMessage(null);
     };
 
     // Set up streaming event listeners
     const unsubscribeStart = client.on('streaming:start', handleStreamingStart);
     const unsubscribeToken = client.on('token:received', handleStreamingToken);
+    const unsubscribeCustom = client.on('custom_event', handleCustomEvent);
     const unsubscribeStatus = client.on('streaming:status', handleStreamingStatus);
     const unsubscribeEnd = client.on('streaming:end', handleStreamingEnd);
 
     return () => {
       unsubscribeStart?.();
       unsubscribeToken?.();
+      unsubscribeCustom?.();
       unsubscribeStatus?.();
       unsubscribeEnd?.();
     };
-  }, [client, setStreamingMessage, appendToStreamingMessage, updateStreamingStatus]);
+  }, [client, setStreamingMessage, appendToStreamingMessage, updateStreamingStatus, showRightSidebar, currentApp]);
 
   // Listen to AI messages for artifact creation
   useEffect(() => {
@@ -115,10 +164,34 @@ const MainAppContent: React.FC = () => {
         mediaItemsCount: message.metadata?.media_items?.length || 0
       });
 
-      // Add AI message to store for chat display
-      if (message.role === 'assistant') {
+      // Add AI message to store for chat display ONLY if it's not from an app
+      if (message.role === 'assistant' && !message.metadata?.sender) {
+        // Only show chat messages for non-app requests
         // Create brief chat message based on content type
         let chatContent = message.content;
+        
+        // Parse JSON response - handle both direct JSON and markdown format
+        try {
+          // First try direct JSON parsing
+          const parsed = JSON.parse(message.content);
+          if (parsed.formatted_content) {
+            chatContent = parsed.formatted_content;
+          }
+        } catch (e) {
+          // Try extracting JSON from markdown code block
+          try {
+            const jsonMatch = message.content.match(/```json\s*\n([\s\S]*?)\n```/);
+            if (jsonMatch) {
+              const jsonContent = jsonMatch[1];
+              const parsed = JSON.parse(jsonContent);
+              if (parsed.formatted_content) {
+                chatContent = parsed.formatted_content;
+              }
+            }
+          } catch (e2) {
+            // Not JSON in any format, use content as-is
+          }
+        }
         
         // If this has media items (images), show a brief message in chat
         if (message.metadata?.media_items && message.metadata.media_items.length > 0) {
@@ -128,8 +201,8 @@ const MainAppContent: React.FC = () => {
           }
         }
         // If content is very long, truncate for chat display
-        else if (message.content && message.content.length > 200) {
-          chatContent = message.content.substring(0, 200) + '... [View full response in app]';
+        else if (chatContent && chatContent.length > 200) {
+          chatContent = chatContent.substring(0, 200) + '... [View full response in app]';
         }
         
         addMessage({
@@ -140,103 +213,18 @@ const MainAppContent: React.FC = () => {
           metadata: message.metadata
         });
         setIsTyping(false);
+      } else if (message.role === 'assistant' && message.metadata?.sender) {
+        // For app-specific responses, only stop typing - no chat message
+        console.log('🚫 Blocking chat message from app response, sender:', message.metadata.sender);
+        setIsTyping(false);
       }
       
       // Route based on sender, or handle chat responses without sender
       if (message.role === 'assistant' && message.content) {
         const sender = message.metadata?.sender;
         
-        // Handle responses from app-specific requests (private requests)
-        if (sender) {
-          if (sender === 'dream-app' && currentApp === 'dream') {
-          logger.info(LogCategory.AI_MESSAGE, 'Processing Dream app response', { sender, currentApp });
-          console.log('🎨 Processing Dream app response');
-          
-          // 提取图片URL从AI响应中（优先从 media_items）
-          let imageUrl = 'https://via.placeholder.com/400x300/4F46E5/white?text=Generated+Content';
-          
-          // 优先从 media_items 中提取
-          if (message.metadata?.media_items && message.metadata.media_items.length > 0) {
-            const imageItem = message.metadata.media_items.find((item: any) => item.type === 'image');
-            if (imageItem && imageItem.url) {
-              imageUrl = imageItem.url;
-              console.log('🖼️ Extracted image URL from media_items:', imageUrl);
-            }
-          }
-          // 备用：从消息内容中提取
-          else if (message.content) {
-            const imageUrlMatch = message.content.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
-            if (imageUrlMatch) {
-              imageUrl = imageUrlMatch[0];
-              console.log('🖼️ Extracted image URL from content:', imageUrl);
-            }
-          }
-          
-          setPendingArtifact({
-            imageUrl,
-            userInput: triggeredAppInput || 'Image generation',
-            timestamp: Date.now(),
-            aiResponse: message.content,
-            messageId: message.id
-          });
-        } else if (sender === 'omni-app' && currentApp === 'omni') {
-          console.log('⚡ Processing Omni app response');
-          setPendingArtifact({
-            textContent: message.content,
-            userInput: triggeredAppInput || 'Content generation',
-            timestamp: Date.now(),
-            messageId: message.id
-          });
-        } else if (sender === 'hunt-app' && currentApp === 'hunt') {
-          console.log('🔍 Processing Hunt app response');
-          setPendingArtifact({
-            textContent: message.content,
-            userInput: triggeredAppInput || 'Product search',
-            timestamp: Date.now(),
-            aiResponse: message.content,
-            messageId: message.id
-          });
-        } else if (sender === 'digitalhub-app' && currentApp === 'digitalhub') {
-          console.log('📁 Processing Digital Hub app response');
-          setPendingArtifact({
-            textContent: message.content,
-            userInput: triggeredAppInput || 'File management',
-            timestamp: Date.now(),
-            aiResponse: message.content,
-            messageId: message.id
-          });
-        } else if (sender === 'assistant-app' && currentApp === 'assistant') {
-          console.log('🤖 Processing Assistant app response');
-          setPendingArtifact({
-            textContent: message.content,
-            userInput: triggeredAppInput || 'Assistant help',
-            timestamp: Date.now(),
-            aiResponse: message.content,
-            messageId: message.id
-          });
-        } else if (sender === 'data-scientist-app' && currentApp === 'data-scientist') {
-          console.log('📊 Processing Data Scientist app response');
-          setPendingArtifact({
-            textContent: message.content,
-            userInput: triggeredAppInput || 'Data analysis',
-            timestamp: Date.now(),
-            aiResponse: message.content,
-            messageId: message.id
-          });
-        } else if (sender === 'doc-app' && currentApp === 'doc') {
-          console.log('📄 Processing Doc app response');
-          setPendingArtifact({
-            textContent: message.content,
-            userInput: triggeredAppInput || 'Document processing',
-            timestamp: Date.now(),
-            aiResponse: message.content,
-            messageId: message.id
-          });
-          } else {
-            logger.debug(LogCategory.AI_MESSAGE, 'Message from different sender, not processing', { sender, currentApp });
-            console.log('📨 Message from different sender, not processing:', { sender, currentApp });
-          }
-        } else {
+        // Apps now use dedicated clients, so main app only handles its own responses (no sender)
+        if (!sender) {
           // Handle chat responses without sender (normal chat flow) - create artifacts for media content
           if (message.metadata?.media_items && message.metadata.media_items.length > 0) {
             logger.info(LogCategory.AI_MESSAGE, 'Processing chat response with media items', { currentApp, mediaItemsCount: message.metadata.media_items.length });
@@ -271,6 +259,8 @@ const MainAppContent: React.FC = () => {
                 });
               } else if (currentApp === 'dream' && showRightSidebar) {
                 // Create artifact if Dream app is already open
+                console.log('🎨 Dream app is open, setting image URL and creating artifact:', imageItem.url);
+                setDreamGeneratedImage(imageItem.url);
                 setPendingArtifact({
                   imageUrl: imageItem.url,
                   userInput: triggeredAppInput || 'Generated image from AI',
@@ -284,7 +274,7 @@ const MainAppContent: React.FC = () => {
             }
             
             // Handle text content for other apps
-            else if (currentApp === 'omni' || currentApp === 'hunt' || currentApp === 'digitalhub' || currentApp === 'assistant' || currentApp === 'data-scientist' || currentApp === 'doc') {
+            else if (currentApp === 'omni' || currentApp === 'hunt' || currentApp === 'assistant' || currentApp === 'data-scientist' || currentApp === 'knowledge') {
               // Create text artifact for other apps
               console.log('📄 Creating text artifact from chat response for app:', currentApp);
               setPendingArtifact({
@@ -437,42 +427,6 @@ const MainAppContent: React.FC = () => {
         }
       }
       
-      // Handle Digital Hub app artifacts
-      if (currentApp === 'digitalhub' && pendingArtifact.textContent) {
-        const { textContent, userInput, timestamp, messageId } = pendingArtifact;
-        
-        const existingArtifact = artifacts.find(a => 
-          a.generatedContent?.metadata?.messageId === messageId
-        );
-        
-        if (!existingArtifact) {
-          console.log('📦 Creating digitalhub management artifact');
-          const artifact: AppArtifact = {
-            id: `artifact-${timestamp}`,
-            appId: 'digitalhub',
-            appName: 'Digital Hub Manager',
-            appIcon: '📁',
-            title: 'File Management Plan',
-            userInput: userInput,
-            createdAt: new Date(timestamp).toISOString(),
-            isOpen: true,
-            generatedContent: {
-              type: 'text',
-              content: textContent,
-              metadata: {
-                generatedAt: new Date(timestamp).toISOString(),
-                prompt: userInput,
-                messageId: messageId,
-                managementType: 'file_organization'
-              }
-            }
-          };
-          
-          setArtifacts(prev => [...prev, artifact]);
-          // client?.emit('artifact:created', artifact); // emit is private
-        }
-      }
-      
       // Handle Assistant app artifacts
       if (currentApp === 'assistant' && pendingArtifact.textContent) {
         const { textContent, userInput, timestamp, messageId } = pendingArtifact;
@@ -545,8 +499,8 @@ const MainAppContent: React.FC = () => {
         }
       }
       
-      // Handle Doc app artifacts
-      if (currentApp === 'doc' && pendingArtifact.textContent) {
+      // Handle Knowledge app artifacts
+      if (currentApp === 'knowledge' && pendingArtifact.textContent) {
         const { textContent, userInput, timestamp, messageId } = pendingArtifact;
         
         const existingArtifact = artifacts.find(a => 
@@ -554,13 +508,13 @@ const MainAppContent: React.FC = () => {
         );
         
         if (!existingArtifact) {
-          console.log('📦 Creating document processing artifact');
+          console.log('📦 Creating knowledge processing artifact');
           const artifact: AppArtifact = {
             id: `artifact-${timestamp}`,
-            appId: 'doc',
-            appName: 'DocIntell AI',
-            appIcon: '📄',
-            title: 'Document Processing Results',
+            appId: 'knowledge',
+            appName: 'Knowledge Hub',
+            appIcon: '🧠',
+            title: 'Knowledge Analysis Results',
             userInput: userInput,
             createdAt: new Date(timestamp).toISOString(),
             isOpen: true,
@@ -571,7 +525,7 @@ const MainAppContent: React.FC = () => {
                 generatedAt: new Date(timestamp).toISOString(),
                 prompt: userInput,
                 messageId: messageId,
-                processingType: 'document_analysis'
+                processingType: 'knowledge_analysis'
               }
             }
           };
@@ -625,11 +579,11 @@ const MainAppContent: React.FC = () => {
       triggers: ['search', 'product', 'buy', 'compare', 'shop'],
     },
     {
-      id: 'digitalhub',
-      name: 'Digital Hub',
-      description: 'File management and organization',
-      icon: '📁',
-      triggers: ['file', 'document', 'organize', 'storage'],
+      id: 'knowledge',
+      name: 'Knowledge Hub',
+      description: 'Advanced document analysis with vector and graph RAG',
+      icon: '🧠',
+      triggers: ['document', 'analyze', 'knowledge', 'pdf', 'file', 'graph', 'vector', 'rag'],
     },
     {
       id: 'assistant',
@@ -675,7 +629,7 @@ const MainAppContent: React.FC = () => {
     };
     
     setArtifacts(prev => [...prev, artifact]);
-    setDreamGeneratedImage(imageUrl);
+    // Note: setDreamGeneratedImage already called by Dream sidebar
     
     // Emit event to chat layer
     // client?.emit('artifact:created', artifact); // emit is private
@@ -689,6 +643,11 @@ const MainAppContent: React.FC = () => {
       dreamGeneratedImage={dreamGeneratedImage}
       onCloseApp={closeApp}
       onDreamImageGenerated={handleDreamImageGenerated}
+      onAppSelect={(appId: string) => {
+        console.log('🚀 Opening app from sidebar:', appId);
+        setCurrentApp(appId as AppId);
+        setTriggeredAppInput(''); // Clear any previous input
+      }}
     />
   );
 
@@ -754,7 +713,17 @@ const MainAppContent: React.FC = () => {
             onBeforeSend: (message: string) => {
               const traceId = logger.startTrace('USER_INPUT_PROCESSING');
               logger.trackUserInput(message, { currentApp, showRightSidebar });
-              console.log('🚀 Trigger test: Checking message:', message, { currentApp, showRightSidebar });
+              console.log('🚀 State check: Current state:', { currentApp, showRightSidebar });
+              
+              // Always add user message to chat first
+              const userMessage = {
+                id: `user-${Date.now()}`,
+                role: 'user' as const,
+                content: message,
+                timestamp: new Date().toISOString(),
+                metadata: {}
+              };
+              addMessage(userMessage);
               
               // Check if message contains app trigger words
               const lowerMessage = message.toLowerCase();
@@ -765,33 +734,33 @@ const MainAppContent: React.FC = () => {
                   logger.trackAppTrigger(app.id, matchingTrigger, message);
                   console.log('🎯 App trigger detected!', { app: app.name, trigger: matchingTrigger, currentApp, showRightSidebar });
                   
-                  // If the app is already open, send message normally (user is using the app)
+                  // If the app is already open, let chat send normally (user is using chat while app is open)
                   if (currentApp === app.id && showRightSidebar) {
-                    logger.info(LogCategory.USER_INPUT, 'App already open, sending message normally', { appId: app.id });
-                    console.log('✅ App already open, sending message normally');
+                    logger.info(LogCategory.USER_INPUT, 'App already open, chat sends to API', { appId: app.id });
+                    console.log('✅ App already open, chat will send to API');
                     logger.endTrace();
                     return message;
                   }
                   
-                  // If app is not open, open it and allow message to continue
-                  logger.info(LogCategory.APP_TRIGGER, 'Opening app and allowing message', { appId: app.id, trigger: matchingTrigger });
-                  console.log('📱 Opening app and allowing message');
+                  // If app is not open, open it and let APP handle the API request
+                  logger.info(LogCategory.APP_TRIGGER, 'Opening app, app will handle API request', { appId: app.id, trigger: matchingTrigger });
+                  console.log('📱 Opening app, blocking chat API request - app will handle');
                   setTimeout(() => {
                     setCurrentApp(app.id as AppId);
                     setShowRightSidebar(true);
                     setTriggeredAppInput(message);
                     logger.info(LogCategory.APP_TRIGGER, 'App opened successfully', { appId: app.id });
-                    console.log('✨ App opened:', app.id);
+                    console.log('✨ App opened and will handle API request:', app.id);
                   }, 1000);
                   
-                  // Allow message to continue to chat - return message
+                  // BLOCK chat API call since app will handle it
                   logger.endTrace();
-                  return message;
+                  return null;
                 }
               }
               
-              // No app triggered, send message normally
-              logger.info(LogCategory.USER_INPUT, 'No app trigger detected, sending to API', { messageLength: message.length });
+              // No app triggered, current state is chat, let chat send to API
+              logger.info(LogCategory.USER_INPUT, 'No app trigger detected, chat sends to API', { messageLength: message.length });
               logger.endTrace();
               return message;
             },
@@ -802,13 +771,13 @@ const MainAppContent: React.FC = () => {
               });
               console.log('📎 Files selected:', files);
               if (files.length > 0) {
-                const fileMessage = `Organize ${files.length} file${files.length > 1 ? 's' : ''}: ${Array.from(files).map(f => f.name).join(', ')}`;
+                const fileMessage = `Analyze ${files.length} document${files.length > 1 ? 's' : ''}: ${Array.from(files).map(f => f.name).join(', ')}`;
                 setTimeout(() => {
-                  setCurrentApp('digitalhub' as AppId);
+                  setCurrentApp('knowledge' as AppId);
                   setShowRightSidebar(true);
                   setTriggeredAppInput(fileMessage);
-                  logger.info(LogCategory.APP_TRIGGER, 'Opened digitalhub app for files', { fileCount: files.length });
-                  console.log('📁 Opened digitalhub app for files');
+                  logger.info(LogCategory.APP_TRIGGER, 'Opened knowledge app for files', { fileCount: files.length });
+                  console.log('🧠 Opened knowledge app for files');
                 }, 500);
               }
             }

@@ -1,0 +1,1642 @@
+[
+  {
+    "eventNumber": 1,
+    "timestamp": "2025-07-20T10:57:15.330Z",
+    "type": "start",
+    "content": "🚀 Starting chat processing with enhanced LangGraph streaming",
+    "raw": "{\"type\": \"start\", \"content\": \"🚀 Starting chat processing with enhanced LangGraph streaming\", \"timestamp\": \"2025-07-20T03:57:15.314594\", \"session_id\": \"default\", \"trace_id\": \"af77037a-ad5e-41e8-852c-eeeb56a13ea7\"}"
+  },
+  {
+    "eventNumber": 2,
+    "timestamp": "2025-07-20T10:57:15.364Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'entry_preparation': {'status': 'starting', 'session_id': 'default'}}",
+    "metadata": {
+      "raw_chunk": {
+        "entry_preparation": {
+          "status": "starting",
+          "session_id": "default"
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'entry_preparation': {'status': 'starting', 'session_id': 'default'}}\", \"timestamp\": \"2025-07-20T03:57:15.363651\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"entry_preparation\": {\"status\": \"starting\", \"session_id\": \"default\"}}}}"
+  },
+  {
+    "eventNumber": 3,
+    "timestamp": "2025-07-20T10:57:16.911Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'entry_preparation': {'status': 'completed', 'tools_found': 7, 'has_session_memory': False, 'template_used': False, 'session_validated': True}}",
+    "metadata": {
+      "raw_chunk": {
+        "entry_preparation": {
+          "status": "completed",
+          "tools_found": 7,
+          "has_session_memory": false,
+          "template_used": false,
+          "session_validated": true
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'entry_preparation': {'status': 'completed', 'tools_found': 7, 'has_session_memory': False, 'template_used': False, 'session_validated': True}}\", \"timestamp\": \"2025-07-20T03:57:16.911062\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"entry_preparation\": {\"status\": \"completed\", \"tools_found\": 7, \"has_session_memory\": false, \"template_used\": false, \"session_validated\": true}}}}"
+  },
+  {
+    "eventNumber": 4,
+    "timestamp": "2025-07-20T10:57:16.934Z",
+    "type": "node_update",
+    "content": "📊 entry_preparation: Credits: 0.0, Messages: 2",
+    "metadata": {
+      "node_name": "entry_preparation",
+      "credits_used": 0,
+      "next_action": "end",
+      "execution_strategy": "direct",
+      "messages_count": 2
+    },
+    "raw": "{\"type\": \"node_update\", \"content\": \"📊 entry_preparation: Credits: 0.0, Messages: 2\", \"timestamp\": \"2025-07-20T03:57:16.933049\", \"session_id\": \"default\", \"metadata\": {\"node_name\": \"entry_preparation\", \"credits_used\": 0.0, \"next_action\": \"end\", \"execution_strategy\": \"direct\", \"messages_count\": 2}}"
+  },
+  {
+    "eventNumber": 5,
+    "timestamp": "2025-07-20T10:57:17.009Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'reasonnode': {'status': 'starting', 'timestamp': '2025-07-20T03:57:16.885038'}}",
+    "metadata": {
+      "raw_chunk": {
+        "reasonnode": {
+          "status": "starting",
+          "timestamp": "2025-07-20T03:57:16.885038"
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'reasonnode': {'status': 'starting', 'timestamp': '2025-07-20T03:57:16.885038'}}\", \"timestamp\": \"2025-07-20T03:57:17.008905\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"reasonnode\": {\"status\": \"starting\", \"timestamp\": \"2025-07-20T03:57:16.885038\"}}}}"
+  },
+  {
+    "eventNumber": 6,
+    "timestamp": "2025-07-20T10:57:17.009Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'model_call': {'status': 'starting', 'tools_count': 7, 'has_enhanced_prompt': True, 'session_memory': True}}",
+    "metadata": {
+      "raw_chunk": {
+        "model_call": {
+          "status": "starting",
+          "tools_count": 7,
+          "has_enhanced_prompt": true,
+          "session_memory": true
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'model_call': {'status': 'starting', 'tools_count': 7, 'has_enhanced_prompt': True, 'session_memory': True}}\", \"timestamp\": \"2025-07-20T03:57:17.008960\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"model_call\": {\"status\": \"starting\", \"tools_count\": 7, \"has_enhanced_prompt\": true, \"session_memory\": true}}}}"
+  },
+  {
+    "eventNumber": 7,
+    "timestamp": "2025-07-20T10:57:18.033Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'model_call': {'status': 'completed', 'has_tool_calls': False}}",
+    "metadata": {
+      "raw_chunk": {
+        "model_call": {
+          "status": "completed",
+          "has_tool_calls": false
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'model_call': {'status': 'completed', 'has_tool_calls': False}}\", \"timestamp\": \"2025-07-20T03:57:18.033437\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"model_call\": {\"status\": \"completed\", \"has_tool_calls\": false}}}}"
+  },
+  {
+    "eventNumber": 8,
+    "timestamp": "2025-07-20T10:57:18.034Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'reasonnode': {'status': 'completed', 'credits_used': 1.75, 'timestamp': '2025-07-20T03:57:16.885038'}}",
+    "metadata": {
+      "raw_chunk": {
+        "reasonnode": {
+          "status": "completed",
+          "credits_used": 1.75,
+          "timestamp": "2025-07-20T03:57:16.885038"
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'reasonnode': {'status': 'completed', 'credits_used': 1.75, 'timestamp': '2025-07-20T03:57:16.885038'}}\", \"timestamp\": \"2025-07-20T03:57:18.033519\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"reasonnode\": {\"status\": \"completed\", \"credits_used\": 1.75, \"timestamp\": \"2025-07-20T03:57:16.885038\"}}}}"
+  },
+  {
+    "eventNumber": 9,
+    "timestamp": "2025-07-20T10:57:18.085Z",
+    "type": "node_update",
+    "content": "📊 reason_model: Credits: 1.75, Messages: 13",
+    "metadata": {
+      "node_name": "reason_model",
+      "credits_used": 1.75,
+      "next_action": "end",
+      "execution_strategy": "direct",
+      "messages_count": 13
+    },
+    "raw": "{\"type\": \"node_update\", \"content\": \"📊 reason_model: Credits: 1.75, Messages: 13\", \"timestamp\": \"2025-07-20T03:57:18.084447\", \"session_id\": \"default\", \"metadata\": {\"node_name\": \"reason_model\", \"credits_used\": 1.75, \"next_action\": \"end\", \"execution_strategy\": \"direct\", \"messages_count\": 13}}"
+  },
+  {
+    "eventNumber": 10,
+    "timestamp": "2025-07-20T10:57:18.253Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'routing': {'status': 'deciding', 'has_tool_calls': False}}",
+    "metadata": {
+      "raw_chunk": {
+        "routing": {
+          "status": "deciding",
+          "has_tool_calls": false
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'routing': {'status': 'deciding', 'has_tool_calls': False}}\", \"timestamp\": \"2025-07-20T03:57:18.253156\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"routing\": {\"status\": \"deciding\", \"has_tool_calls\": false}}}}"
+  },
+  {
+    "eventNumber": 11,
+    "timestamp": "2025-07-20T10:57:18.253Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'routing': {'status': 'completed', 'decision': 'direct_response', 'next_action': 'end'}}",
+    "metadata": {
+      "raw_chunk": {
+        "routing": {
+          "status": "completed",
+          "decision": "direct_response",
+          "next_action": "end"
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'routing': {'status': 'completed', 'decision': 'direct_response', 'next_action': 'end'}}\", \"timestamp\": \"2025-07-20T03:57:18.253241\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"routing\": {\"status\": \"completed\", \"decision\": \"direct_response\", \"next_action\": \"end\"}}}}"
+  },
+  {
+    "eventNumber": 12,
+    "timestamp": "2025-07-20T10:57:18.339Z",
+    "type": "node_update",
+    "content": "📊 should_continue: Credits: 1.75, Messages: 13",
+    "metadata": {
+      "node_name": "should_continue",
+      "credits_used": 1.75,
+      "next_action": "end",
+      "execution_strategy": "direct",
+      "messages_count": 13
+    },
+    "raw": "{\"type\": \"node_update\", \"content\": \"📊 should_continue: Credits: 1.75, Messages: 13\", \"timestamp\": \"2025-07-20T03:57:18.338357\", \"session_id\": \"default\", \"metadata\": {\"node_name\": \"should_continue\", \"credits_used\": 1.75, \"next_action\": \"end\", \"execution_strategy\": \"direct\", \"messages_count\": 13}}"
+  },
+  {
+    "eventNumber": 13,
+    "timestamp": "2025-07-20T10:57:18.601Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'responsenode': {'status': 'starting', 'timestamp': '2025-07-20T03:57:16.885038'}}",
+    "metadata": {
+      "raw_chunk": {
+        "responsenode": {
+          "status": "starting",
+          "timestamp": "2025-07-20T03:57:16.885038"
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'responsenode': {'status': 'starting', 'timestamp': '2025-07-20T03:57:16.885038'}}\", \"timestamp\": \"2025-07-20T03:57:18.601301\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"responsenode\": {\"status\": \"starting\", \"timestamp\": \"2025-07-20T03:57:16.885038\"}}}}"
+  },
+  {
+    "eventNumber": 14,
+    "timestamp": "2025-07-20T10:57:18.601Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_formatting': {'status': 'starting', 'messages_count': 13, 'has_tools_results': True}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_formatting": {
+          "status": "starting",
+          "messages_count": 13,
+          "has_tools_results": true
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_formatting': {'status': 'starting', 'messages_count': 13, 'has_tools_results': True}}\", \"timestamp\": \"2025-07-20T03:57:18.601349\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_formatting\": {\"status\": \"starting\", \"messages_count\": 13, \"has_tools_results\": true}}}}"
+  },
+  {
+    "eventNumber": 15,
+    "timestamp": "2025-07-20T10:57:19.196Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '```', 'token_index': 1}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "```",
+          "token_index": 1
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '```', 'token_index': 1}}\", \"timestamp\": \"2025-07-20T03:57:19.195395\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"```\", \"token_index\": 1}}}}"
+  },
+  {
+    "eventNumber": 16,
+    "timestamp": "2025-07-20T10:57:19.197Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'json', 'token_index': 2}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "json",
+          "token_index": 2
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'json', 'token_index': 2}}\", \"timestamp\": \"2025-07-20T03:57:19.195552\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"json\", \"token_index\": 2}}}}"
+  },
+  {
+    "eventNumber": 17,
+    "timestamp": "2025-07-20T10:57:19.197Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\n', 'token_index': 3}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\n",
+          "token_index": 3
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\\n', 'token_index': 3}}\", \"timestamp\": \"2025-07-20T03:57:19.195638\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\n\", \"token_index\": 3}}}}"
+  },
+  {
+    "eventNumber": 18,
+    "timestamp": "2025-07-20T10:57:19.197Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '{\\n', 'token_index': 4}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "{\n",
+          "token_index": 4
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '{\\\\n', 'token_index': 4}}\", \"timestamp\": \"2025-07-20T03:57:19.195783\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"{\\n\", \"token_index\": 4}}}}"
+  },
+  {
+    "eventNumber": 19,
+    "timestamp": "2025-07-20T10:57:19.216Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 5}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " ",
+          "token_index": 5
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 5}}\", \"timestamp\": \"2025-07-20T03:57:19.214404\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \", \"token_index\": 5}}}}"
+  },
+  {
+    "eventNumber": 20,
+    "timestamp": "2025-07-20T10:57:19.216Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \"', 'token_index': 6}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " \"",
+          "token_index": 6
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \\\"', 'token_index': 6}}\", \"timestamp\": \"2025-07-20T03:57:19.214650\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \\\"\", \"token_index\": 6}}}}"
+  },
+  {
+    "eventNumber": 21,
+    "timestamp": "2025-07-20T10:57:19.252Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'formatted', 'token_index': 7}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "formatted",
+          "token_index": 7
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'formatted', 'token_index': 7}}\", \"timestamp\": \"2025-07-20T03:57:19.251865\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"formatted\", \"token_index\": 7}}}}"
+  },
+  {
+    "eventNumber": 22,
+    "timestamp": "2025-07-20T10:57:19.252Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_content', 'token_index': 8}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "_content",
+          "token_index": 8
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_content', 'token_index': 8}}\", \"timestamp\": \"2025-07-20T03:57:19.252000\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"_content\", \"token_index\": 8}}}}"
+  },
+  {
+    "eventNumber": 23,
+    "timestamp": "2025-07-20T10:57:19.281Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\":', 'token_index': 9}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\":",
+          "token_index": 9
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\":', 'token_index': 9}}\", \"timestamp\": \"2025-07-20T03:57:19.281082\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\\":\", \"token_index\": 9}}}}"
+  },
+  {
+    "eventNumber": 24,
+    "timestamp": "2025-07-20T10:57:19.281Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \"', 'token_index': 10}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " \"",
+          "token_index": 10
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \\\"', 'token_index': 10}}\", \"timestamp\": \"2025-07-20T03:57:19.281233\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \\\"\", \"token_index\": 10}}}}"
+  },
+  {
+    "eventNumber": 25,
+    "timestamp": "2025-07-20T10:57:19.303Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'Hello', 'token_index': 11}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "Hello",
+          "token_index": 11
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'Hello', 'token_index': 11}}\", \"timestamp\": \"2025-07-20T03:57:19.302590\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"Hello\", \"token_index\": 11}}}}"
+  },
+  {
+    "eventNumber": 26,
+    "timestamp": "2025-07-20T10:57:19.304Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '!', 'token_index': 12}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "!",
+          "token_index": 12
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '!', 'token_index': 12}}\", \"timestamp\": \"2025-07-20T03:57:19.302752\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"!\", \"token_index\": 12}}}}"
+  },
+  {
+    "eventNumber": 27,
+    "timestamp": "2025-07-20T10:57:19.329Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' You', 'token_index': 13}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " You",
+          "token_index": 13
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' You', 'token_index': 13}}\", \"timestamp\": \"2025-07-20T03:57:19.328821\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" You\", \"token_index\": 13}}}}"
+  },
+  {
+    "eventNumber": 28,
+    "timestamp": "2025-07-20T10:57:19.330Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' greeted', 'token_index': 14}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " greeted",
+          "token_index": 14
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' greeted', 'token_index': 14}}\", \"timestamp\": \"2025-07-20T03:57:19.328978\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" greeted\", \"token_index\": 14}}}}"
+  },
+  {
+    "eventNumber": 29,
+    "timestamp": "2025-07-20T10:57:19.353Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' with', 'token_index': 15}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " with",
+          "token_index": 15
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' with', 'token_index': 15}}\", \"timestamp\": \"2025-07-20T03:57:19.352296\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" with\", \"token_index\": 15}}}}"
+  },
+  {
+    "eventNumber": 30,
+    "timestamp": "2025-07-20T10:57:19.353Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \\\\\"', 'token_index': 16}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " \\\"",
+          "token_index": 16
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \\\\\\\\\\\"', 'token_index': 16}}\", \"timestamp\": \"2025-07-20T03:57:19.352629\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \\\\\\\"\", \"token_index\": 16}}}}"
+  },
+  {
+    "eventNumber": 31,
+    "timestamp": "2025-07-20T10:57:19.376Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'hi', 'token_index': 17}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "hi",
+          "token_index": 17
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'hi', 'token_index': 17}}\", \"timestamp\": \"2025-07-20T03:57:19.375910\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"hi\", \"token_index\": 17}}}}"
+  },
+  {
+    "eventNumber": 32,
+    "timestamp": "2025-07-20T10:57:19.376Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '...', 'token_index': 18}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "...",
+          "token_index": 18
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '...', 'token_index': 18}}\", \"timestamp\": \"2025-07-20T03:57:19.376166\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"...\", \"token_index\": 18}}}}"
+  },
+  {
+    "eventNumber": 33,
+    "timestamp": "2025-07-20T10:57:19.398Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\\\"', 'token_index': 19}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\\\"",
+          "token_index": 19
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\\\\\\\\\"', 'token_index': 19}}\", \"timestamp\": \"2025-07-20T03:57:19.397603\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\\\\\\"\", \"token_index\": 19}}}}"
+  },
+  {
+    "eventNumber": 34,
+    "timestamp": "2025-07-20T10:57:19.398Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' How', 'token_index': 20}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " How",
+          "token_index": 20
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' How', 'token_index': 20}}\", \"timestamp\": \"2025-07-20T03:57:19.397752\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" How\", \"token_index\": 20}}}}"
+  },
+  {
+    "eventNumber": 35,
+    "timestamp": "2025-07-20T10:57:19.436Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' can', 'token_index': 21}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " can",
+          "token_index": 21
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' can', 'token_index': 21}}\", \"timestamp\": \"2025-07-20T03:57:19.436099\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" can\", \"token_index\": 21}}}}"
+  },
+  {
+    "eventNumber": 36,
+    "timestamp": "2025-07-20T10:57:19.436Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' I', 'token_index': 22}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " I",
+          "token_index": 22
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' I', 'token_index': 22}}\", \"timestamp\": \"2025-07-20T03:57:19.436165\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" I\", \"token_index\": 22}}}}"
+  },
+  {
+    "eventNumber": 37,
+    "timestamp": "2025-07-20T10:57:19.460Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' assist', 'token_index': 23}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " assist",
+          "token_index": 23
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' assist', 'token_index': 23}}\", \"timestamp\": \"2025-07-20T03:57:19.459834\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" assist\", \"token_index\": 23}}}}"
+  },
+  {
+    "eventNumber": 38,
+    "timestamp": "2025-07-20T10:57:19.460Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' you', 'token_index': 24}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " you",
+          "token_index": 24
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' you', 'token_index': 24}}\", \"timestamp\": \"2025-07-20T03:57:19.459900\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" you\", \"token_index\": 24}}}}"
+  },
+  {
+    "eventNumber": 39,
+    "timestamp": "2025-07-20T10:57:19.483Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' today', 'token_index': 25}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " today",
+          "token_index": 25
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' today', 'token_index': 25}}\", \"timestamp\": \"2025-07-20T03:57:19.482964\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" today\", \"token_index\": 25}}}}"
+  },
+  {
+    "eventNumber": 40,
+    "timestamp": "2025-07-20T10:57:19.483Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '?\",\\n', 'token_index': 26}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "?\",\n",
+          "token_index": 26
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '?\\\",\\\\n', 'token_index': 26}}\", \"timestamp\": \"2025-07-20T03:57:19.483026\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"?\\\",\\n\", \"token_index\": 26}}}}"
+  },
+  {
+    "eventNumber": 41,
+    "timestamp": "2025-07-20T10:57:19.507Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 27}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " ",
+          "token_index": 27
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 27}}\", \"timestamp\": \"2025-07-20T03:57:19.506974\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \", \"token_index\": 27}}}}"
+  },
+  {
+    "eventNumber": 42,
+    "timestamp": "2025-07-20T10:57:19.507Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \"', 'token_index': 28}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " \"",
+          "token_index": 28
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \\\"', 'token_index': 28}}\", \"timestamp\": \"2025-07-20T03:57:19.507044\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \\\"\", \"token_index\": 28}}}}"
+  },
+  {
+    "eventNumber": 43,
+    "timestamp": "2025-07-20T10:57:19.551Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'content', 'token_index': 29}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "content",
+          "token_index": 29
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'content', 'token_index': 29}}\", \"timestamp\": \"2025-07-20T03:57:19.551271\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"content\", \"token_index\": 29}}}}"
+  },
+  {
+    "eventNumber": 44,
+    "timestamp": "2025-07-20T10:57:19.551Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_types', 'token_index': 30}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "_types",
+          "token_index": 30
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_types', 'token_index': 30}}\", \"timestamp\": \"2025-07-20T03:57:19.551328\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"_types\", \"token_index\": 30}}}}"
+  },
+  {
+    "eventNumber": 45,
+    "timestamp": "2025-07-20T10:57:19.573Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\":', 'token_index': 31}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\":",
+          "token_index": 31
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\":', 'token_index': 31}}\", \"timestamp\": \"2025-07-20T03:57:19.573263\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\\":\", \"token_index\": 31}}}}"
+  },
+  {
+    "eventNumber": 46,
+    "timestamp": "2025-07-20T10:57:19.573Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' [\"', 'token_index': 32}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " [\"",
+          "token_index": 32
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' [\\\"', 'token_index': 32}}\", \"timestamp\": \"2025-07-20T03:57:19.573327\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" [\\\"\", \"token_index\": 32}}}}"
+  },
+  {
+    "eventNumber": 47,
+    "timestamp": "2025-07-20T10:57:19.597Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'text', 'token_index': 33}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "text",
+          "token_index": 33
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'text', 'token_index': 33}}\", \"timestamp\": \"2025-07-20T03:57:19.597195\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"text\", \"token_index\": 33}}}}"
+  },
+  {
+    "eventNumber": 48,
+    "timestamp": "2025-07-20T10:57:19.597Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\"],\\n', 'token_index': 34}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\"],\n",
+          "token_index": 34
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\"],\\\\n', 'token_index': 34}}\", \"timestamp\": \"2025-07-20T03:57:19.597238\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\\"],\\n\", \"token_index\": 34}}}}"
+  },
+  {
+    "eventNumber": 49,
+    "timestamp": "2025-07-20T10:57:19.625Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 35}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " ",
+          "token_index": 35
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 35}}\", \"timestamp\": \"2025-07-20T03:57:19.625796\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \", \"token_index\": 35}}}}"
+  },
+  {
+    "eventNumber": 50,
+    "timestamp": "2025-07-20T10:57:19.625Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \"', 'token_index': 36}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " \"",
+          "token_index": 36
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \\\"', 'token_index': 36}}\", \"timestamp\": \"2025-07-20T03:57:19.625840\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \\\"\", \"token_index\": 36}}}}"
+  },
+  {
+    "eventNumber": 51,
+    "timestamp": "2025-07-20T10:57:19.650Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'media', 'token_index': 37}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "media",
+          "token_index": 37
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'media', 'token_index': 37}}\", \"timestamp\": \"2025-07-20T03:57:19.650318\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"media\", \"token_index\": 37}}}}"
+  },
+  {
+    "eventNumber": 52,
+    "timestamp": "2025-07-20T10:57:19.650Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_items', 'token_index': 38}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "_items",
+          "token_index": 38
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_items', 'token_index': 38}}\", \"timestamp\": \"2025-07-20T03:57:19.650370\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"_items\", \"token_index\": 38}}}}"
+  },
+  {
+    "eventNumber": 53,
+    "timestamp": "2025-07-20T10:57:19.672Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\":', 'token_index': 39}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\":",
+          "token_index": 39
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\":', 'token_index': 39}}\", \"timestamp\": \"2025-07-20T03:57:19.671857\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\\":\", \"token_index\": 39}}}}"
+  },
+  {
+    "eventNumber": 54,
+    "timestamp": "2025-07-20T10:57:19.672Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' [],\\n', 'token_index': 40}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " [],\n",
+          "token_index": 40
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' [],\\\\n', 'token_index': 40}}\", \"timestamp\": \"2025-07-20T03:57:19.671923\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" [],\\n\", \"token_index\": 40}}}}"
+  },
+  {
+    "eventNumber": 55,
+    "timestamp": "2025-07-20T10:57:19.697Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 41}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " ",
+          "token_index": 41
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 41}}\", \"timestamp\": \"2025-07-20T03:57:19.696968\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \", \"token_index\": 41}}}}"
+  },
+  {
+    "eventNumber": 56,
+    "timestamp": "2025-07-20T10:57:19.697Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \"', 'token_index': 42}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " \"",
+          "token_index": 42
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \\\"', 'token_index': 42}}\", \"timestamp\": \"2025-07-20T03:57:19.697222\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \\\"\", \"token_index\": 42}}}}"
+  },
+  {
+    "eventNumber": 57,
+    "timestamp": "2025-07-20T10:57:19.782Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'cit', 'token_index': 43}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "cit",
+          "token_index": 43
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'cit', 'token_index': 43}}\", \"timestamp\": \"2025-07-20T03:57:19.781577\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"cit\", \"token_index\": 43}}}}"
+  },
+  {
+    "eventNumber": 58,
+    "timestamp": "2025-07-20T10:57:19.782Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'ations', 'token_index': 44}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "ations",
+          "token_index": 44
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'ations', 'token_index': 44}}\", \"timestamp\": \"2025-07-20T03:57:19.781792\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"ations\", \"token_index\": 44}}}}"
+  },
+  {
+    "eventNumber": 59,
+    "timestamp": "2025-07-20T10:57:19.830Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\":', 'token_index': 45}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\":",
+          "token_index": 45
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\":', 'token_index': 45}}\", \"timestamp\": \"2025-07-20T03:57:19.829450\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\\":\", \"token_index\": 45}}}}"
+  },
+  {
+    "eventNumber": 60,
+    "timestamp": "2025-07-20T10:57:19.830Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' [],\\n', 'token_index': 46}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " [],\n",
+          "token_index": 46
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' [],\\\\n', 'token_index': 46}}\", \"timestamp\": \"2025-07-20T03:57:19.829618\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" [],\\n\", \"token_index\": 46}}}}"
+  },
+  {
+    "eventNumber": 61,
+    "timestamp": "2025-07-20T10:57:19.854Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 47}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " ",
+          "token_index": 47
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 47}}\", \"timestamp\": \"2025-07-20T03:57:19.854283\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \", \"token_index\": 47}}}}"
+  },
+  {
+    "eventNumber": 62,
+    "timestamp": "2025-07-20T10:57:19.854Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \"', 'token_index': 48}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " \"",
+          "token_index": 48
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \\\"', 'token_index': 48}}\", \"timestamp\": \"2025-07-20T03:57:19.854399\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \\\"\", \"token_index\": 48}}}}"
+  },
+  {
+    "eventNumber": 63,
+    "timestamp": "2025-07-20T10:57:19.882Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'code', 'token_index': 49}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "code",
+          "token_index": 49
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'code', 'token_index': 49}}\", \"timestamp\": \"2025-07-20T03:57:19.882087\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"code\", \"token_index\": 49}}}}"
+  },
+  {
+    "eventNumber": 64,
+    "timestamp": "2025-07-20T10:57:19.882Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_blocks', 'token_index': 50}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "_blocks",
+          "token_index": 50
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_blocks', 'token_index': 50}}\", \"timestamp\": \"2025-07-20T03:57:19.882155\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"_blocks\", \"token_index\": 50}}}}"
+  },
+  {
+    "eventNumber": 65,
+    "timestamp": "2025-07-20T10:57:19.904Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\":', 'token_index': 51}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\":",
+          "token_index": 51
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\":', 'token_index': 51}}\", \"timestamp\": \"2025-07-20T03:57:19.903480\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\\":\", \"token_index\": 51}}}}"
+  },
+  {
+    "eventNumber": 66,
+    "timestamp": "2025-07-20T10:57:19.904Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' [],\\n', 'token_index': 52}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " [],\n",
+          "token_index": 52
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' [],\\\\n', 'token_index': 52}}\", \"timestamp\": \"2025-07-20T03:57:19.903569\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" [],\\n\", \"token_index\": 52}}}}"
+  },
+  {
+    "eventNumber": 67,
+    "timestamp": "2025-07-20T10:57:19.935Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 53}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " ",
+          "token_index": 53
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 53}}\", \"timestamp\": \"2025-07-20T03:57:19.934766\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \", \"token_index\": 53}}}}"
+  },
+  {
+    "eventNumber": 68,
+    "timestamp": "2025-07-20T10:57:19.935Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \"', 'token_index': 54}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " \"",
+          "token_index": 54
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \\\"', 'token_index': 54}}\", \"timestamp\": \"2025-07-20T03:57:19.934832\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \\\"\", \"token_index\": 54}}}}"
+  },
+  {
+    "eventNumber": 69,
+    "timestamp": "2025-07-20T10:57:19.962Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'tables', 'token_index': 55}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "tables",
+          "token_index": 55
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'tables', 'token_index': 55}}\", \"timestamp\": \"2025-07-20T03:57:19.962258\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"tables\", \"token_index\": 55}}}}"
+  },
+  {
+    "eventNumber": 70,
+    "timestamp": "2025-07-20T10:57:19.962Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\":', 'token_index': 56}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\":",
+          "token_index": 56
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\":', 'token_index': 56}}\", \"timestamp\": \"2025-07-20T03:57:19.962342\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\\":\", \"token_index\": 56}}}}"
+  },
+  {
+    "eventNumber": 71,
+    "timestamp": "2025-07-20T10:57:20.000Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' [],\\n', 'token_index': 57}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " [],\n",
+          "token_index": 57
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' [],\\\\n', 'token_index': 57}}\", \"timestamp\": \"2025-07-20T03:57:19.999225\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" [],\\n\", \"token_index\": 57}}}}"
+  },
+  {
+    "eventNumber": 72,
+    "timestamp": "2025-07-20T10:57:20.000Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 58}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " ",
+          "token_index": 58
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 58}}\", \"timestamp\": \"2025-07-20T03:57:19.999511\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \", \"token_index\": 58}}}}"
+  },
+  {
+    "eventNumber": 73,
+    "timestamp": "2025-07-20T10:57:20.128Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \"', 'token_index': 59}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " \"",
+          "token_index": 59
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \\\"', 'token_index': 59}}\", \"timestamp\": \"2025-07-20T03:57:20.126607\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \\\"\", \"token_index\": 59}}}}"
+  },
+  {
+    "eventNumber": 74,
+    "timestamp": "2025-07-20T10:57:20.129Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'has', 'token_index': 60}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "has",
+          "token_index": 60
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'has', 'token_index': 60}}\", \"timestamp\": \"2025-07-20T03:57:20.127019\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"has\", \"token_index\": 60}}}}"
+  },
+  {
+    "eventNumber": 75,
+    "timestamp": "2025-07-20T10:57:20.448Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_media', 'token_index': 61}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "_media",
+          "token_index": 61
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_media', 'token_index': 61}}\", \"timestamp\": \"2025-07-20T03:57:20.448080\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"_media\", \"token_index\": 61}}}}"
+  },
+  {
+    "eventNumber": 76,
+    "timestamp": "2025-07-20T10:57:20.448Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\":', 'token_index': 62}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\":",
+          "token_index": 62
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\":', 'token_index': 62}}\", \"timestamp\": \"2025-07-20T03:57:20.448151\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\\":\", \"token_index\": 62}}}}"
+  },
+  {
+    "eventNumber": 77,
+    "timestamp": "2025-07-20T10:57:20.454Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' false', 'token_index': 63}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " false",
+          "token_index": 63
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' false', 'token_index': 63}}\", \"timestamp\": \"2025-07-20T03:57:20.453724\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" false\", \"token_index\": 63}}}}"
+  },
+  {
+    "eventNumber": 78,
+    "timestamp": "2025-07-20T10:57:20.454Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ',\\n', 'token_index': 64}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": ",\n",
+          "token_index": 64
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ',\\\\n', 'token_index': 64}}\", \"timestamp\": \"2025-07-20T03:57:20.453800\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \",\\n\", \"token_index\": 64}}}}"
+  },
+  {
+    "eventNumber": 79,
+    "timestamp": "2025-07-20T10:57:20.462Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 65}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " ",
+          "token_index": 65
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 65}}\", \"timestamp\": \"2025-07-20T03:57:20.461769\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \", \"token_index\": 65}}}}"
+  },
+  {
+    "eventNumber": 80,
+    "timestamp": "2025-07-20T10:57:20.462Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \"', 'token_index': 66}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " \"",
+          "token_index": 66
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \\\"', 'token_index': 66}}\", \"timestamp\": \"2025-07-20T03:57:20.461967\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \\\"\", \"token_index\": 66}}}}"
+  },
+  {
+    "eventNumber": 81,
+    "timestamp": "2025-07-20T10:57:20.464Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'has', 'token_index': 67}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "has",
+          "token_index": 67
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'has', 'token_index': 67}}\", \"timestamp\": \"2025-07-20T03:57:20.463905\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"has\", \"token_index\": 67}}}}"
+  },
+  {
+    "eventNumber": 82,
+    "timestamp": "2025-07-20T10:57:20.464Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_code', 'token_index': 68}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "_code",
+          "token_index": 68
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_code', 'token_index': 68}}\", \"timestamp\": \"2025-07-20T03:57:20.464036\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"_code\", \"token_index\": 68}}}}"
+  },
+  {
+    "eventNumber": 83,
+    "timestamp": "2025-07-20T10:57:20.468Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\":', 'token_index': 69}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\":",
+          "token_index": 69
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\":', 'token_index': 69}}\", \"timestamp\": \"2025-07-20T03:57:20.468558\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\\":\", \"token_index\": 69}}}}"
+  },
+  {
+    "eventNumber": 84,
+    "timestamp": "2025-07-20T10:57:20.468Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' false', 'token_index': 70}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " false",
+          "token_index": 70
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' false', 'token_index': 70}}\", \"timestamp\": \"2025-07-20T03:57:20.468621\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" false\", \"token_index\": 70}}}}"
+  },
+  {
+    "eventNumber": 85,
+    "timestamp": "2025-07-20T10:57:20.472Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ',\\n', 'token_index': 71}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": ",\n",
+          "token_index": 71
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ',\\\\n', 'token_index': 71}}\", \"timestamp\": \"2025-07-20T03:57:20.472017\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \",\\n\", \"token_index\": 71}}}}"
+  },
+  {
+    "eventNumber": 86,
+    "timestamp": "2025-07-20T10:57:20.472Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 72}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " ",
+          "token_index": 72
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' ', 'token_index': 72}}\", \"timestamp\": \"2025-07-20T03:57:20.472075\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \", \"token_index\": 72}}}}"
+  },
+  {
+    "eventNumber": 87,
+    "timestamp": "2025-07-20T10:57:20.503Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \"', 'token_index': 73}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " \"",
+          "token_index": 73
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' \\\"', 'token_index': 73}}\", \"timestamp\": \"2025-07-20T03:57:20.503078\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" \\\"\", \"token_index\": 73}}}}"
+  },
+  {
+    "eventNumber": 88,
+    "timestamp": "2025-07-20T10:57:20.503Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'has', 'token_index': 74}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "has",
+          "token_index": 74
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'has', 'token_index': 74}}\", \"timestamp\": \"2025-07-20T03:57:20.503150\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"has\", \"token_index\": 74}}}}"
+  },
+  {
+    "eventNumber": 89,
+    "timestamp": "2025-07-20T10:57:20.530Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_c', 'token_index': 75}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "_c",
+          "token_index": 75
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '_c', 'token_index': 75}}\", \"timestamp\": \"2025-07-20T03:57:20.530492\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"_c\", \"token_index\": 75}}}}"
+  },
+  {
+    "eventNumber": 90,
+    "timestamp": "2025-07-20T10:57:20.530Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'itations', 'token_index': 76}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "itations",
+          "token_index": 76
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': 'itations', 'token_index': 76}}\", \"timestamp\": \"2025-07-20T03:57:20.530573\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"itations\", \"token_index\": 76}}}}"
+  },
+  {
+    "eventNumber": 91,
+    "timestamp": "2025-07-20T10:57:20.559Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\":', 'token_index': 77}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\":",
+          "token_index": 77
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\":', 'token_index': 77}}\", \"timestamp\": \"2025-07-20T03:57:20.558894\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\\":\", \"token_index\": 77}}}}"
+  },
+  {
+    "eventNumber": 92,
+    "timestamp": "2025-07-20T10:57:20.559Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' false', 'token_index': 78}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": " false",
+          "token_index": 78
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': ' false', 'token_index': 78}}\", \"timestamp\": \"2025-07-20T03:57:20.558959\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \" false\", \"token_index\": 78}}}}"
+  },
+  {
+    "eventNumber": 93,
+    "timestamp": "2025-07-20T10:57:20.598Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\n', 'token_index': 79}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "\n",
+          "token_index": 79
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '\\\\n', 'token_index': 79}}\", \"timestamp\": \"2025-07-20T03:57:20.598449\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"\\n\", \"token_index\": 79}}}}"
+  },
+  {
+    "eventNumber": 94,
+    "timestamp": "2025-07-20T10:57:20.598Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '}\\n', 'token_index': 80}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "}\n",
+          "token_index": 80
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '}\\\\n', 'token_index': 80}}\", \"timestamp\": \"2025-07-20T03:57:20.598533\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"}\\n\", \"token_index\": 80}}}}"
+  },
+  {
+    "eventNumber": 95,
+    "timestamp": "2025-07-20T10:57:20.598Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'streaming', 'token': '```', 'token_index': 81}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "streaming",
+          "token": "```",
+          "token_index": 81
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'streaming', 'token': '```', 'token_index': 81}}\", \"timestamp\": \"2025-07-20T03:57:20.598575\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_token\": {\"status\": \"streaming\", \"token\": \"```\", \"token_index\": 81}}}}"
+  },
+  {
+    "eventNumber": 96,
+    "timestamp": "2025-07-20T10:57:20.720Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_token': {'status': 'completed', 'total_tokens': 81, 'full_content': '```json\\n{\\n  \"formatted_content\": \"Hello! You greeted with \\\\\"hi...\\\\\" How can I assist you today?\",\\n  \"content_types\": [\"text\"],\\n  \"media_items\": [],\\n  \"citations\": [],\\n  \"code_blocks\": [],\\n  \"tables\": [],\\n  \"has_media\": false,\\n  \"has_code\": false,\\n  \"has_citations\": false\\n}\\n```'}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_token": {
+          "status": "completed",
+          "total_tokens": 81,
+          "full_content": "```json\n{\n  \"formatted_content\": \"Hello! You greeted with \\\"hi...\\\" How can I assist you today?\",\n  \"content_types\": [\"text\"],\n  \"media_items\": [],\n  \"citations\": [],\n  \"code_blocks\": [],\n  \"tables\": [],\n  \"has_media\": false,\n  \"has_code\": false,\n  \"has_citations\": false\n}\n```"
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_token': {'status': 'completed', 'total_tokens': 81, 'full_content': '```json\\\\n{\\\\n  \\\"formatted_content\\\": \\\"Hello! You greeted with \\\\\\\\\\\"hi...\\\\\\\\\\\" How can I assist you today?\\\",\\\\n  \\\"content_types\\\": [\\\"text\\\"],\\\\n  \\\"media_items\\\": [],\\\\n  \\\"citations\\\": [],\\\\n  \\\"code_blocks\\\": [],\\\\n  \\\"tables\\\": [],\\\\n  \\\"has_media\\\": false,\\\\n  \\\"has_code\\\": false,\\\\n  \\\"has_citations\\\": false\\\\n}\\\\n```'}}\", \"timestamp\": \"2025-07-20T03:57:20.7...[TRUNCATED]"
+  },
+  {
+    "eventNumber": 97,
+    "timestamp": "2025-07-20T10:57:20.720Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'response_formatting': {'status': 'completed', 'has_media': False, 'has_code': False, 'content_types': ['text']}}",
+    "metadata": {
+      "raw_chunk": {
+        "response_formatting": {
+          "status": "completed",
+          "has_media": false,
+          "has_code": false,
+          "content_types": [
+            "text"
+          ]
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'response_formatting': {'status': 'completed', 'has_media': False, 'has_code': False, 'content_types': ['text']}}\", \"timestamp\": \"2025-07-20T03:57:20.717724\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"response_formatting\": {\"status\": \"completed\", \"has_media\": false, \"has_code\": false, \"content_types\": [\"text\"]}}}}"
+  },
+  {
+    "eventNumber": 98,
+    "timestamp": "2025-07-20T10:57:20.720Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'responsenode': {'status': 'completed', 'credits_used': 1.75, 'timestamp': '2025-07-20T03:57:16.885038'}}",
+    "metadata": {
+      "raw_chunk": {
+        "responsenode": {
+          "status": "completed",
+          "credits_used": 1.75,
+          "timestamp": "2025-07-20T03:57:16.885038"
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'responsenode': {'status': 'completed', 'credits_used': 1.75, 'timestamp': '2025-07-20T03:57:16.885038'}}\", \"timestamp\": \"2025-07-20T03:57:20.718189\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"responsenode\": {\"status\": \"completed\", \"credits_used\": 1.75, \"timestamp\": \"2025-07-20T03:57:16.885038\"}}}}"
+  },
+  {
+    "eventNumber": 99,
+    "timestamp": "2025-07-20T10:57:20.720Z",
+    "type": "content",
+    "content": "```json\n{\n  \"formatted_content\": \"Hello! You greeted with \\\"hi...\\\" How can I assist you today?\",\n  \"content_types\": [\"text\"],\n  \"media_items\": [],\n  \"citations\": [],\n  \"code_blocks\": [],\n  \"tables\": [],\n  \"has_media\": false,\n  \"has_code\": false,\n  \"has_citations\": false\n}\n```",
+    "raw": "{\"type\": \"content\", \"content\": \"```json\\n{\\n  \\\"formatted_content\\\": \\\"Hello! You greeted with \\\\\\\"hi...\\\\\\\" How can I assist you today?\\\",\\n  \\\"content_types\\\": [\\\"text\\\"],\\n  \\\"media_items\\\": [],\\n  \\\"citations\\\": [],\\n  \\\"code_blocks\\\": [],\\n  \\\"tables\\\": [],\\n  \\\"has_media\\\": false,\\n  \\\"has_code\\\": false,\\n  \\\"has_citations\\\": false\\n}\\n```\", \"timestamp\": \"2025-07-20T03:57:20.720019\", \"session_id\": \"default\"}"
+  },
+  {
+    "eventNumber": 100,
+    "timestamp": "2025-07-20T10:57:20.975Z",
+    "type": "node_update",
+    "content": "📊 format_response: Credits: 1.75, Messages: 14",
+    "metadata": {
+      "node_name": "format_response",
+      "credits_used": 1.75,
+      "next_action": "end",
+      "execution_strategy": "direct",
+      "messages_count": 14
+    },
+    "raw": "{\"type\": \"node_update\", \"content\": \"📊 format_response: Credits: 1.75, Messages: 14\", \"timestamp\": \"2025-07-20T03:57:20.974242\", \"session_id\": \"default\", \"metadata\": {\"node_name\": \"format_response\", \"credits_used\": 1.75, \"next_action\": \"end\", \"execution_strategy\": \"direct\", \"messages_count\": 14}}"
+  },
+  {
+    "eventNumber": 101,
+    "timestamp": "2025-07-20T10:57:21.511Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'memory_revision': {'status': 'starting', 'session_id': 'default'}}",
+    "metadata": {
+      "raw_chunk": {
+        "memory_revision": {
+          "status": "starting",
+          "session_id": "default"
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'memory_revision': {'status': 'starting', 'session_id': 'default'}}\", \"timestamp\": \"2025-07-20T03:57:21.510829\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"memory_revision\": {\"status\": \"starting\", \"session_id\": \"default\"}}}}"
+  },
+  {
+    "eventNumber": 102,
+    "timestamp": "2025-07-20T10:57:21.560Z",
+    "type": "custom_event",
+    "content": "🔄 Custom: {'memory_revision': {'status': 'completed', 'memory_updated': False, 'tools_used': []}}",
+    "metadata": {
+      "raw_chunk": {
+        "memory_revision": {
+          "status": "completed",
+          "memory_updated": false,
+          "tools_used": []
+        }
+      }
+    },
+    "raw": "{\"type\": \"custom_event\", \"content\": \"🔄 Custom: {'memory_revision': {'status': 'completed', 'memory_updated': False, 'tools_used': []}}\", \"timestamp\": \"2025-07-20T03:57:21.559965\", \"session_id\": \"default\", \"metadata\": {\"raw_chunk\": {\"memory_revision\": {\"status\": \"completed\", \"memory_updated\": false, \"tools_used\": []}}}}"
+  },
+  {
+    "eventNumber": 103,
+    "timestamp": "2025-07-20T10:57:21.897Z",
+    "type": "node_update",
+    "content": "📊 memory_revision: Credits: 1.75, Messages: 14",
+    "metadata": {
+      "node_name": "memory_revision",
+      "credits_used": 1.75,
+      "next_action": "end",
+      "execution_strategy": "direct",
+      "messages_count": 14
+    },
+    "raw": "{\"type\": \"node_update\", \"content\": \"📊 memory_revision: Credits: 1.75, Messages: 14\", \"timestamp\": \"2025-07-20T03:57:21.896101\", \"session_id\": \"default\", \"metadata\": {\"node_name\": \"memory_revision\", \"credits_used\": 1.75, \"next_action\": \"end\", \"execution_strategy\": \"direct\", \"messages_count\": 14}}"
+  },
+  {
+    "eventNumber": 104,
+    "timestamp": "2025-07-20T10:57:22.938Z",
+    "type": "credits",
+    "content": "Credits used: 1.8",
+    "raw": "{\"type\": \"credits\", \"content\": \"Credits used: 1.8\", \"timestamp\": \"2025-07-20T03:57:22.937779\", \"session_id\": \"default\"}"
+  },
+  {
+    "eventNumber": 105,
+    "timestamp": "2025-07-20T10:57:22.938Z",
+    "type": "end",
+    "content": "🚀 Response complete",
+    "raw": "{\"type\": \"end\", \"content\": \"🚀 Response complete\", \"timestamp\": \"2025-07-20T03:57:22.937849\", \"session_id\": \"default\"}"
+  },
+  {
+    "eventNumber": 106,
+    "timestamp": "2025-07-20T10:57:22.938Z",
+    "type": "DONE_MARKER",
+    "raw": "[DONE]"
+  }
+]

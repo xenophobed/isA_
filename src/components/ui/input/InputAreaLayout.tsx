@@ -1,4 +1,4 @@
-import React, { useState, useRef, KeyboardEvent } from 'react';
+import React, { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
 
 export interface InputAreaLayoutProps {
@@ -12,6 +12,7 @@ export interface InputAreaLayoutProps {
   onError?: (error: Error) => void;
   onFileSelect?: (files: FileList) => void;
   onSend?: (message: string, metadata?: Record<string, any>) => Promise<void>;
+  onSendMultimodal?: (message: string, files: File[], metadata?: Record<string, any>) => Promise<void>;
   suggestionsContent?: React.ReactNode;
   className?: string;
   children?: React.ReactNode;
@@ -19,8 +20,7 @@ export interface InputAreaLayoutProps {
 }
 
 /**
- * Standalone InputAreaLayout for main_app
- * Simplified version without SDK dependencies
+ * Clean InputAreaLayout - CSS Classes
  */
 export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
   placeholder,
@@ -33,6 +33,7 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
   onError,
   onFileSelect,
   onSend,
+  onSendMultimodal,
   suggestionsContent,
   className = '',
   children,
@@ -41,9 +42,57 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
-  // Quick suggestion examples
+  // Initialize audio context
+  useEffect(() => {
+    try {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    } catch (e) {
+      console.log('Audio not supported');
+    }
+  }, []);
+
+  // Audio feedback
+  const playAudioFeedback = (type: 'send' | 'click' | 'success' | 'error') => {
+    if (!audioContextRef.current) return;
+    
+    const ctx = audioContextRef.current;
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    switch (type) {
+      case 'send':
+        oscillator.frequency.setValueAtTime(800, ctx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+        break;
+      case 'click':
+        oscillator.frequency.setValueAtTime(600, ctx.currentTime);
+        break;
+      case 'success':
+        oscillator.frequency.setValueAtTime(523, ctx.currentTime);
+        oscillator.frequency.setValueAtTime(659, ctx.currentTime + 0.1);
+        break;
+      case 'error':
+        oscillator.frequency.setValueAtTime(300, ctx.currentTime);
+        break;
+    }
+    
+    gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+    
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.2);
+  };
+
   const suggestions = [
     'Create a blog post',
     'Generate an image', 
@@ -53,36 +102,118 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
   ];
 
   const handleSuggestionClick = (suggestion: string) => {
+    playAudioFeedback('click');
     setInputValue(suggestion);
     textareaRef.current?.focus();
+    setShowSuggestions(false);
+  };
+
+  // Voice recording functions
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const audioFile = new File([audioBlob], `recording-${Date.now()}.wav`, { type: 'audio/wav' });
+        
+        // Add recorded audio to attached files
+        setAttachedFiles(prev => [...prev, audioFile]);
+        
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      playAudioFeedback('success');
+      
+      console.log('🎤 Recording started');
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      playAudioFeedback('error');
+      if (onError) {
+        onError(error instanceof Error ? error : new Error('Recording failed'));
+      }
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      playAudioFeedback('success');
+      console.log('🎤 Recording stopped');
+    }
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  // File handling functions
+  const handleFileSelection = (files: FileList) => {
+    const newFiles = Array.from(files);
+    setAttachedFiles(prev => [...prev, ...newFiles]);
+    playAudioFeedback('click');
+    
+    if (onFileSelect) {
+      onFileSelect(files);
+    }
+    
+    console.log('📎 Files attached:', newFiles.map(f => f.name));
+  };
+
+  const removeFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+    playAudioFeedback('click');
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading || !onSend) return;
+    if ((!inputValue.trim() && attachedFiles.length === 0) || isLoading) return;
 
-    let messageToSend = inputValue;
-    console.log('📤 InputAreaLayout: Sending message:', messageToSend);
+    playAudioFeedback('send');
+    let messageToSend = inputValue.trim() || 'Please analyze the attached files';
 
-    // Apply onBeforeSend transformation if provided
     if (onBeforeSend) {
       messageToSend = onBeforeSend(messageToSend);
-      console.log('📤 InputAreaLayout: After onBeforeSend:', messageToSend);
+      if (messageToSend === null) {
+        setInputValue('');
+        setAttachedFiles([]);
+        return;
+      }
     }
 
     setIsLoading(true);
     
     try {
-      console.log('📤 InputAreaLayout: Calling onSend with:', messageToSend);
-      await onSend(messageToSend);
-      setInputValue('');
-      console.log('✅ InputAreaLayout: Message sent successfully');
+      // Use multimodal send if files are attached or if onSendMultimodal is available
+      if (attachedFiles.length > 0 && onSendMultimodal) {
+        await onSendMultimodal(messageToSend, attachedFiles);
+      } else if (onSend) {
+        await onSend(messageToSend);
+      }
       
-      // Call onAfterSend if provided
+      setInputValue('');
+      setAttachedFiles([]);
+      playAudioFeedback('success');
+      
       if (onAfterSend) {
         onAfterSend(messageToSend);
       }
     } catch (error) {
-      console.error('❌ InputAreaLayout: Send failed:', error);
+      playAudioFeedback('error');
       if (onError) {
         onError(error instanceof Error ? error : new Error('Send failed'));
       }
@@ -98,65 +229,173 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
     }
   };
 
-  return (
+  // Beautiful Loading Spinner Component
+  const LoadingSpinner = () => (
     <div 
-      className={`isa-input-area-layout p-6 bg-black/20 backdrop-blur-xl border-t border-white/10 ${className}`}
       style={{
-        padding: '1.5rem !important',
-        background: 'rgba(0, 0, 0, 0.2) !important',
-        backdropFilter: 'blur(12px) !important',
-        borderTop: '1px solid rgba(255, 255, 255, 0.1) !important',
-        borderLeft: 'none !important',
-        borderRight: 'none !important',
-        borderBottom: 'none !important',
-        display: 'flex !important',
-        flexDirection: 'column',
-        gap: '0.75rem !important'
+        position: 'relative',
+        width: '16px',
+        height: '16px'
       }}
     >
+      <div 
+        style={{
+          position: 'absolute',
+          inset: '0',
+          borderRadius: '50%',
+          border: '2px solid transparent',
+          borderTopColor: 'rgba(255, 255, 255, 0.3)',
+          animation: 'spin 1s linear infinite'
+        }}
+      />
+      <div 
+        style={{
+          position: 'absolute',
+          inset: '2px',
+          borderRadius: '50%',
+          border: '2px solid transparent',
+          borderTopColor: '#60a5fa',
+          animation: 'spin 0.8s linear infinite reverse'
+        }}
+      />
+      <div 
+        style={{
+          position: 'absolute',
+          inset: '4px',
+          borderRadius: '50%',
+          border: '2px solid transparent',
+          borderTopColor: '#a78bfa',
+          animation: 'spin 1.2s linear infinite'
+        }}
+      />
+      <div 
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          width: '4px',
+          height: '4px',
+          background: 'linear-gradient(45deg, #60a5fa, #a78bfa)',
+          borderRadius: '50%',
+          transform: 'translate(-50%, -50%)',
+          animation: 'pulse 1s ease-in-out infinite'
+        }}
+      />
+    </div>
+  );
+
+  return (
+    <div className={`input-area-container ${className}`}>
       {/* Suggestions Content */}
       {suggestionsContent && (
-        <div className="isa-input-suggestions mb-4">
+        <div className="suggestions-content">
           {suggestionsContent}
         </div>
       )}
       
+      {/* File Attachments Display */}
+      {attachedFiles.length > 0 && (
+        <div className="attached-files">
+          <div className="attached-files-label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M17 8l-5-5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M12 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {attachedFiles.length} file{attachedFiles.length > 1 ? 's' : ''} attached
+          </div>
+          <div className="attached-files-list">
+            {attachedFiles.map((file, index) => (
+              <div key={index} className="attached-file-item">
+                <div className="file-info">
+                  <div className="file-icon">
+                    {file.type.startsWith('image/') ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+                        <circle cx="9" cy="9" r="2" stroke="currentColor" strokeWidth="2"/>
+                        <path d="M21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21" stroke="currentColor" strokeWidth="2"/>
+                      </svg>
+                    ) : file.type.startsWith('audio/') ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2"/>
+                        <path d="M12 19v4" stroke="currentColor" strokeWidth="2"/>
+                        <path d="M8 23h8" stroke="currentColor" strokeWidth="2"/>
+                      </svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2"/>
+                        <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div className="file-details">
+                    <div className="file-name">{file.name}</div>
+                    <div className="file-size">{Math.round(file.size / 1024)}KB</div>
+                  </div>
+                </div>
+                <button
+                  className="remove-file"
+                  onClick={() => removeFile(index)}
+                  title={`Remove ${file.name}`}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
       {/* Main Input Area */}
-      <div className="isa-input-area-main relative">
-        <div className="flex gap-3 items-end">
-          {/* File Upload Button */}
-          <FileUpload
-            onFileSelect={onFileSelect || (() => {})}
-            accept="image/*,application/pdf,text/*"
-            multiple={true}
-            className="w-12 h-12 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl flex items-center justify-center text-white hover:bg-white/20 transition-all hover:scale-105 flex-shrink-0"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-white">
-              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M12 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M9 14l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </FileUpload>
+      <div className="input-controls">
+        <div className="input-row">
+          {/* File Upload Button Container */}
+          <div className="button-container">
+            <FileUpload
+              className="upload-button"
+              onFileSelect={handleFileSelection}
+              accept="image/*,application/pdf,text/*,.doc,.docx,.md,.wav,.mp3,.m4a,.flac,.ogg"
+              multiple={true}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M9 14l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </FileUpload>
+          </div>
           
-          {/* Suggestions Toggle Button */}
-          <button
-            onClick={() => setShowSuggestions(!showSuggestions)}
-            className={`w-12 h-12 backdrop-blur-xl border border-white/20 rounded-2xl flex items-center justify-center text-white transition-all hover:scale-105 flex-shrink-0 ${
-              showSuggestions 
-                ? 'bg-gradient-to-r from-blue-500/30 to-purple-500/30 border-blue-400/50 shadow-lg shadow-blue-500/25' 
-                : 'bg-white/10 hover:bg-white/20'
-            }`}
-            title="Smart suggestions"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-white">
-              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-              <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m15.5-6.5L19 7l-1.5 1.5M5 17l1.5-1.5L5 14l1.5 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
+          {/* Audio Recording Button Container */}
+          <div className="button-container">
+            <button
+              className={`audio-button ${isRecording ? 'recording' : ''}`}
+              onClick={toggleRecording}
+              disabled={isLoading}
+            >
+              {isRecording ? (
+                // Recording indicator (pulsing red dot)
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="8" fill="#ef4444" className="animate-pulse"/>
+                  <circle cx="12" cy="12" r="4" fill="white"/>
+                </svg>
+              ) : (
+                // Microphone icon
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M12 19v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M8 23h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </button>
+          </div>
           
-          {/* Chat Input */}
-          <div className="flex-1 relative">
+          {/* Chat Input Container */}
+          <div className="input-container">
             <textarea
               ref={textareaRef}
               value={inputValue}
@@ -166,21 +405,22 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
               disabled={disabled || isLoading}
               autoFocus={autoFocus}
               rows={1}
-              style={{ 
-                maxHeight: maxRows ? `${maxRows * 1.5}rem` : '6rem',
-                resize: 'none'
+              className="chat-input"
+              style={{
+                maxHeight: maxRows ? `${maxRows * 1.5}rem` : '150px'
               }}
-              className="w-full p-4 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl text-white placeholder-white/50 focus:outline-none focus:border-blue-400 focus:bg-white/20 transition-all resize-none overflow-auto"
             />
-            
-            {/* Send Button */}
+          </div>
+          
+          {/* Send Button Container */}
+          <div className="button-container">
             <button
+              className={`send-button ${(!inputValue.trim() || isLoading) ? 'disabled' : 'active'}`}
               onClick={handleSendMessage}
               disabled={!inputValue.trim() || isLoading}
-              className="absolute right-2 bottom-2 w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-all"
             >
               {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <LoadingSpinner />
               ) : (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -193,20 +433,37 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
         
         {/* Suggestions Panel */}
         {showSuggestions && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 bg-black/80 backdrop-blur-xl border border-white/20 rounded-xl p-4 z-50">
-            <div className="text-white text-sm font-medium mb-3">Quick Suggestions</div>
-            <div className="grid grid-cols-1 gap-2">
+          <div className="suggestions-panel">
+            <div className="suggestions-header">
+              <div className="suggestions-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="2" fill="currentColor"/>
+                </svg>
+                Quick Suggestions
+              </div>
+              <button
+                className="close-suggestions"
+                onClick={() => {
+                  playAudioFeedback('click');
+                  setShowSuggestions(false);
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="suggestions-grid">
               {suggestions.map((suggestion, index) => (
-                <button
+                <div
                   key={index}
-                  onClick={() => {
-                    handleSuggestionClick(suggestion);
-                    setShowSuggestions(false);
-                  }}
-                  className="text-left p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm transition-colors"
+                  className="suggestion-item"
+                  onClick={() => handleSuggestionClick(suggestion)}
                 >
+                  <div className="suggestion-dot" />
                   {suggestion}
-                </button>
+                </div>
               ))}
             </div>
           </div>
@@ -215,7 +472,7 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
       
       {/* Additional Content */}
       {children && (
-        <div className="isa-input-area-extra mt-4">
+        <div className="additional-content">
           {children}
         </div>
       )}

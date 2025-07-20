@@ -9,6 +9,13 @@ export interface ChatSession {
   timestamp: string;
   messageCount: number;
   artifacts: string[];
+  messages: Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
+    metadata?: any;
+  }>;
   metadata?: {
     apps_used?: string[];
     total_messages?: number;
@@ -31,16 +38,24 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
   onNewSession,
   className = ''
 }) => {
-  const { artifacts, currentApp, startNewChat } = useAppStore();
+  const { artifacts, currentApp, startNewChat, messages, clearMessages, setArtifacts } = useAppStore();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string>('default');
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState<string>('');
 
   // Initialize with default sessions or load from localStorage
   useEffect(() => {
     const savedSessions = localStorage.getItem('main_app_sessions');
     if (savedSessions) {
       try {
-        setSessions(JSON.parse(savedSessions));
+        const parsedSessions = JSON.parse(savedSessions);
+        // Migrate old sessions that don't have messages property
+        const migratedSessions = parsedSessions.map((session: any) => ({
+          ...session,
+          messages: session.messages || [] // Add empty messages array if missing
+        }));
+        setSessions(migratedSessions);
       } catch (error) {
         logger.error(LogCategory.CHAT_FLOW, 'Failed to load sessions from localStorage', { error });
       }
@@ -54,6 +69,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
           timestamp: new Date().toISOString(),
           messageCount: 1,
           artifacts: [],
+          messages: [],
           metadata: {
             apps_used: [],
             total_messages: 1,
@@ -66,18 +82,41 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
     }
   }, []);
 
-  // Update current session when artifacts change
+  // Update current session when artifacts or messages change
   useEffect(() => {
-    if (artifacts.length > 0) {
+    if (artifacts.length > 0 || messages.length > 0) {
       updateCurrentSession();
     }
-  }, [artifacts, currentApp]);
+  }, [artifacts, currentApp, messages]);
 
   const saveSessionsToStorage = (sessionsToSave: ChatSession[]) => {
     try {
-      localStorage.setItem('main_app_sessions', JSON.stringify(sessionsToSave));
+      // Optimize storage: remove very old sessions to prevent localStorage bloat
+      const maxSessions = 20;
+      const recentSessions = sessionsToSave
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, maxSessions);
+      
+      const dataToSave = JSON.stringify(recentSessions);
+      
+      // Check localStorage size and warn if getting large
+      if (dataToSave.length > 500000) { // 500KB
+        logger.warn(LogCategory.CHAT_FLOW, 'Session data getting large, consider cleanup', { 
+          size: dataToSave.length,
+          sessionCount: recentSessions.length 
+        });
+      }
+      
+      localStorage.setItem('main_app_sessions', dataToSave);
     } catch (error) {
-      logger.error(LogCategory.CHAT_FLOW, 'Failed to save sessions to localStorage', { error });
+      if (error.name === 'QuotaExceededError') {
+        logger.error(LogCategory.CHAT_FLOW, 'localStorage quota exceeded, clearing old sessions', { error });
+        // Emergency cleanup: keep only last 5 sessions
+        const emergencyCleanup = sessionsToSave.slice(0, 5);
+        localStorage.setItem('main_app_sessions', JSON.stringify(emergencyCleanup));
+      } else {
+        logger.error(LogCategory.CHAT_FLOW, 'Failed to save sessions to localStorage', { error });
+      }
     }
   };
 
@@ -88,18 +127,31 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
           const appsUsed = new Set(session.metadata?.apps_used || []);
           if (currentApp) appsUsed.add(currentApp);
 
+          // Optimize messages: only store essential data and truncate very long content
+          const optimizedMessages = messages.map(msg => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content.length > 2000 ? msg.content.substring(0, 2000) + '...[truncated]' : msg.content,
+            timestamp: msg.timestamp,
+            metadata: msg.metadata
+          }));
+
+          // Keep only last 50 messages to prevent memory bloat
+          const recentMessages = optimizedMessages.slice(-50);
+
           return {
             ...session,
             lastMessage: artifacts.length > 0 ? 
               `Generated ${artifacts[artifacts.length - 1].appName} content` : 
-              session.lastMessage,
+              (messages.length > 0 ? messages[messages.length - 1].content.substring(0, 100) + '...' : session.lastMessage),
             timestamp: new Date().toISOString(),
-            messageCount: session.messageCount + 1,
+            messageCount: messages.length,
             artifacts: artifacts.map(a => a.id),
+            messages: recentMessages,
             metadata: {
               ...session.metadata,
               apps_used: Array.from(appsUsed),
-              total_messages: session.messageCount + 1,
+              total_messages: messages.length,
               last_activity: new Date().toISOString()
             }
           };
@@ -120,6 +172,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
       timestamp: new Date().toISOString(),
       messageCount: 0,
       artifacts: [],
+      messages: [],
       metadata: {
         apps_used: [],
         total_messages: 0,
@@ -143,13 +196,31 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
   };
 
   const handleSessionSelect = (session: ChatSession) => {
+    // Save current session messages before switching
+    if (currentSessionId !== session.id) {
+      updateCurrentSession();
+    }
+    
     setCurrentSessionId(session.id);
+    
+    // Load session messages and artifacts
+    clearMessages();
+    if (session.messages && session.messages.length > 0) {
+      session.messages.forEach(msg => {
+        useAppStore.getState().addMessage(msg);
+      });
+    }
+    
+    // Load session artifacts
+    setArtifacts([]);
+    
     onSessionSelect?.(session);
     
     logger.info(LogCategory.CHAT_FLOW, 'Session selected', {
       sessionId: session.id,
       title: session.title,
-      messageCount: session.messageCount
+      messageCount: session.messageCount,
+      messagesLoaded: session.messages ? session.messages.length : 0
     });
   };
 
@@ -166,6 +237,37 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
     }
 
     logger.info(LogCategory.CHAT_FLOW, 'Session deleted', { sessionId });
+  };
+
+  const startRenameSession = (sessionId: string, currentTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSessionId(sessionId);
+    setEditingTitle(currentTitle);
+  };
+
+  const saveRename = () => {
+    if (!editingSessionId || !editingTitle.trim()) return;
+    
+    const updatedSessions = sessions.map(s => 
+      s.id === editingSessionId 
+        ? { ...s, title: editingTitle.trim() }
+        : s
+    );
+    setSessions(updatedSessions);
+    saveSessionsToStorage(updatedSessions);
+    
+    setEditingSessionId(null);
+    setEditingTitle('');
+    
+    logger.info(LogCategory.CHAT_FLOW, 'Session renamed', {
+      sessionId: editingSessionId,
+      newTitle: editingTitle.trim()
+    });
+  };
+
+  const cancelRename = () => {
+    setEditingSessionId(null);
+    setEditingTitle('');
   };
 
   const getSessionDisplayInfo = (session: ChatSession) => {
@@ -242,25 +344,51 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <div className={`text-sm font-medium truncate ${
-                      isActive ? 'text-blue-300' : 'text-white'
-                    }`}>
-                      {session.title}
-                    </div>
-                    {isActive && (
+                    {editingSessionId === session.id ? (
+                      <input
+                        type="text"
+                        value={editingTitle}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onBlur={saveRename}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveRename();
+                          if (e.key === 'Escape') cancelRename();
+                        }}
+                        className="text-sm font-medium bg-white/10 border border-white/20 rounded px-2 py-1 text-white w-full"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <div 
+                        className={`text-sm font-medium truncate cursor-pointer ${
+                          isActive ? 'text-blue-300' : 'text-white'
+                        }`}
+                        onDoubleClick={(e) => startRenameSession(session.id, session.title, e)}
+                      >
+                        {session.title}
+                      </div>
+                    )}
+                    {isActive && editingSessionId !== session.id && (
                       <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse flex-shrink-0" />
                     )}
                   </div>
                   
-                  <div className="text-gray-400 text-xs truncate mb-2">
-                    {session.lastMessage}
-                  </div>
+                  {editingSessionId !== session.id && (
+                    <div className="text-gray-400 text-xs truncate mb-2">
+                      {session.messages && session.messages.length > 0 
+                        ? (() => {
+                            const lastMsg = session.messages[session.messages.length - 1].content;
+                            // Show only first 60 chars and handle very long messages efficiently
+                            return lastMsg.length > 60 ? lastMsg.substring(0, 60) + '...' : lastMsg;
+                          })()
+                        : session.lastMessage
+                      }
+                    </div>
+                  )}
                   
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-gray-500 text-xs">{displayInfo.timeAgo}</span>
-                      <span className="text-gray-500 text-xs">•</span>
-                      <span className="text-gray-500 text-xs">{session.messageCount} msg</span>
                     </div>
                     
                     {displayInfo.appsUsed.length > 0 && (
@@ -278,16 +406,28 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
                   </div>
                 </div>
                 
-                {session.id !== 'default' && (
-                  <button
-                    onClick={(e) => deleteSession(session.id, e)}
-                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-500/20 rounded text-red-400 hover:text-red-300"
-                    title="Delete session"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                      <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                  </button>
+                {session.id !== 'default' && editingSessionId !== session.id && (
+                  <div className="flex items-center gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => startRenameSession(session.id, session.title, e)}
+                      className="p-1 hover:bg-blue-500/20 rounded text-blue-400 hover:text-blue-300"
+                      title="Rename session"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => deleteSession(session.id, e)}
+                      className="p-1 hover:bg-red-500/20 rounded text-red-400 hover:text-red-300"
+                      title="Delete session"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                  </div>
                 )}
               </div>
             </button>

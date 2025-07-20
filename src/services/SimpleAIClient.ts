@@ -25,6 +25,9 @@ type EventCallback = (data: any) => void;
 export class SimpleAIClient {
   private apiEndpoint: string;
   private events: Map<string, EventCallback[]> = new Map();
+  
+  // State for content token extraction
+  private previousFormattedLength: number = 0;
 
   constructor(apiEndpoint: string = 'http://localhost:8080') {
     this.apiEndpoint = apiEndpoint;
@@ -53,21 +56,64 @@ export class SimpleAIClient {
     callbacks.forEach(callback => callback(data));
   }
 
-  // Send message
+  // Send message (text only)
   async sendMessage(content: string, metadata: any = {}): Promise<string> {
+    return this.sendMultimodalMessage(content, [], metadata);
+  }
+
+  // Send multimodal message with files
+  async sendMultimodalMessage(content: string, files: File[] = [], metadata: any = {}): Promise<string> {
     const messageId = `user-${Date.now()}`;
 
     try {
-      const response = await fetch(`${this.apiEndpoint}/api/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: content,
-          metadata
-        })
-      });
+      let response: Response;
+
+      if (files.length === 0) {
+        // Text-only request (JSON)
+        response = await fetch(`${this.apiEndpoint}/api/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: content,
+            session_id: metadata.session_id || 'default',
+            user_id: metadata.user_id || 'test_user',
+            use_streaming: true,
+            template_parameters: metadata.template_parameters
+          })
+        });
+      } else {
+        // Multimodal request (FormData)
+        const formData = new FormData();
+        formData.append('message', content);
+        formData.append('session_id', metadata.session_id || 'default');
+        formData.append('user_id', metadata.user_id || 'test_user');
+        formData.append('use_streaming', 'true');
+
+        // Add template parameters if provided
+        if (metadata.template_parameters) {
+          Object.entries(metadata.template_parameters).forEach(([key, value]) => {
+            formData.append(`template_parameters[${key}]`, value as string);
+          });
+        }
+
+        // Add files
+        files.forEach((file, index) => {
+          if (file.type.startsWith('audio/')) {
+            formData.append('audio', file);
+          } else {
+            formData.append(`file_${index}`, file);
+          }
+        });
+
+        console.log('🔄 SimpleAI: Sending multimodal request with', files.length, 'files');
+
+        response = await fetch(`${this.apiEndpoint}/api/chat`, {
+          method: 'POST',
+          body: formData // No Content-Type header for FormData
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -90,8 +136,12 @@ export class SimpleAIClient {
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let accumulatedContent = '';
-    let isStreaming = false;
+    let accumulatedTokens = '';
+    let hasStartedStreaming = false;
+    let isReceivingTokens = false;
+    
+    // Reset token extraction state for new message
+    this.previousFormattedLength = 0;
 
     try {
       while (true) {
@@ -108,97 +158,164 @@ export class SimpleAIClient {
             // Handle [DONE] marker
             if (dataContent === '[DONE]') {
               console.log('🔚 SimpleAI: Stream ended with [DONE] marker');
+              if (isReceivingTokens) {
+                this.emit('streaming:end', { type: 'done' });
+                this.emit('typing:changed', false);
+              }
               continue;
             }
             
             try {
               const eventData = JSON.parse(dataContent);
               
-              // Log all events to understand the full structure
-              console.log('📥 SimpleAI: Event received:', eventData.type, eventData);
-              
-              // Debug: Check if we're missing the start event
+              // Only handle key events, ignore most workflow events
               if (eventData.type === 'start') {
-                console.log('🎬 SimpleAI: START EVENT DETECTED - should trigger streaming');
+                console.log('🎬 SimpleAI: Stream session started');
+                // Don't emit streaming:start yet, wait for actual tokens
               }
               
-              // Handle start event
-              if (eventData.type === 'start') {
-                console.log('🎬 SimpleAI: Streaming started');
-                this.emit('streaming:start', eventData);
-                this.emit('typing:changed', true);
-                isStreaming = true;
+              // Handle response tokens (the actual streaming content)
+              else if (eventData.type === 'custom_event' && 
+                       eventData.metadata?.raw_chunk?.response_token) {
+                
+                const tokenData = eventData.metadata.raw_chunk.response_token;
+                
+                if (tokenData.token) {
+                  accumulatedTokens += tokenData.token;
+                  console.log('🔤 Token received:', JSON.stringify(tokenData.token));
+                  
+                  // Start streaming when we get past the JSON structure to actual content
+                  if (!hasStartedStreaming && this.shouldStartStreaming(accumulatedTokens)) {
+                    console.log('🎬 SimpleAI: Starting content streaming');
+                    this.emit('streaming:start', { type: 'content_start' });
+                    this.emit('typing:changed', true);
+                    hasStartedStreaming = true;
+                    isReceivingTokens = true;
+                  }
+                  
+                  // Only process content tokens, not JSON structure
+                  if (hasStartedStreaming) {
+                    this.processContentToken(accumulatedTokens, tokenData.token);
+                  }
+                }
               }
               
-              // Handle status events (if any)
-              else if (eventData.type === 'status' || eventData.type === 'progress') {
-                console.log('📊 SimpleAI: Status update:', eventData);
-                this.emit('streaming:status', eventData);
+              // Handle final content (shouldn't process if we streamed tokens)
+              else if (eventData.type === 'content') {
+                console.log('🏁 SimpleAI: Final content received');
+                
+                if (isReceivingTokens) {
+                  console.log('✅ SimpleAI: Tokens were streamed, skipping final content processing');
+                  this.emit('streaming:end', { type: 'content_complete' });
+                  this.emit('typing:changed', false);
+                } else {
+                  // Fallback for non-streamed responses
+                  console.log('📄 SimpleAI: No tokens were streamed, processing final content');
+                  let actualContent = this.extractFormattedContent(eventData.content);
+                  await this.processFinalResponse(actualContent, requestId, metadata);
+                }
+                
+                // Reset state
+                accumulatedTokens = '';
+                hasStartedStreaming = false;
+                isReceivingTokens = false;
               }
               
-              // Handle individual token streaming from custom_event
-              else if (eventData.type === 'custom_event' && eventData.content?.includes('response_token')) {
+              // Handle end event
+              else if (eventData.type === 'end') {
+                console.log('🏁 SimpleAI: Stream session ended');
+                if (isReceivingTokens) {
+                  this.emit('streaming:end', { type: 'session_end' });
+                  this.emit('typing:changed', false);
+                }
+              }
+              
+              // Handle node updates (workflow progress)
+              else if (eventData.type === 'node_update') {
+                const nodeName = eventData.metadata?.node_name;
+                const nextAction = eventData.metadata?.next_action;
+                
+                // Only show meaningful workflow steps to user
+                if (nodeName === 'entry_preparation' && nextAction === 'end') {
+                  this.emit('streaming:status', { status: 'Processing request...', type: 'workflow', node: nodeName });
+                } else if (nodeName === 'reasonnode' && nextAction === 'end') {
+                  this.emit('streaming:status', { status: 'Generating response...', type: 'workflow', node: nodeName });
+                } else if (nodeName === 'format_response' && nextAction === 'end') {
+                  this.emit('streaming:status', { status: 'Finalizing...', type: 'workflow', node: nodeName });
+                }
+              }
+              
+              // Handle tool execution events (minimal status updates)
+              else if (eventData.type === 'tool_executing') {
+                const toolName = eventData.metadata?.tool_name || 'tool';
+                this.emit('streaming:status', { status: `Executing ${toolName}...`, type: 'tool' });
+              }
+              else if (eventData.type === 'tool_completed') {
+                const toolName = eventData.metadata?.tool_name || 'tool';
+                this.emit('streaming:status', { status: `Completed ${toolName}`, type: 'tool', tool_name: toolName });
+              }
+              
+              // Handle tool result messages (contains actual tool output)
+              else if (eventData.type === 'tool_result_msg') {
                 try {
-                  // Extract token info from the custom event content
-                  const tokenMatch = eventData.content.match(/'response_token':\s*{[^}]*'token':\s*'([^']*)'[^}]*}/);
-                  if (tokenMatch) {
-                    const token = tokenMatch[1];
-                    if (!isStreaming) {
-                      isStreaming = true;
-                      this.emit('streaming:start', { type: 'custom_token_start' });
-                      this.emit('typing:changed', true);
+                  // Extract the tool result from the content
+                  const content = eventData.content || '';
+                  console.log('🔧 SimpleAI: Raw tool result content:', content);
+                  
+                  // Try multiple patterns to extract JSON
+                  let jsonString = null;
+                  
+                  // Pattern 1: ToolMessage: {...} with potential line breaks
+                  let jsonMatch = content.match(/ToolMessage:\s*(\{[\s\S]*\})/);
+                  if (jsonMatch) {
+                    jsonString = jsonMatch[1];
+                  } else {
+                    // Pattern 2: Just look for JSON object
+                    jsonMatch = content.match(/(\{[\s\S]*\})/);
+                    if (jsonMatch) {
+                      jsonString = jsonMatch[1];
                     }
+                  }
+                  if (jsonString) {
+                    // Clean up common JSON issues caused by streaming
+                    jsonString = jsonString
+                      .replace(/\\n/g, '')  // Remove escaped newlines that break JSON
+                      .replace(/\n/g, '')   // Remove actual newlines
+                      .replace(/,\s*}/g, '}')  // Remove trailing commas
+                      .replace(/,\s*]/g, ']')  // Remove trailing commas in arrays
+                      .trim();
                     
-                    // Emit individual token
-                    this.emit('token:received', { content: token });
-                    console.log('🔤 SimpleAI: Token received:', token);
+                    console.log('🔧 SimpleAI: Cleaned JSON string:', jsonString.substring(0, 200) + '...');
+                    
+                    const toolResult = JSON.parse(jsonString);
+                    
+                    // Generic tool result handler for all tools
+                    console.log(`🔧 SimpleAI: Tool result for ${toolResult.action}:`, toolResult);
+                    
+                    // Emit generic tool result event
+                    this.emit('tool:result', {
+                      action: toolResult.action,
+                      status: toolResult.status,
+                      data: toolResult.data || {},
+                      success: toolResult.status === 'success'
+                    });
+                    
+                    // Special handling for image URLs if present
+                    if (toolResult.data?.image_urls && toolResult.data.image_urls.length > 0) {
+                      console.log('🖼️ SimpleAI: Found image URLs:', toolResult.data.image_urls);
+                      this.emit('tool:images_found', { 
+                        urls: toolResult.data.image_urls,
+                        action: toolResult.action,
+                        data: toolResult.data
+                      });
+                    }
+                  } else {
+                    console.log('⚠️ SimpleAI: No JSON found in tool result message');
                   }
                 } catch (e) {
-                  // Ignore token extraction errors
+                  console.log('⚠️ SimpleAI: Error parsing tool result message:', e);
+                  console.log('⚠️ SimpleAI: Raw content was:', eventData.content);
                 }
-              }
-              
-              // Handle final content response
-              else if (eventData.type === 'content') {
-                console.log('🏁 SimpleAI: Final content received, processing response');
-                this.emit('streaming:end', { type: 'content_complete' });
-                this.emit('typing:changed', false);
-                
-                // Process final response
-                await this.processFinalResponse(eventData.content, requestId, metadata);
-                
-                // Reset for next message
-                accumulatedContent = '';
-                isStreaming = false;
-              }
-              
-              // Legacy token format (keep for compatibility)
-              else if (eventData.type === 'token') {
-                if (!isStreaming) {
-                  isStreaming = true;
-                  this.emit('typing:changed', true);
-                }
-                
-                // Accumulate for final processing
-                accumulatedContent += eventData.content;
-                console.log('📝 SimpleAI: Accumulated content length:', accumulatedContent.length);
-                
-                // Extract and emit clean content tokens (not JSON)
-                this.extractAndEmitCleanToken(accumulatedContent, eventData.content);
-              }
-              
-              // Legacy end format (keep for compatibility)
-              else if (eventData.type === 'end') {
-                console.log('🏁 SimpleAI: End event received, processing final response');
-                this.emit('streaming:end', { type: 'legacy_end' });
-                this.emit('typing:changed', false);
-                
-                // Process final response
-                await this.processFinalResponse(accumulatedContent, requestId, metadata);
-                
-                // Reset for next message
-                accumulatedContent = '';
-                isStreaming = false;
               }
               
             } catch (parseError) {
@@ -212,37 +329,50 @@ export class SimpleAIClient {
     }
   }
 
-  private extractAndEmitCleanToken(accumulated: string, newToken: string) {
-    // Only emit tokens if we're in the formatted_content section
-    if (accumulated.includes('"formatted_content"')) {
-      try {
-        const match = accumulated.match(/"formatted_content":\s*"([^"\\]*(\\.[^"\\]*)*)"/);
-        if (match) {
-          const currentContent = match[1]
+  private shouldStartStreaming(accumulated: string): boolean {
+    // Start streaming when we reach actual content after "User:" or "Assistant:"
+    // This skips the JSON structure tokens and waits for readable content
+    const patterns = [
+      'User: ',
+      'Assistant: '
+    ];
+    
+    return patterns.some(pattern => accumulated.includes(pattern));
+  }
+
+  private processContentToken(accumulated: string, _newToken: string) {
+    try {
+      // Look for the actual content within the formatted_content field
+      // We want to extract just the human-readable conversation, not the JSON structure
+      
+      // Find where actual conversation content starts and ends
+      const userMatch = accumulated.match(/User: ([^\\]*)\\n\\nAssistant: ([^"]*)/);
+      if (userMatch) {
+        const assistantContent = userMatch[2];
+        
+        // Only emit new content that wasn't already sent
+        if (assistantContent.length > this.previousFormattedLength) {
+          const newContent = assistantContent.substring(this.previousFormattedLength);
+          
+          // Clean up escaped characters for display
+          const cleanContent = newContent
             .replace(/\\n/g, '\n')
             .replace(/\\"/g, '"')
             .replace(/\\\\/g, '\\');
           
-          // Calculate what new content this token adds
-          const prevAccumulated = accumulated.substring(0, accumulated.lastIndexOf(newToken));
-          const prevMatch = prevAccumulated.match(/"formatted_content":\s*"([^"\\]*(\\.[^"\\]*)*)"/);
-          const prevContent = prevMatch ? 
-            prevMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\') : '';
-          
-          if (currentContent.length > prevContent.length) {
-            const newContent = currentContent.substring(prevContent.length);
-            if (newContent.trim()) {
-              this.emit('token:received', { content: newContent });
-            }
+          if (cleanContent.length > 0) {
+            console.log('🔤 SimpleAI: Emitting clean content:', JSON.stringify(cleanContent));
+            this.emit('token:received', { content: cleanContent });
+            this.previousFormattedLength = assistantContent.length;
           }
         }
-      } catch (e) {
-        // Ignore extraction errors
       }
+    } catch (e) {
+      console.log('⚠️ SimpleAI: Error processing content token:', e);
     }
   }
 
-  private async processFinalResponse(content: string, requestId: string, metadata: any = {}) {
+  private async processFinalResponse(content: string, _requestId: string, metadata: any = {}) {
     try {
       // Check if we have any content to process
       if (!content.trim()) {
@@ -250,50 +380,50 @@ export class SimpleAIClient {
         return;
       }
       
-      // Parse the complete JSON response
-      let jsonContent = content;
+      // Try to extract formatted_content if this is JSON wrapped
+      let actualContent = this.extractFormattedContent(content);
       
-      // Remove markdown wrapper if present
-      if (jsonContent.startsWith('```json')) {
-        const match = jsonContent.match(/```json\n([\s\S]*?)\n```/);
-        if (match) jsonContent = match[1];
-      }
+      console.log('📦 SimpleAI: Processing content:', actualContent.substring(0, 200) + '...');
       
-      // Try to parse the JSON
-      let responseData;
+      // Extract image URLs and media items
+      let media_items: any[] = [];
+      
+      // First, try to get media_items from the parsed JSON structure
       try {
-        responseData = JSON.parse(jsonContent);
-      } catch (parseError) {
-        console.log('⚠️ SimpleAI: Could not parse as JSON, using raw content:', jsonContent.substring(0, 200));
-        // Create a fallback response
-        responseData = {
-          formatted_content: content,
-          content_types: ['text'],
-          has_media: false,
-          media_items: []
-        };
+        const parsedContent = JSON.parse(content);
+        if (parsedContent.media_items && Array.isArray(parsedContent.media_items)) {
+          media_items = parsedContent.media_items;
+          console.log('🖼️ SimpleAI: Found media_items in parsed content:', media_items);
+        }
+      } catch (e) {
+        // If not JSON, try to extract from markdown
+        const imageUrls = this.extractImageUrls(actualContent);
+        media_items = imageUrls.map(url => ({
+          type: 'image',
+          url: url,
+          title: 'Generated Image'
+        }));
       }
-      console.log('📦 SimpleAI: Parsed final response', responseData);
       
       // Use provided metadata directly
       const requestMetadata = metadata;
       
-      // Create message
+      // Create message with processed content
       const message: Message = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: this.extractCleanContent(responseData.formatted_content) || responseData.formatted_content || '',
+        content: actualContent,
         timestamp: new Date().toISOString(),
         metadata: {
           ...requestMetadata,
-          content_types: responseData.content_types || ['text'],
-          has_media: responseData.has_media || false,
-          media_items: responseData.media_items || []
+          content_types: ['text'],
+          has_media: media_items.length > 0,
+          media_items: media_items
         }
       };
 
-      // All responses go to centralized store via message:received event
-      console.log('💬 SimpleAI: Routing response to centralized store');
+      console.log('💬 SimpleAI: Routing processed response to centralized store');
+      console.log('🖼️ SimpleAI: Found', media_items.length, 'images in response');
       this.emit('message:received', message);
       
     } catch (parseError) {
@@ -301,34 +431,56 @@ export class SimpleAIClient {
     }
   }
 
-  private extractCleanContent(formattedContent: string): string {
+  private extractFormattedContent(content: string): string {
     try {
-      // Check if content starts with ```json and ends with ```
-      if (formattedContent.startsWith('```json') && formattedContent.includes('```')) {
-        const jsonStart = formattedContent.indexOf('```json\n') + 8;
-        const jsonEnd = formattedContent.lastIndexOf('\n```');
-        const jsonStr = formattedContent.substring(jsonStart, jsonEnd);
-        
-        const parsed = JSON.parse(jsonStr);
-        
-        // Extract the actual text content, excluding image URLs and technical parts
-        let cleanText = '';
-        if (parsed.formatted_content) {
-          // Remove image URLs and technical content, keep only human-readable text
-          cleanText = parsed.formatted_content
-            .replace(/https:\/\/[^\s]+/g, '') // Remove URLs
-            .replace(/\\n/g, '\n') // Convert escaped newlines
-            .replace(/\\"/g, '"') // Convert escaped quotes
-            .trim();
-        }
-        
-        return cleanText || 'Hello! How can I assist you today?';
+      // Try to parse as JSON first
+      const parsedContent = JSON.parse(content);
+      if (parsedContent.formatted_content) {
+        console.log('✅ SimpleAI: Extracted formatted_content from JSON in processFinalResponse');
+        return parsedContent.formatted_content;
       }
       
-      return formattedContent;
-    } catch (error) {
-      console.log('⚠️ Failed to extract clean content, using original:', error);
-      return formattedContent;
+      // If it has formatted_content field but it's an object, try to stringify it
+      if (typeof parsedContent.formatted_content === 'object') {
+        return JSON.stringify(parsedContent.formatted_content, null, 2);
+      }
+      
+      // Return the entire parsed content if no formatted_content field
+      return typeof parsedContent === 'string' ? parsedContent : JSON.stringify(parsedContent, null, 2);
+      
+    } catch (jsonError) {
+      // Not JSON, return content as-is
+      console.log('📄 SimpleAI: Content is not JSON in processFinalResponse, using as-is');
+      return content;
     }
   }
+
+  private extractImageUrls(content: string): string[] {
+    const imageUrls: string[] = [];
+    
+    // Match markdown image format: ![alt](url)
+    const markdownImages = content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/g);
+    if (markdownImages) {
+      markdownImages.forEach(match => {
+        const urlMatch = match.match(/\((https?:\/\/[^\s)]+)\)/);
+        if (urlMatch) {
+          imageUrls.push(urlMatch[1]);
+        }
+      });
+    }
+    
+    // Match direct image URLs
+    const directUrls = content.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/gi);
+    if (directUrls) {
+      directUrls.forEach(url => {
+        if (!imageUrls.includes(url)) {
+          imageUrls.push(url);
+        }
+      });
+    }
+    
+    console.log('🔍 SimpleAI: Extracted image URLs:', imageUrls);
+    return imageUrls;
+  }
+
 }

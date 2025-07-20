@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InputAreaLayout CSS Debug Analysis</title>
+    <style>
+        /* Simulate Tailwind Base Reset (from @tailwind base) */
+        *, ::before, ::after {
+            box-sizing: border-box;
+            border-width: 0;
+            border-style: solid;
+            border-color: #e5e7eb;
+        }
+        
+        html {
+            line-height: 1.5;
+            -webkit-text-size-adjust: 100%;
+            -moz-tab-size: 4;
+            tab-size: 4;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+        }
+        
+        body {
+            margin: 0;
+            line-height: inherit;
+        }
+        
+        button {
+            font-family: inherit;
+            font-size: 100%;
+            font-weight: inherit;
+            line-height: inherit;
+            color: inherit;
+            margin: 0;
+            padding: 0;
+        }
+        
+        button, input, textarea {
+            font-family: inherit;
+            font-size: 100%;
+            font-weight: inherit;
+            line-height: inherit;
+            color: inherit;
+            margin: 0;
+            padding: 0;
+        }
+        
+        textarea {
+            resize: vertical;
+        }
+        
+        /* Simulate Tailwind Utilities that might be applied */
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .flex-1 { flex: 1 1 0%; }
+        .h-screen { height: 100vh; }
+        .text-white { --tw-text-opacity: 1; color: rgb(255 255 255 / var(--tw-text-opacity)); }
+        .overflow-hidden { overflow: hidden; }
+        .bg-black\/20 { background-color: rgb(0 0 0 / 0.2); }
+        .backdrop-blur-xl { --tw-backdrop-blur: blur(24px); backdrop-filter: var(--tw-backdrop-blur); }
+        .border-b { border-bottom-width: 1px; }
+        .border-white\/10 { border-color: rgb(255 255 255 / 0.1); }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .z-10 { z-index: 10; }
+        
+        /* Actual CSS from globals.css for InputAreaLayout */
+        div.input-area-container {
+            padding: min(6vw, 24px) !important;
+            background: rgba(0, 0, 0, 0.4) !important;
+            backdrop-filter: blur(20px) saturate(120%) !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-left: none !important;
+            border-right: none !important;
+            border-bottom: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 16px !important;
+            min-height: max(80px, 10vh) !important;
+            position: relative !important;
+        }
+        
+        .suggestions-content {
+            margin-bottom: 16px;
+        }
+        
+        .input-controls {
+            position: relative;
+        }
+        
+        .input-row {
+            display: flex;
+            gap: min(3vw, 12px);
+            align-items: flex-end;
+        }
+        
+        div.input-area-container button.upload-button {
+            width: max(40px, 10vw) !important;
+            height: max(40px, 10vw) !important;
+            max-width: 48px !important;
+            max-height: 48px !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+            backdrop-filter: blur(10px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 12px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-shrink: 0 !important;
+            cursor: pointer !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            color: white !important;
+            font-family: inherit !important;
+            font-size: inherit !important;
+            text-decoration: none !important;
+            box-sizing: border-box !important;
+            outline: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background-image: none !important;
+            text-transform: none !important;
+            letter-spacing: normal !important;
+            word-spacing: normal !important;
+            line-height: normal !important;
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+            appearance: none !important;
+        }
+        
+        div.input-area-container button.upload-button:hover {
+            transform: scale(1.05) !important;
+            background: rgba(255, 255, 255, 0.15) !important;
+        }
+        
+        div.input-area-container button.upload-button:active {
+            transform: scale(0.95) !important;
+        }
+        
+        div.input-area-container div.suggestions-button {
+            width: max(40px, 10vw) !important;
+            height: max(40px, 10vw) !important;
+            max-width: 48px !important;
+            max-height: 48px !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+            backdrop-filter: blur(10px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 12px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            flex-shrink: 0 !important;
+            color: white !important;
+            box-sizing: border-box !important;
+        }
+        
+        .input-container {
+            flex: 1;
+            position: relative;
+            min-width: 0;
+        }
+        
+        div.input-area-container textarea.chat-input {
+            width: 100% !important;
+            resize: none !important;
+            padding: min(4vw, 16px) !important;
+            padding-right: min(12vw, 48px) !important;
+            background: rgba(255, 255, 255, 0.08) !important;
+            backdrop-filter: blur(10px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-radius: 16px !important;
+            color: white !important;
+            font-size: max(14px, 4vw) !important;
+            font-family: inherit !important;
+            line-height: 1.5 !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            outline: none !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+        }
+        
+        div.input-area-container textarea.chat-input:focus {
+            background: rgba(255, 255, 255, 0.12) !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+        }
+        
+        div.input-area-container textarea.chat-input::placeholder {
+            color: rgba(255, 255, 255, 0.5) !important;
+        }
+        
+        div.input-area-container button.send-button {
+            position: absolute !important;
+            right: 8px !important;
+            bottom: 8px !important;
+            width: max(28px, 7vw) !important;
+            height: max(28px, 7vw) !important;
+            max-width: 32px !important;
+            max-height: 32px !important;
+            border-radius: 8px !important;
+            border: none !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: white !important;
+            box-sizing: border-box !important;
+        }
+        
+        div.input-area-container button.send-button.disabled {
+            background: #6b7280 !important;
+            cursor: not-allowed !important;
+            opacity: 0.5 !important;
+        }
+        
+        div.input-area-container button.send-button.active {
+            background: #10b981 !important;
+            cursor: pointer !important;
+            opacity: 1 !important;
+        }
+        
+        div.input-area-container button.send-button.active:hover {
+            transform: scale(1.1) !important;
+            background: #059669 !important;
+        }
+        
+        /* Test scenarios for debugging */
+        .debug-scenario {
+            margin: 20px;
+            padding: 20px;
+            border: 2px solid #333;
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            min-height: 200px;
+        }
+        
+        .debug-title {
+            color: #60a5fa;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        /* Base body styling for dark theme */
+        body {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>InputAreaLayout CSS Debug Analysis</h1>
+    
+    <div class="debug-scenario">
+        <div class="debug-title">Scenario 1: Basic InputAreaLayout Structure</div>
+        <div class="input-area-container">
+            <div class="input-controls">
+                <div class="input-row">
+                    <!-- File Upload Button -->
+                    <button class="upload-button">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M12 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M9 14l3-3 3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    
+                    <!-- Suggestions Toggle Button -->
+                    <div class="suggestions-button">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                            <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m15.5-6.5L19 7l-1.5 1.5M5 17l1.5-1.5L5 14l1.5 1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    
+                    <!-- Chat Input Container -->
+                    <div class="input-container">
+                        <textarea
+                            class="chat-input"
+                            placeholder="Type your message..."
+                            rows="1"
+                        ></textarea>
+                        
+                        <!-- Send Button -->
+                        <button class="send-button active">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="debug-scenario">
+        <div class="debug-title">Scenario 2: With Tailwind Classes Applied (like in ChatLayout)</div>
+        <div class="input-area-container flex flex-col h-screen text-white overflow-hidden">
+            <div class="input-controls">
+                <div class="input-row">
+                    <button class="upload-button">📎</button>
+                    <div class="suggestions-button">⚙️</div>
+                    <div class="input-container">
+                        <textarea class="chat-input" placeholder="Type your message..."></textarea>
+                        <button class="send-button active">▶</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="debug-scenario">
+        <div class="debug-title">Scenario 3: Inspect Element Simulation</div>
+        <div style="font-family: monospace; font-size: 12px; background: #000; color: #0f0; padding: 10px;">
+            &lt;div class="input-area-container"&gt;<br>
+            &nbsp;&nbsp;&lt;div class="input-controls"&gt;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&lt;div class="input-row"&gt;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;button class="upload-button"&gt;...&lt;/button&gt;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class="suggestions-button"&gt;...&lt;/div&gt;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class="input-container"&gt;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;textarea class="chat-input"&gt;&lt;/textarea&gt;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;button class="send-button active"&gt;...&lt;/button&gt;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br>
+            &nbsp;&nbsp;&lt;/div&gt;<br>
+            &lt;/div&gt;
+        </div>
+    </div>
+    
+    <script>
+        // Debug information
+        console.log('=== CSS DEBUG ANALYSIS ===');
+        console.log('1. All CSS selectors use high specificity (div.input-area-container)');
+        console.log('2. All properties use !important declarations');
+        console.log('3. Tailwind base reset is simulated');
+        console.log('4. Component structure matches React component');
+        
+        // Test computed styles
+        const container = document.querySelector('.input-area-container');
+        if (container) {
+            const styles = window.getComputedStyle(container);
+            console.log('Computed styles for .input-area-container:');
+            console.log('- padding:', styles.padding);
+            console.log('- background:', styles.background);
+            console.log('- backdrop-filter:', styles.backdropFilter);
+            console.log('- border:', styles.border);
+            console.log('- display:', styles.display);
+            console.log('- flex-direction:', styles.flexDirection);
+            console.log('- gap:', styles.gap);
+        }
+        
+        const uploadButton = document.querySelector('.upload-button');
+        if (uploadButton) {
+            const buttonStyles = window.getComputedStyle(uploadButton);
+            console.log('Computed styles for .upload-button:');
+            console.log('- width:', buttonStyles.width);
+            console.log('- height:', buttonStyles.height);
+            console.log('- background:', buttonStyles.background);
+            console.log('- border:', buttonStyles.border);
+            console.log('- border-radius:', buttonStyles.borderRadius);
+        }
+        
+        const chatInput = document.querySelector('.chat-input');
+        if (chatInput) {
+            const inputStyles = window.getComputedStyle(chatInput);
+            console.log('Computed styles for .chat-input:');
+            console.log('- width:', inputStyles.width);
+            console.log('- padding:', inputStyles.padding);
+            console.log('- background:', inputStyles.background);
+            console.log('- border:', inputStyles.border);
+            console.log('- color:', inputStyles.color);
+        }
+    </script>
+</body>
+</html>

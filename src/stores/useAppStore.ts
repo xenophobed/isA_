@@ -83,6 +83,7 @@ export interface AppActions {
   // Chat actions
   addMessage: (message: ChatMessage) => void;
   sendMessage: (content: string, client: any, metadata?: Record<string, any>) => Promise<void>;
+  sendMultimodalMessage: (content: string, files: File[], client: any, metadata?: Record<string, any>) => Promise<void>;
   setIsTyping: (typing: boolean) => void;
   setChatLoading: (loading: boolean) => void;
   clearMessages: () => void;
@@ -181,19 +182,11 @@ export const useAppStore = create<AppStore>()(
         return;
       }
 
-      const { addMessage, setChatLoading, setIsTyping } = get();
+      const { setChatLoading, setIsTyping } = get();
       
-      // Create user message
-      const userMessage: ChatMessage = {
-        id: `user-${Date.now()}`,
-        role: 'user',
-        content,
-        timestamp: new Date().toISOString(),
-        metadata
-      };
+      // Don't add user message here - it's already added in onBeforeSend
+      // This avoids duplicate user messages
       
-      // Add user message immediately to store
-      addMessage(userMessage);
       setChatLoading(true);
       setIsTyping(true);
       
@@ -205,6 +198,39 @@ export const useAppStore = create<AppStore>()(
         setChatLoading(false);
       } catch (error) {
         logger.error(LogCategory.CHAT_FLOW, 'Failed to send message', { error });
+        setChatLoading(false);
+        setIsTyping(false);
+      }
+    },
+
+    sendMultimodalMessage: async (content, files, client, metadata = {}) => {
+      if (!client) {
+        logger.error(LogCategory.CHAT_FLOW, 'No AI client provided to sendMultimodalMessage');
+        return;
+      }
+
+      const { setChatLoading, setIsTyping } = get();
+      
+      // Don't add user message here - it's already added in onBeforeSend
+      // This avoids duplicate user messages
+      
+      setChatLoading(true);
+      setIsTyping(true);
+      
+      try {
+        // Use the provided client (from SimpleAIProvider) with multimodal method
+        await client.sendMultimodalMessage(content, files, metadata);
+        
+        // AI response will be handled by the client's event system in main_app
+        setChatLoading(false);
+        
+        logger.info(LogCategory.CHAT_FLOW, 'Multimodal message sent successfully', {
+          contentLength: content.length,
+          fileCount: files.length,
+          fileTypes: files.map(f => f.type)
+        });
+      } catch (error) {
+        logger.error(LogCategory.CHAT_FLOW, 'Failed to send multimodal message', { error });
         setChatLoading(false);
         setIsTyping(false);
       }
@@ -456,6 +482,7 @@ export const useStreamingMessage = () => useAppStore(state => state.streamingMes
 export const useChatActions = () => useAppStore(state => ({
   addMessage: state.addMessage,
   sendMessage: state.sendMessage,  // Note: requires (content, client, metadata)
+  sendMultimodalMessage: state.sendMultimodalMessage,  // Note: requires (content, files, client, metadata)
   setIsTyping: state.setIsTyping,
   setChatLoading: state.setChatLoading,
   clearMessages: state.clearMessages,
