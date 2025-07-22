@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { SimpleAIClient } from '../services/SimpleAIClient';
+import { BaseSidebar } from '../components/ui/BaseSidebar';
+import { TestOmniStream } from './tests/test_omni_stream';
 
 interface OmniSidebarProps {
   triggeredInput?: string;
@@ -32,15 +33,31 @@ interface TopicConfig {
   templates: TemplateConfig[];
 }
 
-/**
- * Sophisticated Agentic Content Generator
- * Advanced multi-purpose content creation with research capabilities
- */
-export const OmniSidebar: React.FC<OmniSidebarProps> = ({ triggeredInput }) => {
-  // Use dedicated AI client for Omni sidebar (independent from main app)
-  const [client] = useState(() => new SimpleAIClient('http://localhost:8080'));
-  const [isGenerating, setIsGenerating] = useState(false);
-  
+interface BaseSidebarInjectedProps {
+  isProcessing?: boolean;
+  error?: string | null;
+  result?: any;
+  onProcess?: (input: string, templateParams?: any, metadata?: any) => Promise<void>;
+  onReset?: () => void;
+  client?: any;
+  // 流式显示相关props
+  streamingContent?: string;
+  streamingStatus?: string;
+  isStreaming?: boolean;
+}
+
+type OmniContentProps = BaseSidebarInjectedProps & {
+  triggeredInput?: string;
+};
+
+const OmniContent: React.FC<OmniContentProps> = ({
+  isProcessing,
+  onProcess,
+  triggeredInput,
+  streamingContent,
+  streamingStatus,
+  isStreaming
+}) => {
   // Content Generation Arguments
   const [args, setArgs] = useState<ContentGenerationArgs>({
     topic: 'custom',
@@ -73,7 +90,7 @@ export const OmniSidebar: React.FC<OmniSidebarProps> = ({ triggeredInput }) => {
     }
   }, [triggeredInput]);
 
-  // Topic Configurations with multiple templates
+  // Topic Configurations with multiple templates (ALL 10 TOPICS)
   const topicConfigs: Record<string, TopicConfig> = {
     custom: {
       name: 'Custom',
@@ -571,7 +588,6 @@ Begin your scientific analysis now.`
     { id: 'creative', title: 'Creative & Artistic', icon: '🎨' },
     { id: 'science', title: 'Science & Research', icon: '🔬' },
   ];
-  
 
   // Update args helper
   const updateArgs = (key: keyof ContentGenerationArgs, value: any) => {
@@ -650,12 +666,11 @@ Begin your scientific analysis now.`
   };
   
   const handleGenerate = async () => {
-    if (!args.subject.trim() || !client || isGenerating) {
+    if (!args.subject.trim() || !onProcess || isProcessing) {
       console.log('⚡ OMNI: Aborting generation - invalid input');
       return;
     }
 
-    setIsGenerating(true);
     try {
       const prompt = generatePromptTemplate(args);
       console.log('⚡ OMNI: Selected topic:', args.topic);
@@ -667,7 +682,7 @@ Begin your scientific analysis now.`
       const requestId = `omni-topic-${Date.now()}`;
       const templateId = `${args.topic}_${args.template}_prompt`;
       
-      await client.sendMessage(prompt, {
+      await onProcess(prompt, {
         template_parameters: {
           app_id: "omni",
           template_id: templateId,
@@ -704,8 +719,6 @@ Begin your scientific analysis now.`
       });
     } catch (error) {
       console.error('Generation failed:', error);
-    } finally {
-      setIsGenerating(false);
     }
   };
 
@@ -858,17 +871,26 @@ Begin your scientific analysis now.`
               )}
             </div>
           )}
+          
+          {/* Reference Text Input */}
+          <textarea
+            value={args.referenceText}
+            onChange={(e) => updateArgs('referenceText', e.target.value)}
+            placeholder="Additional context or instructions..."
+            className="w-full mt-2 p-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-xs"
+            rows={2}
+          />
         </div>
         
         {/* Generate Button */}
         <button
           onClick={handleGenerate}
-          disabled={isGenerating || !args.subject.trim()}
+          disabled={isProcessing || !args.subject.trim()}
           className={`w-full p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg text-white font-medium flex items-center justify-center gap-2 transition-all ${
-            isGenerating ? 'animate-pulse' : 'hover:from-blue-600 hover:to-purple-600'
+            isProcessing ? 'animate-pulse' : 'hover:from-blue-600 hover:to-purple-600'
           } disabled:opacity-50 disabled:cursor-not-allowed`}
         >
-          {isGenerating ? (
+          {isProcessing ? (
             <>
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
               Generating...
@@ -882,21 +904,63 @@ Begin your scientific analysis now.`
         </button>
         
         {/* Generation Status */}
-        {isGenerating && (
+        {isProcessing && (
           <div className="p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg mt-4">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
-              <span className="text-sm text-blue-300 font-medium">Agentic AI at work...</span>
+              <span className="text-sm text-blue-300 font-medium">
+                {isStreaming ? streamingStatus : 'Agentic AI at work...'}
+              </span>
             </div>
-            <div className="text-xs text-white/60 space-y-1">
-              <div>• Researching topic with web search</div>
-              <div>• Analyzing sources and trends</div>
-              <div>• Generating sophisticated content</div>
-              <div>• Results will appear in chat with citations</div>
-            </div>
+            
+            {/* 显示实时流式内容 */}
+            {isStreaming && streamingContent ? (
+              <div className="mt-3">
+                <div className="text-xs text-blue-300 mb-1">Real-time Generation:</div>
+                <div className="bg-black/20 rounded p-2 max-h-32 overflow-y-auto text-sm text-white">
+                  {streamingContent}
+                  <span className="inline-block w-2 h-4 bg-blue-400 ml-1 animate-pulse"></span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-white/60 space-y-1">
+                <div>• Researching topic with web search</div>
+                <div>• Analyzing sources and trends</div>
+                <div>• Generating sophisticated content</div>
+                <div>• Results will appear in chat with citations</div>
+              </div>
+            )}
           </div>
         )}
       </div>
     </div>
+  );
+};
+
+/**
+ * Sophisticated Agentic Content Generator
+ * Advanced multi-purpose content creation with research capabilities
+ */
+export const OmniSidebar: React.FC<OmniSidebarProps> = ({ triggeredInput }) => {
+  return (
+    <BaseSidebar
+      title="Omni Generator"
+      icon="⚡"
+      triggeredInput={triggeredInput}
+      onResult={(result) => {
+        console.log('⚡ OMNI: Final result received:', {
+          role: result?.role,
+          contentLength: result?.content?.length,
+          sender: result?.metadata?.sender
+        });
+      }}
+      onError={(error) => {
+        console.error('❌ OMNI: Error occurred:', error);
+      }}
+    >
+      <OmniContent 
+        triggeredInput={triggeredInput}
+      />
+    </BaseSidebar>
   );
 };

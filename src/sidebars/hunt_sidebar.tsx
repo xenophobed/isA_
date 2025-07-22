@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SimpleAIClient } from '../services/SimpleAIClient';
+import { BaseSidebar } from '../components/ui/BaseSidebar';
 import { logger, LogCategory } from '../utils/logger';
 
 interface HuntSidebarProps {
@@ -57,37 +57,25 @@ const analysisTypes = [
   { id: 'feature_comparison', name: 'Feature Comparison', icon: '⚖️', desc: 'Side-by-side analysis' }
 ];
 
-/**
- * Hunt AI - Advanced Web Intelligence
- * Web Search, Crawl, and Automation with rich analysis capabilities
- */
-export const HuntSidebar: React.FC<HuntSidebarProps> = ({ triggeredInput }) => {
-  // Use dedicated AI client for Hunt sidebar (independent from main app)
-  const [client] = useState(() => new SimpleAIClient('http://localhost:8080'));
+interface BaseSidebarInjectedProps {
+  isProcessing?: boolean;
+  error?: string | null;
+  result?: any;
+  onProcess?: (input: string, templateParams?: any, metadata?: any) => Promise<void>;
+  onReset?: () => void;
+  client?: any;
+}
+
+type HuntContentProps = BaseSidebarInjectedProps;
+
+const HuntContent: React.FC<HuntContentProps> = ({
+  isProcessing,
+  onProcess
+}) => {
   const [selectedTool, setSelectedTool] = useState<WebTool>(webTools[0]);
   const [input, setInput] = useState('');
   const [selectedAnalysis, setSelectedAnalysis] = useState<string[]>(['product_analysis']);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
-
-  // Auto-fill input from triggered input
-  React.useEffect(() => {
-    if (triggeredInput && triggeredInput !== input) {
-      logger.info(LogCategory.USER_INPUT, 'Hunt sidebar received triggered input', {
-        input: triggeredInput.substring(0, 100)
-      });
-      setInput(triggeredInput);
-      
-      // Smart tool detection based on input
-      if (triggeredInput.includes('http') || triggeredInput.includes('www.')) {
-        setSelectedTool(webTools[1]); // web_crawl for URLs
-      } else if (triggeredInput.toLowerCase().includes('automate') || triggeredInput.toLowerCase().includes('fill')) {
-        setSelectedTool(webTools[2]); // web_automation for tasks
-      } else {
-        setSelectedTool(webTools[0]); // web_search for queries
-      }
-    }
-  }, [triggeredInput, input]);
 
   // Handle analysis type selection
   const toggleAnalysisType = (analysisId: string) => {
@@ -100,7 +88,7 @@ export const HuntSidebar: React.FC<HuntSidebarProps> = ({ triggeredInput }) => {
 
   // Execute web tool based on Web Tools Documentation
   const handleWebToolExecution = async () => {
-    if (!input.trim() || !client || isProcessing) return;
+    if (!input.trim() || !onProcess || isProcessing) return;
 
     const traceId = logger.startTrace('WEB_TOOL_EXECUTION');
     logger.info(LogCategory.USER_INPUT, 'Starting web tool execution', {
@@ -109,7 +97,6 @@ export const HuntSidebar: React.FC<HuntSidebarProps> = ({ triggeredInput }) => {
       analysisTypes: selectedAnalysis
     });
 
-    setIsProcessing(true);
     setProcessingStatus(`Processing with ${selectedTool.name}...`);
 
     try {
@@ -157,32 +144,25 @@ export const HuntSidebar: React.FC<HuntSidebarProps> = ({ triggeredInput }) => {
       }
 
       const requestId = `hunt-${selectedTool.id}-${Date.now()}`;
-      const messageData = {
-        template_parameters: {
-          app_id: "hunt",
-          template_id: `${selectedTool.id}_prompt`,
-          prompt_args: {
-            user_query: input,
-            service_function: serviceFunction,
-            service_args: serviceArgs,
-            web_tool: selectedTool.id,
-            analysis_types: selectedAnalysis
-          }
-        },
-        metadata: {
-          sender: 'hunt-app',
-          app: 'hunt',
-          requestId,
-          expected_outputs: ['analysis_results', 'extracted_data', 'rich_content'],
-          estimated_time: selectedTool.estimatedTime,
-          original_input: input
+      
+      await onProcess(input, {
+        app_id: "hunt",
+        template_id: `${selectedTool.id}_prompt`,
+        prompt_args: {
+          user_query: input,
+          service_function: serviceFunction,
+          service_args: serviceArgs,
+          web_tool: selectedTool.id,
+          analysis_types: selectedAnalysis
         }
-      };
-
-      logger.trackAPICall('sendMessage', 'POST', messageData);
-
-      // Send request to Web Tools service
-      await client.sendMessage(input, messageData);
+      }, {
+        sender: 'hunt-app',
+        app: 'hunt',
+        requestId,
+        expected_outputs: ['analysis_results', 'extracted_data', 'rich_content'],
+        estimated_time: selectedTool.estimatedTime,
+        original_input: input
+      });
 
       console.log('🚀 Web Tools: Request sent with tool:', selectedTool.name);
     } catch (error) {
@@ -192,15 +172,13 @@ export const HuntSidebar: React.FC<HuntSidebarProps> = ({ triggeredInput }) => {
       });
       console.error('Web tool execution failed:', error);
       setProcessingStatus('');
-    } finally {
-      setIsProcessing(false);
     }
 
     logger.endTrace();
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 p-3">
       {/* Compact Tool Header */}
       <div className="flex items-center gap-3 p-2 bg-blue-500/10 rounded border border-blue-500/20">
         <span className="text-lg">{selectedTool.icon}</span>
@@ -298,68 +276,77 @@ export const HuntSidebar: React.FC<HuntSidebarProps> = ({ triggeredInput }) => {
         ) : (
           <>
             <span>{selectedTool.icon}</span>
-            Execute {selectedTool.name}
+            Hunt
           </>
         )}
       </button>
 
-      {/* Compact Processing Status */}
+      {/* Processing Status */}
       {isProcessing && (
-        <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded">
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded p-2">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
-            <span className="text-xs text-blue-300">{processingStatus}</span>
+            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+            <span className="text-xs text-blue-300">
+              {processingStatus || `Processing ${selectedTool.name}...`}
+            </span>
           </div>
         </div>
       )}
 
-      {/* Compact Quick Actions */}
+      {/* Quick Search Templates */}
       <div>
-        <div className="text-xs text-white/60 mb-1">💡 Quick examples</div>
+        <div className="text-xs text-white/60 mb-1">💡 Quick Searches</div>
         <div className="grid grid-cols-1 gap-1">
-          <button 
+          <button
             onClick={() => {
-              setInput("gaming laptop under $1500");
-              setSelectedTool(webTools[0]); // web_search
+              setInput("Find best wireless earbuds under $100");
+              setSelectedTool(webTools[0]);
               setSelectedAnalysis(['product_analysis', 'price_comparison']);
             }}
             className="p-1 bg-white/5 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition-all text-left"
           >
-            🎮 Gaming laptop research
+            🎧 Best wireless earbuds
           </button>
-          <button 
+          <button
             onClick={() => {
-              setInput("https://amazon.com/product");
-              setSelectedTool(webTools[1]); // web_crawl
-              setSelectedAnalysis(['product_analysis', 'sentiment_analysis']);
+              setInput("Compare iPhone vs Android reviews");
+              setSelectedTool(webTools[0]);
+              setSelectedAnalysis(['sentiment_analysis', 'feature_comparison']);
             }}
             className="p-1 bg-white/5 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition-all text-left"
           >
-            🕷️ Amazon product analysis
+            📱 Phone comparison
           </button>
-          <button 
+          <button
             onClick={() => {
-              setInput("https://google.com search for airpods");
-              setSelectedTool(webTools[2]); // web_automation
-              setSelectedAnalysis(['price_comparison']);
+              setInput("Track price history for Tesla Model 3");
+              setSelectedTool(webTools[1]);
+              setSelectedAnalysis(['price_comparison', 'market_research']);
             }}
             className="p-1 bg-white/5 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition-all text-left"
           >
-            🤖 Automate Google search
+            🚗 Price tracking
           </button>
-        </div>
-      </div>
-
-      {/* Compact Features Info */}
-      <div className="p-2 bg-gradient-to-r from-blue-500/10 to-green-500/10 border border-blue-500/20 rounded">
-        <div className="text-blue-300 text-xs font-medium mb-1">🚀 Web Intelligence</div>
-        <div className="text-blue-200/80 text-xs space-y-1">
-          <div>• Search, crawl, automate any website</div>
-          <div>• Rich outputs: text, images, videos</div>
-          <div>• Product sentiment & social analysis</div>
-          <div>• Multi-site comparison & extraction</div>
         </div>
       </div>
     </div>
+  );
+};
+
+export const HuntSidebar: React.FC<HuntSidebarProps> = ({ triggeredInput }) => {
+  return (
+    <BaseSidebar
+      title="Hunt AI"
+      icon="🔍"
+      triggeredInput={triggeredInput}
+      onResult={(result) => {
+        console.log('🔍 Hunt result:', result);
+      }}
+      onError={(error) => {
+        console.error('❌ Hunt error:', error);
+      }}
+    >
+      <HuntContent />
+    </BaseSidebar>
   );
 };

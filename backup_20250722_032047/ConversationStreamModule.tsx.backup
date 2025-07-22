@@ -7,7 +7,6 @@
  * - 渲染聊天消息列表，支持用户和AI消息
  * - 支持流式消息显示，实时更新内容
  * - 处理消息状态显示和时间戳
- * - 只监听和显示Chat相关消息，不处理App消息
  * 
  * 【消息渲染逻辑】
  * 第79-91行是关键的消息内容显示逻辑：
@@ -105,7 +104,13 @@ export const ConversationStreamModule = memo<ConversationStreamModuleProps>(({
               }`}>
                 {message.role === 'user' ? 'U' : isStreaming ? '🤖' : 'AI'}
               </div>
-              {/* 状态显示已移至右侧边栏，不在聊天气泡中显示 */}
+              {/* 状态显示在头像右侧 */}
+              {isStreaming && hasStatus && message.role === 'assistant' && (
+                <div className="ml-2 flex items-center gap-1 text-blue-400 text-xs">
+                  <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
+                  <span>{message.streamingStatus}</span>
+                </div>
+              )}
             </div>
           )}
           
@@ -124,9 +129,8 @@ export const ConversationStreamModule = memo<ConversationStreamModuleProps>(({
                 )}
               </div>
             ) : isStreaming && hasStatus ? (
-              <div className="text-blue-400 text-sm italic flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                <span>{message.streamingStatus}</span>
+              <div className="text-gray-400 text-sm italic">
+                {message.streamingStatus}
               </div>
             ) : null}
             

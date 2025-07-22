@@ -1,3 +1,25 @@
+/**
+ * ============================================================================
+ * 会话管理器 (SessionManager.tsx)
+ * ============================================================================
+ * 
+ * 【核心功能】
+ * - 管理聊天会话的创建、存储和导航
+ * - 持久化会话数据到localStorage
+ * - 提供会话切换和历史记录功能
+ * - 同步当前消息和工件到会话
+ * 
+ * 【消息处理】
+ * 第209-212行：loadSession时会加载历史消息
+ * 调用 useAppStore.getState().addMessage(msg) 恢复会话消息
+ * 
+ * 【重要】这里只在加载历史会话时添加消息
+ * 不会在正常聊天过程中创建新消息
+ * 
+ * 【会话结构】
+ * ChatSession包含完整的消息历史和工件信息
+ * 用于实现会话持久化和多会话切换
+ */
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { logger, LogCategory } from '../../utils/logger';
@@ -109,7 +131,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
       
       localStorage.setItem('main_app_sessions', dataToSave);
     } catch (error) {
-      if (error.name === 'QuotaExceededError') {
+      if (error instanceof Error && error.name === 'QuotaExceededError') {
         logger.error(LogCategory.CHAT_FLOW, 'localStorage quota exceeded, clearing old sessions', { error });
         // Emergency cleanup: keep only last 5 sessions
         const emergencyCleanup = sessionsToSave.slice(0, 5);
@@ -332,10 +354,10 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
           const isActive = session.id === currentSessionId;
           
           return (
-            <button
+            <div
               key={session.id}
               onClick={() => handleSessionSelect(session)}
-              className={`w-full text-left p-3 rounded-lg border transition-all group relative ${
+              className={`w-full text-left p-3 rounded-lg border transition-all group relative cursor-pointer ${
                 isActive 
                   ? 'bg-blue-500/20 border-blue-500/50 shadow-lg shadow-blue-500/10' 
                   : 'bg-white/5 hover:bg-white/10 border-white/10 hover:border-white/20'
@@ -430,7 +452,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
                   </div>
                 )}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>

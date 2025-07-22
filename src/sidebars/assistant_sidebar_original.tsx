@@ -1,8 +1,16 @@
-import React, { useState } from 'react';
-import { BaseSidebar } from '../components/ui/BaseSidebar';
+import React, { useState, useEffect } from 'react';
+import { SimpleAIClient } from '../services/SimpleAIClient';
 
 interface AssistantSidebarProps {
   triggeredInput?: string;
+}
+
+// Simple assistant state focused on what users actually need
+interface AssistantState {
+  input: string;
+  currentView: 'today' | 'conversation';
+  todayItems: TodayItem[];
+  isTyping: boolean;
 }
 
 interface TodayItem {
@@ -14,30 +22,16 @@ interface TodayItem {
   priority: boolean;
 }
 
-interface AssistantState {
-  input: string;
-  currentView: 'today' | 'conversation';
-  todayItems: TodayItem[];
-  isTyping: boolean;
-}
-
-// 接收 BaseSidebar 注入的 props
-interface BaseSidebarInjectedProps {
-  isProcessing?: boolean;
-  error?: string | null;
-  result?: any;
-  onProcess?: (input: string, templateParams?: any, metadata?: any) => Promise<void>;
-  onReset?: () => void;
-  client?: any;
-}
-
-type AssistantContentProps = BaseSidebarInjectedProps;
-
-const AssistantContent: React.FC<AssistantContentProps> = ({
-  isProcessing,
-  result,
-  onProcess
-}) => {
+/**
+ * Personal Assistant - Like having a real assistant
+ * Simple, conversational, and focused on getting things done
+ */
+export const AssistantSidebar: React.FC<AssistantSidebarProps> = ({ triggeredInput }) => {
+  // Use dedicated AI client for Assistant sidebar (independent from main app)
+  const [client] = useState(() => new SimpleAIClient('http://localhost:8080'));
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Simple state focused on user needs
   const [assistant, setAssistant] = useState<AssistantState>({
     input: '',
     currentView: 'today',
@@ -50,40 +44,56 @@ const AssistantContent: React.FC<AssistantContentProps> = ({
     isTyping: false
   });
 
+  // Auto-fill from triggered input
+  useEffect(() => {
+    if (triggeredInput) {
+      setAssistant(prev => ({ ...prev, input: triggeredInput }));
+    }
+  }, [triggeredInput]);
+
   // Handle conversation with assistant
   const handleConversation = async () => {
-    if (!assistant.input.trim() || !onProcess || isProcessing) return;
+    if (!assistant.input.trim() || !client || isProcessing) return;
 
+    setIsProcessing(true);
     setAssistant(prev => ({ ...prev, isTyping: true }));
 
     try {
-      await onProcess(assistant.input, {
-        app_id: "assistant",
-        template_id: "personal_assistant_prompt",
-        prompt_args: {
-          user_request: assistant.input,
-          current_time: new Date().toLocaleTimeString(),
-          today_items_count: assistant.todayItems.length,
-          pending_items: assistant.todayItems.filter(item => !item.completed),
-          user_preferences: {
-            preferred_reminder_time: '9:00 AM',
-            work_hours: '9:00-17:00'
-          },
-          context: 'personal_assistant'
+      // Store conversation and create appropriate items
+      const requestId = `assist-${Date.now()}`;
+      
+      await client.sendMessage(assistant.input, {
+        template_parameters: {
+          app_id: "assistant",
+          template_id: "personal_assistant_prompt",
+          prompt_args: {
+            user_request: assistant.input,
+            current_time: new Date().toLocaleTimeString(),
+            today_items_count: assistant.todayItems.length,
+            pending_items: assistant.todayItems.filter(item => !item.completed),
+            user_preferences: {
+              preferred_reminder_time: '9:00 AM',
+              work_hours: '9:00-17:00'
+            },
+            context: 'personal_assistant'
+          }
+        },
+        metadata: {
+          sender: 'assistant-app',
+          app: 'assistant',
+          requestId,
+          requestType: 'personal_request',
+          service_function: 'store_working_memory_from_dialog',
+          expected_outputs: ['assistant_response', 'action_created', 'reminder_set']
         }
-      }, {
-        sender: 'assistant-app',
-        app: 'assistant',
-        requestId: `assist-${Date.now()}`,
-        requestType: 'personal_request',
-        service_function: 'store_working_memory_from_dialog',
-        expected_outputs: ['assistant_response', 'action_created', 'reminder_set']
       });
 
       setAssistant(prev => ({ ...prev, input: '', isTyping: false }));
     } catch (error) {
       console.error('Assistant conversation failed:', error);
       setAssistant(prev => ({ ...prev, isTyping: false }));
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -124,11 +134,12 @@ const AssistantContent: React.FC<AssistantContentProps> = ({
   const totalCount = assistant.todayItems.length;
 
   return (
-    <div className="space-y-3 h-full flex flex-col p-3">
-      {/* Compact Progress */}
+    <div className="space-y-3 h-full flex flex-col">
+      {/* Compact Header */}
       <div className="flex items-center gap-3 p-2 bg-green-500/10 rounded border border-green-500/20">
         <span className="text-lg">👋</span>
         <div className="flex-1 min-w-0">
+          <div className="text-sm text-white font-medium">Assistant</div>
           <div className="flex gap-2 text-xs text-white/60">
             <span>{completedCount}/{totalCount} done</span>
             <span>{currentTime}</span>
@@ -297,30 +308,19 @@ const AssistantContent: React.FC<AssistantContentProps> = ({
         </button>
       </div>
 
-      {/* Result Display (if needed) */}
-      {result && (
-        <div className="p-2 bg-green-500/10 border border-green-500/20 rounded text-xs text-green-300">
-          Response received
+      {/* Compact Processing Status */}
+      {assistant.isTyping && (
+        <div className="p-2 bg-green-500/10 border border-green-500/20 rounded">
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1">
+              <div className="w-1 h-1 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-1 h-1 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-1 h-1 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            </div>
+            <span className="text-xs text-green-300">Thinking...</span>
+          </div>
         </div>
       )}
     </div>
-  );
-};
-
-export const AssistantSidebar: React.FC<AssistantSidebarProps> = ({ triggeredInput }) => {
-  return (
-    <BaseSidebar
-      title="Assistant"
-      icon="👋"
-      triggeredInput={triggeredInput}
-      onResult={(result) => {
-        console.log('🤖 Assistant result:', result);
-      }}
-      onError={(error) => {
-        console.error('❌ Assistant error:', error);
-      }}
-    >
-      <AssistantContent />
-    </BaseSidebar>
   );
 };

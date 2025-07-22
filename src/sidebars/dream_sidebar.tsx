@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SimpleAIClient } from '../services/SimpleAIClient';
+import { BaseSidebar } from '../components/ui/BaseSidebar';
 import { useAppStore } from '../stores/useAppStore';
 import { logger, LogCategory } from '../utils/logger';
 
@@ -139,70 +139,44 @@ const detectBestMode = (input: string, hasImage: boolean): ImageMode => {
   return possibleModes[0] || imageModes[0];
 };
 
-/**
- * Atomic Image Intelligence - Professional Image Processing
- * 9 specialized modes for every image creation and editing need
- */
-export const DreamSidebar: React.FC<DreamSidebarProps> = ({ 
-  triggeredInput, 
-  generatedImage,
-  onImageGenerated 
-}) => {
-  logger.trackComponentRender('DreamSidebar', { 
-    hasTriggeredInput: !!triggeredInput,
-    hasGeneratedImage: !!generatedImage
-  });
+interface BaseSidebarInjectedProps {
+  isProcessing?: boolean;
+  error?: string | null;
+  result?: any;
+  onProcess?: (input: string, templateParams?: any, metadata?: any) => Promise<void>;
+  onReset?: () => void;
+  client?: any;
+}
 
-  // Use dedicated AI client for Dream sidebar (independent from main app)
-  const [client] = useState(() => new SimpleAIClient('http://localhost:8080'));
-  
+type DreamContentProps = BaseSidebarInjectedProps;
+
+const DreamContent: React.FC<DreamContentProps> = ({
+  isProcessing,
+  result,
+  onProcess
+}) => {
   // Use app store for state management
   const { 
-    currentApp,
-    setCurrentApp,
     dream: dreamState,
     setDreamGeneratedImage,
-    setDreamGenerating
   } = useAppStore();
   
   // Modern state management
   const [prompt, setPrompt] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [selectedMode, setSelectedMode] = useState<ImageMode>(imageModes[0]);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [localGeneratedImage, setLocalGeneratedImage] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string>('');
-
-  // Auto-fill input and smart mode detection
-  React.useEffect(() => {
-    if (triggeredInput && triggeredInput !== prompt) {
-      logger.info(LogCategory.USER_INPUT, 'Dream sidebar received triggered input', {
-        input: triggeredInput.substring(0, 100),
-        previousPrompt: prompt
-      });
-      setPrompt(triggeredInput);
-      
-      // Smart mode detection based on input and available images
-      const bestMode = detectBestMode(triggeredInput, !!uploadedImage);
-      setSelectedMode(bestMode);
-      
-      logger.debug(LogCategory.AI_MESSAGE, 'Smart mode detected', {
-        modeId: bestMode.id,
-        modeName: bestMode.name,
-        hasImage: !!uploadedImage
-      });
-      
-      console.log('🎨 Atomic Image Intelligence ready with smart mode:', bestMode.name);
-    }
-  }, [triggeredInput, prompt, uploadedImage]);
+  const [streamingContent, setStreamingContent] = useState<string>('');
+  const [workflowStage, setWorkflowStage] = useState<string>('');
 
   // Restore generated image from global state when component mounts or reopens
   React.useEffect(() => {
-    if (dreamState.generatedImage && !localGeneratedImage) {
+    if (dreamState.generatedImage) {
       console.log('🎨 Restoring generated image from global state:', dreamState.generatedImage);
       setLocalGeneratedImage(dreamState.generatedImage);
     }
-  }, [dreamState.generatedImage, localGeneratedImage]);
+  }, [dreamState.generatedImage]);
 
   // Real-time mode recommendations
   React.useEffect(() => {
@@ -218,113 +192,76 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
     }
   }, [prompt, uploadedImage, selectedMode.id]);
 
-  // Listen for Atomic Image Intelligence responses
+  // Handle result updates
   React.useEffect(() => {
-    if (!client) return;
-
-    const handleImageResponse = (message: any) => {
-      // Since we use a dedicated client, all responses are for this Dream app
-      if (message.role === 'assistant' && isProcessing) {
-        console.log('🎨 AtomicImageIntelligence: Received response:', message);
-        
-        // Extract image URL from response content (markdown with JSON code block)
-        let imageUrl = null;
-        try {
-          if (message.content) {
-            // Extract JSON from markdown code block ```json ... ```
-            const jsonMatch = message.content.match(/```json\s*\n([\s\S]*?)\n```/);
-            if (jsonMatch) {
-              const jsonContent = jsonMatch[1];
-              const parsed = JSON.parse(jsonContent);
-              
-              if (parsed.media_items && parsed.media_items.length > 0) {
-                const imageItem = parsed.media_items.find((item: any) => item.type === 'image');
-                if (imageItem && imageItem.url) {
-                  imageUrl = imageItem.url;
-                  console.log('🖼️ AtomicImageIntelligence: Image URL extracted from markdown JSON:', imageUrl);
-                }
-              }
-            } else {
-              // Fallback: try parsing content directly as JSON
-              const parsed = JSON.parse(message.content);
-              if (parsed.media_items && parsed.media_items.length > 0) {
-                const imageItem = parsed.media_items.find((item: any) => item.type === 'image');
-                if (imageItem && imageItem.url) {
-                  imageUrl = imageItem.url;
-                  console.log('🖼️ AtomicImageIntelligence: Image URL extracted from direct JSON:', imageUrl);
-                }
+    if (result) {
+      console.log('🎨 AtomicImageIntelligence: Received response:', result);
+      
+      // Extract image URL from response content (markdown with JSON code block)
+      let imageUrl = null;
+      try {
+        if (result.content) {
+          // Extract JSON from markdown code block ```json ... ```
+          const jsonMatch = result.content.match(/```json\s*\n([\s\S]*?)\n```/);
+          if (jsonMatch) {
+            const jsonContent = jsonMatch[1];
+            const parsed = JSON.parse(jsonContent);
+            
+            if (parsed.media_items && parsed.media_items.length > 0) {
+              const imageItem = parsed.media_items.find((item: any) => item.type === 'image');
+              if (imageItem && imageItem.url) {
+                imageUrl = imageItem.url;
+                console.log('🖼️ AtomicImageIntelligence: Image URL extracted from markdown JSON:', imageUrl);
               }
             }
-          }
-          
-          // Fallback: check metadata for media_items (old format)
-          if (!imageUrl && message.metadata?.media_items) {
-            const imageItem = message.metadata.media_items.find((item: any) => item.type === 'image');
-            if (imageItem && imageItem.url) {
-              imageUrl = imageItem.url;
-              console.log('🖼️ AtomicImageIntelligence: Image URL found in metadata:', imageUrl);
-            }
-          }
-        } catch (e) {
-          console.log('🔍 Failed to parse content, checking metadata for image URL');
-          // Fallback: check metadata for media_items
-          if (message.metadata?.media_items) {
-            const imageItem = message.metadata.media_items.find((item: any) => item.type === 'image');
-            if (imageItem && imageItem.url) {
-              imageUrl = imageItem.url;
-              console.log('🖼️ AtomicImageIntelligence: Image URL found in metadata:', imageUrl);
+          } else {
+            // Fallback: try parsing content directly as JSON
+            const parsed = JSON.parse(result.content);
+            if (parsed.media_items && parsed.media_items.length > 0) {
+              const imageItem = parsed.media_items.find((item: any) => item.type === 'image');
+              if (imageItem && imageItem.url) {
+                imageUrl = imageItem.url;
+                console.log('🖼️ AtomicImageIntelligence: Image URL extracted from direct JSON:', imageUrl);
+              }
             }
           }
         }
         
-        if (imageUrl) {
-          // Update local state
-          setLocalGeneratedImage(imageUrl);
-          setIsProcessing(false);
-          setProcessingStatus('');
-          
-          // Update centralized store
-          setDreamGeneratedImage(imageUrl);
-          
-          // Notify main_app to create artifact
-          if (onImageGenerated) {
-            onImageGenerated(imageUrl, prompt);
+        // Fallback: check metadata for media_items (old format)
+        if (!imageUrl && result.metadata?.media_items) {
+          const imageItem = result.metadata.media_items.find((item: any) => item.type === 'image');
+          if (imageItem && imageItem.url) {
+            imageUrl = imageItem.url;
+            console.log('🖼️ AtomicImageIntelligence: Image URL found in metadata:', imageUrl);
           }
-          
-          console.log('✅ AtomicImageIntelligence: Processing complete');
+        }
+      } catch (e) {
+        console.log('🔍 Failed to parse content, checking metadata for image URL');
+        // Fallback: check metadata for media_items
+        if (result.metadata?.media_items) {
+          const imageItem = result.metadata.media_items.find((item: any) => item.type === 'image');
+          if (imageItem && imageItem.url) {
+            imageUrl = imageItem.url;
+            console.log('🖼️ AtomicImageIntelligence: Image URL found in metadata:', imageUrl);
+          }
         }
       }
-    };
-
-    // Listen for processing status updates
-    const handleProcessingStatus = (data: any) => {
-      if (isProcessing && data.status) {
-        console.log('📊 AtomicImageIntelligence: Status update:', data.status);
-        setProcessingStatus(data.status);
+      
+      if (imageUrl) {
+        // Update local state
+        setLocalGeneratedImage(imageUrl);
+        
+        // Update centralized store
+        setDreamGeneratedImage(imageUrl);
+        
+        console.log('✅ AtomicImageIntelligence: Processing complete');
       }
-    };
-
-    const unsubscribeMessage = client.on('message:received', handleImageResponse);
-    const unsubscribeStatus = client.on('streaming:status', handleProcessingStatus);
-    
-    return () => {
-      unsubscribeMessage?.();
-      unsubscribeStatus?.();
-    };
-  }, [client, isProcessing, prompt, onImageGenerated, setDreamGeneratedImage]);
-
-  // Handle external image updates
-  React.useEffect(() => {
-    if (generatedImage && isProcessing) {
-      setIsProcessing(false);
-      setProcessingStatus('');
-      setLocalGeneratedImage(generatedImage);
     }
-  }, [generatedImage, isProcessing]);
+  }, [result, setDreamGeneratedImage]);
 
   // Handle image processing with Atomic Image Intelligence
   const handleImageProcessing = async () => {
-    if (!prompt.trim() || !client || isProcessing) return;
+    if (!prompt.trim() || !onProcess || isProcessing) return;
     
     // Check if mode requires image but none is uploaded
     if (selectedMode.requiresImage && !uploadedImage) {
@@ -341,8 +278,9 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
       estimatedCost: selectedMode.cost
     });
 
-    setIsProcessing(true);
     setProcessingStatus(`Processing with ${selectedMode.name}...`);
+    setStreamingContent('');
+    setWorkflowStage('🔸 Stage 1: 初始化');
     
     try {
       const requestId = `atomic-image-${Date.now()}`;
@@ -350,34 +288,24 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
       // Map mode to template_id (prompt name)
       const templateId = `${selectedMode.id}_prompt`;
       
-      const messageData = {
-        message: prompt,
-        template_parameters: {
-          app_id: "dream",
-          template_id: templateId,
-          prompt_args: {
-            prompt: prompt,
-            input_image: uploadedImage || null,
-            quality: 'high',
-            style_preset: 'auto',
-            mode: selectedMode.id
-          }
-        },
-        // Keep metadata for tracking
-        metadata: {
-          sender: 'atomic-image-app',
-          app: 'dream', 
-          requestId,
-          processing_mode: selectedMode.id,
-          estimated_time: selectedMode.estimatedTime,
-          estimated_cost: selectedMode.cost
+      await onProcess(prompt, {
+        app_id: "dream",
+        template_id: templateId,
+        prompt_args: {
+          prompt: prompt,
+          input_image: uploadedImage || null,
+          quality: 'high',
+          style_preset: 'auto',
+          mode: selectedMode.id
         }
-      };
-      
-      logger.trackAPICall('sendMessage', 'POST', messageData);
-      
-      // Send request to Atomic Image Intelligence Service with new template structure
-      await client.sendMessage(prompt, messageData);
+      }, {
+        sender: 'atomic-image-app',
+        app: 'dream', 
+        requestId,
+        processing_mode: selectedMode.id,
+        estimated_time: selectedMode.estimatedTime,
+        estimated_cost: selectedMode.cost
+      });
       
       console.log('🚀 AtomicImageIntelligence: Request sent with mode:', selectedMode.name);
     } catch (error) {
@@ -386,8 +314,9 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
         mode: selectedMode.id
       });
       console.error('Atomic Image Intelligence processing failed:', error);
-      setIsProcessing(false);
       setProcessingStatus('');
+      setStreamingContent('');
+      setWorkflowStage('');
     }
     
     logger.endTrace();
@@ -428,7 +357,7 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-3">
       {/* Compact Mode Header */}
       <div className="flex items-center gap-3 p-2 bg-purple-500/10 rounded border border-purple-500/20">
         <span className="text-lg">{selectedMode.icon}</span>
@@ -549,13 +478,34 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
         )}
       </button>
 
-      {/* Compact Processing Status */}
+      {/* Processing Status */}
       {isProcessing && (
-        <div className="bg-purple-500/10 border border-purple-500/20 rounded p-2">
+        <div className="bg-purple-500/10 border border-purple-500/20 rounded p-3 space-y-2">
+          {/* 工作流阶段指示器 */}
+          {workflowStage && (
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+              <span className="text-xs text-blue-300 font-medium">{workflowStage}</span>
+            </div>
+          )}
+          
+          {/* 处理状态 */}
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin"></div>
-            <span className="text-xs text-purple-300">Processing {selectedMode.name}...</span>
+            <span className="text-xs text-purple-300">
+              {processingStatus || `Processing ${selectedMode.name}...`}
+            </span>
           </div>
+          
+          {/* 实时流式内容显示 */}
+          {streamingContent && (
+            <div className="bg-black/20 rounded p-2 max-h-20 overflow-y-auto">
+              <div className="text-xs text-gray-300 whitespace-pre-wrap">
+                {streamingContent}
+                <span className="inline-block w-1 h-3 bg-blue-400 ml-1 animate-pulse"></span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -701,5 +651,25 @@ export const DreamSidebar: React.FC<DreamSidebarProps> = ({
         </div>
       </div>
     </div>
+  );
+};
+
+export const DreamSidebar: React.FC<DreamSidebarProps> = ({ 
+  triggeredInput
+}) => {
+  return (
+    <BaseSidebar
+      title="Atomic Image Intelligence"
+      icon="🎨"
+      triggeredInput={triggeredInput}
+      onResult={(result) => {
+        console.log('🎨 Dream result:', result);
+      }}
+      onError={(error) => {
+        console.error('❌ Dream error:', error);
+      }}
+    >
+      <DreamContent />
+    </BaseSidebar>
   );
 };

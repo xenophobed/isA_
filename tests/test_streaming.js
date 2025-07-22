@@ -18,7 +18,7 @@ async function testStreamingAPI() {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        message: 'what\'s the weather in newyork',
+        message: 'hi',
         session_id: 'test_session',
         user_id: 'test_user',
         use_streaming: true
@@ -73,11 +73,23 @@ async function testStreamingAPI() {
             eventLog.push(logEntry);
             console.log(`📥 Event #${eventCount}: ${eventData.type}`, eventData.status ? `(${eventData.status})` : '');
             
-            // Log key events with more detail
-            if (eventData.type === 'content' || eventData.type === 'response_token' || eventData.type === 'token') {
-              console.log(`   📝 Content preview: ${eventData.content ? eventData.content.substring(0, 100) + '...' : 'N/A'}`);
+            // Log key events with more detail - SHOW FULL CONTENT
+            if (eventData.type === 'content') {
+              console.log(`\n📄 ========== FINAL CONTENT EVENT ==========`);
+              console.log(`   📝 FULL CONTENT:\n${eventData.content || 'N/A'}`);
               if (eventData.full_content) {
-                console.log(`   📄 Full content preview: ${eventData.full_content.substring(0, 100) + '...'}`);
+                console.log(`   📄 FULL_CONTENT FIELD:\n${eventData.full_content}`);
+              }
+              console.log(`   🔧 METADATA:`, JSON.stringify(eventData.metadata, null, 2));
+              console.log(`   🔗 RAW EVENT DATA:`, JSON.stringify(eventData, null, 2));
+              console.log(`========================================\n`);
+            } else if (eventData.type === 'custom_event' && eventData.metadata?.raw_chunk?.response_batch) {
+              const batch = eventData.metadata.raw_chunk.response_batch;
+              console.log(`   🚀 Batch: "${batch.tokens}" (${batch.start_index}-${batch.start_index + batch.count}, total: ${batch.total_index})`);
+            } else if (eventData.type === 'custom_event' && eventData.metadata?.raw_chunk?.response_token) {
+              const token = eventData.metadata.raw_chunk.response_token;
+              if (token.status === 'completed') {
+                console.log(`   ✅ Streaming completed - Total tokens: ${token.total_tokens}`);
               }
             }
             
@@ -112,23 +124,47 @@ async function testStreamingAPI() {
       console.log(`   ${type}: ${count}`);
     });
 
-    // Analyze final content events
-    console.log('\n🔍 Final Content Analysis:');
+    // Show COMPLETE ACCUMULATED STREAMING CONTENT
+    console.log('\n🔄 ========== ACCUMULATED STREAMING ANALYSIS ==========');
+    const batchEvents = eventLog.filter(e => 
+      e.type === 'custom_event' && 
+      e.metadata?.raw_chunk?.response_batch?.status === 'streaming'
+    );
+    
+    if (batchEvents.length > 0) {
+      let streamedContent = '';
+      batchEvents.forEach(event => {
+        const batch = event.metadata.raw_chunk.response_batch;
+        streamedContent += batch.tokens;
+      });
+      console.log(`📝 COMPLETE STREAMED CONTENT (${streamedContent.length} chars):`);
+      console.log(`"${streamedContent}"`);
+    }
+
+    // Analyze final content events  
+    console.log('\n🔍 ========== FINAL CONTENT ANALYSIS ==========');
     const finalEvents = eventLog.filter(e => 
       e.type === 'content' || 
-      (e.type === 'response_token' && e.status === 'completed') ||
+      (e.type === 'custom_event' && e.metadata?.raw_chunk?.response_token?.status === 'completed') ||
       e.type === 'end'
     );
     
     finalEvents.forEach((event, index) => {
-      console.log(`   Final Event #${index + 1}: ${event.type}${event.status ? ':' + event.status : ''}`);
-      if (event.content) {
-        console.log(`     Content: ${event.content}`);
-      }
-      if (event.full_content) {
-        console.log(`     Full Content: ${event.full_content}`);
+      console.log(`\n--- Final Event #${index + 1}: ${event.type}${event.status ? ':' + event.status : ''} ---`);
+      
+      if (event.type === 'content') {
+        console.log(`📄 COMPLETE FINAL CONTENT:`);
+        console.log(`"${event.content || 'N/A'}"`);
+        
+        if (event.metadata) {
+          console.log(`🔧 METADATA:`, JSON.stringify(event.metadata, null, 2));
+        }
+      } else if (event.content) {
+        console.log(`📝 Content: ${event.content}`);
       }
     });
+    
+    console.log('===============================================\n');
 
   } catch (error) {
     console.error('❌ Test failed:', error);

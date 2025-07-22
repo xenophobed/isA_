@@ -5,11 +5,9 @@
  * 
  * 【核心功能】
  * - 使用Zustand进行集中状态管理
- * - 管理聊天消息数组，包括流式消息  
+ * - 管理聊天消息数组，包括流式消息
  * - 管理应用切换、侧边栏状态、工件等
  * - 提供统一的聊天操作接口
- * - 处理所有StreamingHandler解析的事件
- * - 根据当前状态决定事件如何分发到UI组件
  * 
  * 【关键状态】
  * - messages: ChatMessage[] - 聊天消息数组，支持流式消息
@@ -210,31 +208,18 @@ export const useAppStore = create<AppStore>()(
 
       const { setChatLoading, setIsTyping } = get();
       
+      // Don't add user message here - it's already added in onBeforeSend
+      // This avoids duplicate user messages
+      
       setChatLoading(true);
       setIsTyping(true);
       
       try {
-        // 使用新的回调系统和StreamingHandler解析器
-        await client.sendMessageWithCallback(content, {
-          onData: (event: any) => {
-            // 使用全局的StreamingHandler解析器
-            if (window && (window as any).streamingParser) {
-              (window as any).streamingParser(event);
-            } else {
-              console.warn('⚠️ STORE: StreamingHandler parser not available');
-            }
-          },
-          onError: (error: Error) => {
-            logger.error(LogCategory.CHAT_FLOW, 'Streaming error', { error: error.message });
-            setChatLoading(false);
-            setIsTyping(false);
-          },
-          onComplete: () => {
-            console.log('✅ STORE: Streaming completed');
-            setChatLoading(false);
-            setIsTyping(false);
-          }
-        }, metadata);
+        // Use the provided client (from SimpleAIProvider)
+        await client.sendMessage(content, metadata);
+        
+        // AI response will be handled by the client's event system in main_app
+        setChatLoading(false);
       } catch (error) {
         logger.error(LogCategory.CHAT_FLOW, 'Failed to send message', { error });
         setChatLoading(false);
@@ -250,31 +235,18 @@ export const useAppStore = create<AppStore>()(
 
       const { setChatLoading, setIsTyping } = get();
       
+      // Don't add user message here - it's already added in onBeforeSend
+      // This avoids duplicate user messages
+      
       setChatLoading(true);
       setIsTyping(true);
       
       try {
-        // 使用新的回调系统和StreamingHandler解析器
-        await client.sendMultimodalMessageWithCallback(content, files, {
-          onData: (event: any) => {
-            // 使用全局的StreamingHandler解析器
-            if (window && (window as any).streamingParser) {
-              (window as any).streamingParser(event);
-            } else {
-              console.warn('⚠️ STORE: StreamingHandler parser not available');
-            }
-          },
-          onError: (error: Error) => {
-            logger.error(LogCategory.CHAT_FLOW, 'Multimodal streaming error', { error: error.message });
-            setChatLoading(false);
-            setIsTyping(false);
-          },
-          onComplete: () => {
-            console.log('✅ STORE: Multimodal streaming completed');
-            setChatLoading(false);
-            setIsTyping(false);
-          }
-        }, metadata);
+        // Use the provided client (from SimpleAIProvider) with multimodal method
+        await client.sendMultimodalMessage(content, files, metadata);
+        
+        // AI response will be handled by the client's event system in main_app
+        setChatLoading(false);
         
         logger.info(LogCategory.CHAT_FLOW, 'Multimodal message sent successfully', {
           contentLength: content.length,
@@ -303,25 +275,16 @@ export const useAppStore = create<AppStore>()(
 
     // Streaming Actions
     startStreamingMessage: (id, status = '正在生成回应') => {
-      set((state) => {
-        // 检查是否已经有流式消息，避免重复创建
-        const hasStreamingMessage = state.messages.some(m => m.isStreaming);
-        if (hasStreamingMessage) {
-          console.warn('⚠️ STORE: Streaming message already exists, skipping creation');
-          return state;
-        }
-        
-        return {
-          messages: [...state.messages, {
-            id,
-            role: 'assistant',
-            content: '',
-            timestamp: new Date().toISOString(),
-            isStreaming: true,
-            streamingStatus: status
-          }]
-        };
-      });
+      set((state) => ({
+        messages: [...state.messages, {
+          id,
+          role: 'assistant',
+          content: '',
+          timestamp: new Date().toISOString(),
+          isStreaming: true,
+          streamingStatus: status
+        }]
+      }));
       logger.debug(LogCategory.CHAT_FLOW, 'Streaming message started', { id, status });
     },
 

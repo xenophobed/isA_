@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SimpleAIClient } from '../services/SimpleAIClient';
+import { BaseSidebar } from '../components/ui/BaseSidebar';
 
 interface DataScientistSidebarProps {
   triggeredInput?: string;
@@ -19,15 +19,21 @@ interface DataWorkflow {
   pgvectorDb?: string;
 }
 
-/**
- * Data Scientist Sidebar
- * Modern data analytics interface using Data Analytics Service
- */
-export const DataScientistSidebar: React.FC<DataScientistSidebarProps> = ({ triggeredInput }) => {
-  // Use dedicated AI client for Data Scientist sidebar (independent from main app)
-  const [client] = useState(() => new SimpleAIClient('http://localhost:8080'));
-  const [isProcessing, setIsProcessing] = useState(false);
-  
+interface BaseSidebarInjectedProps {
+  isProcessing?: boolean;
+  error?: string | null;
+  result?: any;
+  onProcess?: (input: string, templateParams?: any, metadata?: any) => Promise<void>;
+  onReset?: () => void;
+  client?: any;
+}
+
+type DataScientistContentProps = BaseSidebarInjectedProps;
+
+const DataScientistContent: React.FC<DataScientistContentProps> = ({
+  isProcessing,
+  onProcess
+}) => {
   // Data workflow state
   const [workflow, setWorkflow] = useState<DataWorkflow>({
     mode: 'combined',
@@ -36,13 +42,6 @@ export const DataScientistSidebar: React.FC<DataScientistSidebarProps> = ({ trig
     },
     query: ''
   });
-
-  // Auto-fill query when triggered
-  React.useEffect(() => {
-    if (triggeredInput && triggeredInput !== workflow.query) {
-      setWorkflow(prev => ({ ...prev, query: triggeredInput }));
-    }
-  }, [triggeredInput]);
 
   // Update workflow state
   const updateWorkflow = (updates: Partial<DataWorkflow>) => {
@@ -68,128 +67,102 @@ export const DataScientistSidebar: React.FC<DataScientistSidebarProps> = ({ trig
 
   // Data ingestion (Function 1)
   const handleDataIngestion = async () => {
-    if (!workflow.dataSource.file || isProcessing || !client) return;
+    if (!workflow.dataSource.file || isProcessing || !onProcess) return;
 
-    setIsProcessing(true);
     try {
       updateWorkflow({
         dataSource: { ...workflow.dataSource, status: 'processing' }
       });
 
-      const response = await client.sendMessage('', {
-        template_parameters: {
-          app_id: "data-scientist",
-          template_id: "ingest_data_source_prompt",
-          prompt_args: {
-            source_path: workflow.dataSource.file.name,
-            source_type: workflow.dataSource.type,
-            file_data: workflow.dataSource.file
-          }
-        },
-        metadata: {
-          sender: 'data-analytics',
-          requestType: 'data_ingestion',
-          requestId: `ingest-${Date.now()}`,
-          expected_outputs: [
-            'sqlite_database_path',
-            'pgvector_database', 
-            'metadata_pipeline',
-            'processing_time_ms'
-          ]
+      await onProcess('', {
+        app_id: "data-scientist",
+        template_id: "ingest_data_source_prompt",
+        prompt_args: {
+          source_path: workflow.dataSource.file.name,
+          source_type: workflow.dataSource.type,
+          file_data: workflow.dataSource.file
         }
+      }, {
+        sender: 'data-analytics',
+        requestType: 'data_ingestion',
+        requestId: `ingest-${Date.now()}`,
+        expected_outputs: [
+          'sqlite_database_path',
+          'pgvector_database', 
+          'metadata_pipeline',
+          'processing_time_ms'
+        ]
       });
 
-      // Extract database paths from response for subsequent queries
-      let responseData: any = {};
-      try {
-        responseData = typeof response === 'string' ? JSON.parse(response) : response;
-      } catch (e) {
-        console.warn('Failed to parse response:', e);
-      }
-      
       updateWorkflow({
-        dataSource: { ...workflow.dataSource, status: 'ready' },
-        sqliteDbPath: responseData.sqlite_database_path,
-        pgvectorDb: responseData.pgvector_database
+        dataSource: { ...workflow.dataSource, status: 'ready' }
       });
     } catch (error) {
       console.error('Data ingestion failed:', error);
       updateWorkflow({
         dataSource: { ...workflow.dataSource, status: 'error' }
       });
-    } finally {
-      setIsProcessing(false);
     }
   };
 
   // Query processing (Function 2)
   const handleQueryProcessing = async () => {
-    if (!workflow.query.trim() || !workflow.sqliteDbPath || isProcessing || !client) return;
+    if (!workflow.query.trim() || !workflow.sqliteDbPath || isProcessing || !onProcess) return;
 
-    setIsProcessing(true);
     try {
-      await client.sendMessage('', {
-        template_parameters: {
-          app_id: "data-scientist",
-          template_id: "query_with_language_prompt",
-          prompt_args: {
-            natural_language_query: workflow.query,
-            sqlite_database_path: workflow.sqliteDbPath,
-            pgvector_database: workflow.pgvectorDb
-          }
-        },
-        metadata: {
-          sender: 'data-analytics',
-          requestType: 'query_processing',
-          requestId: `query-${Date.now()}`,
-          expected_outputs: [
-            'query_processing',
-            'results',
-            'generated_sql',
-            'sql_explanation'
-          ]
+      await onProcess('', {
+        app_id: "data-scientist",
+        template_id: "query_with_language_prompt",
+        prompt_args: {
+          natural_language_query: workflow.query,
+          sqlite_database_path: workflow.sqliteDbPath,
+          pgvector_database: workflow.pgvectorDb
         }
+      }, {
+        sender: 'data-analytics',
+        requestType: 'query_processing',
+        requestId: `query-${Date.now()}`,
+        expected_outputs: [
+          'query_processing',
+          'results',
+          'generated_sql',
+          'sql_explanation'
+        ]
       });
     } catch (error) {
       console.error('Query processing failed:', error);
-    } finally {
-      setIsProcessing(false);
     }
   };
 
   // Combined workflow (Function 1 + Function 2)
   const handleCombinedAnalysis = async () => {
-    if (!workflow.dataSource.file || !workflow.query.trim() || isProcessing || !client) return;
+    if (!workflow.dataSource.file || !workflow.query.trim() || isProcessing || !onProcess) return;
 
-    setIsProcessing(true);
     try {
       updateWorkflow({
         dataSource: { ...workflow.dataSource, status: 'processing' }
       });
 
-      await client.sendMessage('', {
-        template_parameters: {
-          app_id: "data-scientist",
-          template_id: "process_data_source_and_query_prompt",
-          prompt_args: {
-            source_path: workflow.dataSource.file.name,
-            source_type: workflow.dataSource.type,
-            natural_language_query: workflow.query,
-            file_data: workflow.dataSource.file
-          }
-        },
-        metadata: {
-          sender: 'data-analytics',
-          requestType: 'combined_analysis',
-          requestId: `combined-${Date.now()}`,
-          expected_outputs: [
-            'ingestion_result',
-            'query_result', 
-            'generated_sql',
-            'data_insights',
-            'visualizations'
-          ]
+      await onProcess('', {
+        app_id: "data-scientist",
+        template_id: "process_data_source_and_query_prompt",
+        prompt_args: {
+          source_path: workflow.dataSource.file.name,
+          source_type: workflow.dataSource.type,
+          natural_language_query: workflow.query,
+          file_data: workflow.dataSource.file
         }
+      }, {
+        sender: 'data-analytics',
+        requestType: 'combined_analysis',
+        requestId: `combined-${Date.now()}`,
+        expected_outputs: [
+          'ingestion_result',
+          'query_result', 
+          'generated_sql',
+          'data_insights',
+          'visualizations'
+        ]
       });
 
       updateWorkflow({
@@ -200,8 +173,6 @@ export const DataScientistSidebar: React.FC<DataScientistSidebarProps> = ({ trig
       updateWorkflow({
         dataSource: { ...workflow.dataSource, status: 'error' }
       });
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -224,7 +195,7 @@ export const DataScientistSidebar: React.FC<DataScientistSidebarProps> = ({ trig
   ];
 
   return (
-    <div className="space-y-4 h-full flex flex-col">
+    <div className="space-y-4 h-full flex flex-col p-3">
       {/* Workflow Mode Selection */}
       <div>
         <label className="text-sm font-medium text-white/80 mb-2 block">🔬 Analysis Mode</label>
@@ -423,5 +394,23 @@ export const DataScientistSidebar: React.FC<DataScientistSidebarProps> = ({ trig
         </div>
       )}
     </div>
+  );
+};
+
+export const DataScientistSidebar: React.FC<DataScientistSidebarProps> = ({ triggeredInput }) => {
+  return (
+    <BaseSidebar
+      title="Data Scientist"
+      icon="🔬"
+      triggeredInput={triggeredInput}
+      onResult={(result) => {
+        console.log('📊 DataScientist result:', result);
+      }}
+      onError={(error) => {
+        console.error('❌ DataScientist error:', error);
+      }}
+    >
+      <DataScientistContent />
+    </BaseSidebar>
   );
 };

@@ -108,6 +108,11 @@ class MainAppLogger {
   }
 
   private outputToConsole(entry: LogEntry): void {
+    // 在生产环境中限制console输出
+    if (!this.shouldOutputToConsole(entry.level)) {
+      return;
+    }
+
     const levelEmoji = {
       [LogLevel.DEBUG]: '🔍',
       [LogLevel.INFO]: 'ℹ️',
@@ -125,7 +130,8 @@ class MainAppLogger {
       [LogCategory.COMPONENT_RENDER]: '🎨',
       [LogCategory.SIDEBAR_INTERACTION]: '📋',
       [LogCategory.EVENT_EMISSION]: '📡',
-      [LogCategory.CHAT_FLOW]: '💬'
+      [LogCategory.CHAT_FLOW]: '💬',
+      [LogCategory.COMPONENT_ERROR]: '💥'
     };
 
     const timestamp = new Date(entry.timestamp).toISOString().split('T')[1].slice(0, -1);
@@ -143,6 +149,21 @@ class MainAppLogger {
     } else {
       logMethod(`${prefix} ${entry.message}`);
     }
+  }
+
+  private shouldOutputToConsole(level: LogLevel): boolean {
+    // 在生产环境中，只输出 warn 和 error 级别的日志
+    if (process.env.NODE_ENV === 'production') {
+      return level === LogLevel.WARN || level === LogLevel.ERROR;
+    }
+    
+    // 在开发环境中，根据配置决定
+    const enableDebugMode = process.env.REACT_APP_ENABLE_DEBUG_MODE === 'true';
+    if (!enableDebugMode && level === LogLevel.DEBUG) {
+      return false;
+    }
+    
+    return true;
   }
 
   // Convenience methods

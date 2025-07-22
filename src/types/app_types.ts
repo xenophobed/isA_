@@ -2,9 +2,30 @@
  * 应用类型定义
  */
 
+// 内容类型枚举
+export type ContentType = 'image' | 'text' | 'file' | 'data' | 'video' | 'audio';
+
+// 应用ID类型
+export type AppId = 'dream' | 'hunt' | 'omni' | 'digitalhub' | 'assistant' | 'data-scientist' | 'doc' | 'knowledge';
+
+// 内容元数据接口
+export interface ContentMetadata {
+  generatedAt?: string;
+  prompt?: string;
+  aiResponse?: string;
+  messageId?: string;
+  wordCount?: number;
+  total_tokens?: number;
+  searchType?: string;
+  responseType?: string;
+  analysisType?: string;
+  processingType?: string;
+  [key: string]: unknown; // 允许扩展属性
+}
+
 export interface AppArtifact {
   id: string;
-  appId: string;
+  appId: AppId;
   appName: string;
   appIcon: string;
   title: string;
@@ -12,10 +33,10 @@ export interface AppArtifact {
   createdAt: string;
   isOpen: boolean;
   generatedContent?: {
-    type: 'image' | 'text' | 'file' | 'data';
+    type: ContentType;
     content: string;
     thumbnail?: string;
-    metadata?: Record<string, any>;
+    metadata?: ContentMetadata;
   };
 }
 
@@ -28,24 +49,52 @@ export interface AvailableApp {
   category: string;
 }
 
+// AI消息接口
+export interface AIMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  metadata?: {
+    sender?: string;
+    app?: string;
+    media_items?: Array<{
+      type: string;
+      url: string;
+      title?: string;
+    }>;
+    [key: string]: unknown;
+  };
+}
+
+// 待处理工件接口
+export interface PendingArtifact {
+  imageUrl?: string;
+  textContent?: string;
+  userInput: string;
+  timestamp: number;
+  aiResponse?: string;
+  messageId?: string;
+}
+
 export interface AppTriggerParams {
   message: string;
-  setCurrentApp: (app: string | null) => void;
+  setCurrentApp: (app: AppId | null) => void;
   setShowRightSidebar: (show: boolean) => void;
   setTriggeredAppInput: (input: string) => void;
 }
 
 export interface MessageHandlerParams {
-  message: any;
-  currentApp: string | null;
+  message: AIMessage;
+  currentApp: AppId | null;
   showRightSidebar: boolean;
   triggeredAppInput: string;
   artifacts: AppArtifact[];
-  setPendingArtifact: (artifact: any) => void;
+  setPendingArtifact: (artifact: PendingArtifact | null) => void;
 }
 
 export interface MessageRendererParams {
-  message: any;
+  message: AIMessage;
   artifacts: AppArtifact[];
   reopenApp: (artifactId: string) => void;
 }

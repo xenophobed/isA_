@@ -142,24 +142,35 @@ export class ArtifactManager {
       }
     }
 
-    // Handle assistant messages
+    // Handle assistant messages - ONLY for artifacts, not regular chat
+    // Regular chat messages should be handled by ConversationStreamModule
     if (message.role === 'assistant' && message.content) {
-      console.log('🤖 ARTIFACT: Rendering assistant message');
-      return (
-        <div key={message.id} className="mb-4 flex gap-4 justify-start">
-          <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
-            🤖
-          </div>
-          <div className="max-w-2xl">
-            <div className="p-4 rounded-2xl bg-gray-700 text-white">
-              {message.content}
-            </div>
-            <div className="text-xs text-white/50 mt-1">
-              {new Date(message.timestamp || Date.now()).toLocaleTimeString()}
-            </div>
-          </div>
-        </div>
+      // Check if this is an artifact-related message
+      const hasArtifactTrigger = artifacts.some(artifact => 
+        artifact.userInput && message.content.includes(artifact.userInput)
       );
+      
+      if (hasArtifactTrigger) {
+        console.log('🤖 ARTIFACT: Rendering assistant message with artifact context');
+        return (
+          <div key={message.id} className="mb-4 flex gap-4 justify-start">
+            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
+              🤖
+            </div>
+            <div className="max-w-2xl">
+              <div className="p-4 rounded-2xl bg-gray-700 text-white">
+                {message.content}
+              </div>
+              <div className="text-xs text-white/50 mt-1">
+                {new Date(message.timestamp || Date.now()).toLocaleTimeString()}
+              </div>
+            </div>
+          </div>
+        );
+      }
+      
+      // For regular chat messages, return null to let ConversationStreamModule handle it
+      return null;
     }
 
     return null; // Fallback

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SimpleAIClient } from '../services/SimpleAIClient';
+import { BaseSidebar } from '../components/ui/BaseSidebar';
 
 interface KnowledgeSidebarProps {
   triggeredInput?: string;
@@ -23,15 +23,24 @@ interface DocumentItem {
   size: string;
 }
 
-/**
- * Knowledge Hub - Your Personal Document Assistant
- * Add documents, ask questions, get instant answers
- */
-export const KnowledgeSidebar: React.FC<KnowledgeSidebarProps> = ({ triggeredInput }) => {
-  // Use dedicated AI client for Knowledge sidebar (independent from main app)
-  const [client] = useState(() => new SimpleAIClient('http://localhost:8080'));
-  const [isProcessing, setIsProcessing] = useState(false);
-  
+interface BaseSidebarInjectedProps {
+  isProcessing?: boolean;
+  error?: string | null;
+  result?: any;
+  onProcess?: (input: string, templateParams?: any, metadata?: any) => Promise<void>;
+  onReset?: () => void;
+  client?: any;
+}
+
+type KnowledgeContentProps = BaseSidebarInjectedProps & {
+  triggeredInput?: string;
+};
+
+const KnowledgeContent: React.FC<KnowledgeContentProps> = ({
+  isProcessing,
+  onProcess,
+  triggeredInput
+}) => {
   // Simple, user-focused state
   const [knowledge, setKnowledge] = useState<KnowledgeState>({
     activeTab: 'add',
@@ -67,9 +76,8 @@ export const KnowledgeSidebar: React.FC<KnowledgeSidebarProps> = ({ triggeredInp
 
   // Add documents to knowledge base
   const handleAddDocuments = async () => {
-    if (knowledge.selectedFiles.length === 0 || !client || isProcessing) return;
+    if (knowledge.selectedFiles.length === 0 || !onProcess || isProcessing) return;
 
-    setIsProcessing(true);
     try {
       for (const file of knowledge.selectedFiles) {
         // Determine best processing approach based on file type
@@ -77,7 +85,7 @@ export const KnowledgeSidebar: React.FC<KnowledgeSidebarProps> = ({ triggeredInp
         
         if (fileType === 'pdf') {
           // Use graph analytics for PDFs (better for structured documents)
-          await client.sendMessage('', {
+          await onProcess('', {
             template_parameters: {
               app_id: "knowledge",
               template_id: "process_pdf_to_knowledge_graph_prompt",
@@ -103,7 +111,7 @@ export const KnowledgeSidebar: React.FC<KnowledgeSidebarProps> = ({ triggeredInp
           const reader = new FileReader();
           reader.onload = async (e) => {
             const text = e.target?.result as string;
-            await client.sendMessage('', {
+            await onProcess('', {
               template_parameters: {
                 app_id: "knowledge",
                 template_id: "add_document_prompt",
@@ -133,19 +141,16 @@ export const KnowledgeSidebar: React.FC<KnowledgeSidebarProps> = ({ triggeredInp
       updateKnowledge({ selectedFiles: [], activeTab: 'ask' });
     } catch (error) {
       console.error('Failed to add documents:', error);
-    } finally {
-      setIsProcessing(false);
     }
   };
 
   // Ask questions about documents
   const handleAskQuestion = async () => {
-    if (!knowledge.query.trim() || !client || isProcessing) return;
+    if (!knowledge.query.trim() || !onProcess || isProcessing) return;
 
-    setIsProcessing(true);
     try {
       // Use intelligent routing - the system decides vector vs graph based on query type
-      await client.sendMessage('', {
+      await onProcess('', {
         template_parameters: {
           app_id: "knowledge",
           template_id: "generate_rag_response_prompt",
@@ -164,19 +169,16 @@ export const KnowledgeSidebar: React.FC<KnowledgeSidebarProps> = ({ triggeredInp
       });
     } catch (error) {
       console.error('Failed to get answer:', error);
-    } finally {
-      setIsProcessing(false);
     }
   };
 
   // Browse and manage documents
   const handleBrowseDocuments = async () => {
-    if (!client || isProcessing) return;
+    if (!onProcess || isProcessing) return;
 
-    setIsProcessing(true);
     try {
       // Get list of all documents
-      await client.sendMessage('', {
+      await onProcess('', {
         template_parameters: {
           app_id: "knowledge",
           template_id: "list_user_knowledge_prompt",
@@ -193,8 +195,6 @@ export const KnowledgeSidebar: React.FC<KnowledgeSidebarProps> = ({ triggeredInp
       });
     } catch (error) {
       console.error('Failed to browse documents:', error);
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -472,5 +472,29 @@ export const KnowledgeSidebar: React.FC<KnowledgeSidebarProps> = ({ triggeredInp
         </div>
       )}
     </div>
+  );
+};
+
+/**
+ * Knowledge Hub - Your Personal Document Assistant
+ * Add documents, ask questions, get instant answers
+ */
+export const KnowledgeSidebar: React.FC<KnowledgeSidebarProps> = ({ triggeredInput }) => {
+  return (
+    <BaseSidebar
+      title="Knowledge Hub"
+      icon="🧠"
+      triggeredInput={triggeredInput}
+      onResult={(result) => {
+        console.log('🧠 Knowledge result:', result);
+      }}
+      onError={(error) => {
+        console.error('❌ Knowledge error:', error);
+      }}
+    >
+      <KnowledgeContent 
+        triggeredInput={triggeredInput}
+      />
+    </BaseSidebar>
   );
 };
