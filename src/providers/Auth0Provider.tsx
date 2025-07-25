@@ -26,7 +26,8 @@ export const Auth0Provider: React.FC<Auth0ProviderProps> = ({ children }) => {
   const domain = process.env.REACT_APP_AUTH0_DOMAIN;
   const clientId = process.env.REACT_APP_AUTH0_CLIENT_ID;
   const audience = process.env.REACT_APP_AUTH0_AUDIENCE;
-  const redirectUri = process.env.REACT_APP_BASE_URL || window.location.origin;
+  // 使用当前域名作为 redirectUri，支持多域名
+  const redirectUri = window.location.origin;
 
   if (!domain || !clientId) {
     console.error('Auth0 configuration missing:', { domain, clientId, audience });
