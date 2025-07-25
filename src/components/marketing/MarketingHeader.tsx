@@ -1,14 +1,13 @@
 'use client'
 
-import { useAuth } from '../../hooks/useAuth'
 import { useState, useEffect } from 'react'
 
 /**
  * 营销页面专用Header组件
  * 样式完全独立，避免与主应用样式冲突
+ * 不依赖 Auth0，直接提供链接到主应用
  */
 export default function MarketingHeader() {
-  const { auth0User, isLoading } = useAuth()
   const [isScrolled, setIsScrolled] = useState(false)
 
   useEffect(() => {
@@ -69,32 +68,20 @@ export default function MarketingHeader() {
             </a>
 
             {/* User Actions */}
-            {!isLoading && (
-              auth0User ? (
-                // 已登录用户 - 跳转到主应用
-                <div className="flex items-center space-x-4">
-                  <div className="text-sm text-gray-600">
-                    Welcome back!
-                  </div>
-                  <a 
-                    href="/" 
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-full font-medium hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 no-underline"
-                  >
-                    Go to App
-                  </a>
-                </div>
-              ) : (
-                // 未登录用户
-                <div className="flex items-center space-x-4">
-                  <a 
-                    href="/"
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full font-medium hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 no-underline"
-                  >
-                    Get Started
-                  </a>
-                </div>
-              )
-            )}
+            <div className="flex items-center space-x-4">
+              <a 
+                href="https://app.iapro.ai"
+                className="text-gray-700 hover:text-blue-600 font-medium transition-colors no-underline"
+              >
+                Sign In
+              </a>
+              <a 
+                href="https://app.iapro.ai"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full font-medium hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 no-underline"
+              >
+                Get Started
+              </a>
+            </div>
           </div>
 
           {/* Mobile Menu Button */}

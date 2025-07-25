@@ -1,6 +1,5 @@
 'use client'
 
-import { useAuth } from '../../../hooks/useAuth'
 import { useState, useEffect } from 'react'
 
 interface HeroSectionProps {
@@ -11,9 +10,9 @@ interface HeroSectionProps {
 /**
  * 营销首页Hero区域组件
  * 独立样式避免与主应用冲突
+ * 不依赖 Auth0，直接提供链接到主应用
  */
 export default function HeroSection({ currentTime, className = "" }: HeroSectionProps) {
-  const { auth0User, isLoading } = useAuth()
   const [taglineIndex, setTaglineIndex] = useState(0)
   
   const taglines = [
@@ -65,33 +64,20 @@ export default function HeroSection({ currentTime, className = "" }: HeroSection
         {valueProps[taglineIndex]}
       </p>
       
-      {!isLoading && (
-        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-4">
-          {auth0User ? (
-            <a 
-              href="/" 
-              className="marketing-cta-button bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-full text-sm font-semibold hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-center no-underline"
-            >
-              Go to Dashboard
-            </a>
-          ) : (
-            <>
-              <a 
-                href="/" 
-                className="marketing-cta-button bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-full text-sm font-semibold hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-center no-underline"
-              >
-                Start Free Trial
-              </a>
-              <a 
-                href="/" 
-                className="marketing-cta-button bg-white/80 backdrop-blur-sm text-gray-700 px-6 py-3 rounded-full text-sm font-semibold hover:bg-white transition-all border border-gray-200 hover:shadow-lg text-center no-underline"
-              >
-                Sign In
-              </a>
-            </>
-          )}
-        </div>
-      )}
+      <div className="flex flex-col sm:flex-row gap-3 justify-center mb-4">
+        <a 
+          href="https://app.iapro.ai" 
+          className="marketing-cta-button bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-full text-sm font-semibold hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-center no-underline"
+        >
+          Start Free Trial
+        </a>
+        <a 
+          href="https://app.iapro.ai" 
+          className="marketing-cta-button bg-white/80 backdrop-blur-sm text-gray-700 px-6 py-3 rounded-full text-sm font-semibold hover:bg-white transition-all border border-gray-200 hover:shadow-lg text-center no-underline"
+        >
+          Sign In
+        </a>
+      </div>
 
       <style jsx>{`
         .marketing-hero {

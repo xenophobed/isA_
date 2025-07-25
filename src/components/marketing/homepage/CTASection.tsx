@@ -1,4 +1,3 @@
-import { useAuth } from '../../../hooks/useAuth'
 import { useState, useEffect } from 'react'
 
 interface CTASectionProps {
@@ -8,9 +7,9 @@ interface CTASectionProps {
 /**
  * Marketing homepage CTA section component
  * Isolated styles to avoid conflicts with main app
+ * No Auth0 dependency, direct links to main app
  */
 export default function CTASection({ className = "" }: CTASectionProps) {
-  const { auth0User, isLoading } = useAuth()
   const [valueIndex, setValueIndex] = useState(0)
   
   const valueProps = [
@@ -52,14 +51,14 @@ export default function CTASection({ className = "" }: CTASectionProps) {
           <div className="flex items-center space-x-2 mb-2">
             <span className="text-xl">{currentValue.icon}</span>
             <h3 className="text-xl font-bold transition-all duration-500">
-              {auth0User ? "Enhance Your Workflow" : currentValue.title}
+              {currentValue.title}
             </h3>
           </div>
           <p className="text-purple-100 text-sm font-medium mb-1 transition-all duration-500">
-            {auth0User ? "Access your personalized AI workspace with advanced features" : currentValue.description}
+            {currentValue.description}
           </p>
           <div className="text-xs text-purple-200 font-medium mb-2">
-            {auth0User ? "All premium features included" : currentValue.benefit}
+            {currentValue.benefit}
           </div>
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-1">
@@ -73,32 +72,18 @@ export default function CTASection({ className = "" }: CTASectionProps) {
           </div>
         </div>
         
-        {!isLoading && (
-          <div className="flex flex-col space-y-2">
-            {auth0User ? (
-              <a 
-                href="/" 
-                className="cta-button bg-white text-purple-600 px-6 py-3 rounded-full font-bold hover:bg-gray-100 transform hover:scale-105 transition-all shadow-xl duration-300 text-sm whitespace-nowrap no-underline"
-              >
-                Launch Workspace
-                <span className="inline ml-1">→</span>
-              </a>
-            ) : (
-              <>
-                <a 
-                  href="/" 
-                  className="cta-button bg-white text-purple-600 px-6 py-3 rounded-full font-bold hover:bg-gray-100 transform hover:scale-105 transition-all shadow-xl duration-300 text-sm whitespace-nowrap no-underline"
-                >
-                  Try Free Now
-                  <span className="inline ml-1">→</span>
-                </a>
-                <div className="text-xs text-purple-200 text-center">
-                  No credit card required
-                </div>
-              </>
-            )}
+        <div className="flex flex-col space-y-2">
+          <a 
+            href="https://app.iapro.ai" 
+            className="cta-button bg-white text-purple-600 px-6 py-3 rounded-full font-bold hover:bg-gray-100 transform hover:scale-105 transition-all shadow-xl duration-300 text-sm whitespace-nowrap no-underline"
+          >
+            Try Free Now
+            <span className="inline ml-1">→</span>
+          </a>
+          <div className="text-xs text-purple-200 text-center">
+            No credit card required
           </div>
-        )}
+        </div>
       </div>
       
       <div className="flex justify-center space-x-1 mt-4">
