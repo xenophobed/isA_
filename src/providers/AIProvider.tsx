@@ -73,7 +73,7 @@ interface AIProviderProps {
 
 export const AIProvider: React.FC<AIProviderProps> = ({ 
   children, 
-  apiEndpoint = process.env.REACT_APP_API_ENDPOINT || 'http://localhost:8080' 
+  apiEndpoint = process.env.REACT_APP_AGENT_SERVICE_URL || 'http://localhost:8080' 
 }) => {
   const [chatService, setChatService] = useState(() => {
     console.log('🏗️ AI Provider: Creating new ChatService instance');

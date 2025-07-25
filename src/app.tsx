@@ -35,7 +35,7 @@ export const App: React.FC = () => {
     >
       <Auth0Provider>
         <UserModule>
-          <AIProvider apiEndpoint={process.env.REACT_APP_API_ENDPOINT || "http://localhost:8080"}>
+          <AIProvider apiEndpoint={process.env.REACT_APP_AGENT_SERVICE_URL || "http://localhost:8080"}>
             <AppModule />
           </AIProvider>
         </UserModule>

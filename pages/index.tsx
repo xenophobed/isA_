@@ -16,7 +16,7 @@ const IndexPage: React.FC = () => {
       if (hostname === 'www.iapro.ai') {
         // 营销页面域名，显示 home 内容
         return;
-      } else if (hostname === 'agent.iapro.ai') {
+      } else if (hostname === 'app.iapro.ai') {
         // 主应用域名，显示 app 内容
         return;
       }

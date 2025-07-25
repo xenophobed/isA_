@@ -100,7 +100,7 @@ const getNumberEnvVar = (key: string, defaultValue: number): number => {
 export const config: AppConfiguration = {
   // API基础配置
   api: {
-    baseUrl: process.env.REACT_APP_API_BASE_URL || process.env.Agent_URL || 'http://localhost:8080',
+    baseUrl: process.env.REACT_APP_AGENT_SERVICE_URL || 'http://localhost:8080',
     timeout: getNumberEnvVar('REACT_APP_API_TIMEOUT', 30000),
     retries: getNumberEnvVar('REACT_APP_API_RETRIES', 3),
     maxFileSize: getNumberEnvVar('REACT_APP_MAX_FILE_SIZE', 10 * 1024 * 1024), // 10MB
@@ -118,8 +118,8 @@ export const config: AppConfiguration = {
 
   // 外部API配置 (使用现有的环境变量结构)
   externalApis: {
-    userServiceUrl: getEnvVar('REACT_APP_EXTERNAL_API_BASE_URL', 'http://localhost:8100'),
-    aiServiceUrl: process.env.REACT_APP_AI_SERVICE_URL || process.env.Agent_URL || 'http://localhost:8080',
+    userServiceUrl: process.env.REACT_APP_USER_SERVICE_URL || 'http://localhost:8100',
+    aiServiceUrl: process.env.REACT_APP_MODEL_SERVICE_URL || 'http://localhost:8082',
     imageServiceUrl: getEnvVar('REACT_APP_IMAGE_SERVICE_URL', 'https://api.replicate.com'),
     contentServiceUrl: getEnvVar('REACT_APP_CONTENT_SERVICE_URL', 'https://api.openai.com')
   },

@@ -4,12 +4,6 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "outputDirectory": ".next",
-  "env": {
-    "REACT_APP_API_ENDPOINT": "@react_app_api_endpoint",
-    "REACT_APP_LOG_LEVEL": "@react_app_log_level",
-    "REACT_APP_ENABLE_LOGGING_DASHBOARD": "@react_app_enable_logging_dashboard",
-    "REACT_APP_ENABLE_DEBUG_MODE": "@react_app_enable_debug_mode"
-  },
   "build": {
     "env": {
       "NODE_ENV": "production",
