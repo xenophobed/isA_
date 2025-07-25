@@ -22,8 +22,9 @@
  * 【重要】这里不会创建AI回复消息，只处理用户输入
  */
 import React, { useCallback } from 'react';
-import { useAppStore, useChatActions } from '../../stores/useAppStore';
-import { AppId } from '../../types/app_types';
+import { useAppStore } from '../../stores/useAppStore';
+import { useChatActions } from '../../stores/useChatStore';
+import { AppId } from '../../types/appTypes';
 import { logger, LogCategory } from '../../utils/logger';
 
 interface ChatInputHandlerProps {

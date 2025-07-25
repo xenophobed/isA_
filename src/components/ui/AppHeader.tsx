@@ -9,15 +9,13 @@ interface AppHeaderProps {
   }>;
   showRightSidebar: boolean;
   onToggleSidebar: () => void;
-  onShowLogs: () => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
   currentApp,
   availableApps,
   showRightSidebar,
-  onToggleSidebar,
-  onShowLogs
+  onToggleSidebar
 }) => {
   return (
     <div className="flex items-center justify-between w-full">
@@ -40,15 +38,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
           SmartAgent v3.0
         </div>
-        
-        <button 
-          onClick={onShowLogs}
-          className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-xl text-blue-400 transition-all hover:scale-105 flex items-center gap-2"
-          title="Open Data Flow Logger"
-        >
-          <span>📊</span>
-          Logs
-        </button>
         
         <button 
           onClick={onToggleSidebar}

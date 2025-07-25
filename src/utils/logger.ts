@@ -15,9 +15,12 @@ export enum LogCategory {
   APP_TRIGGER = 'APP_TRIGGER',
   STATE_CHANGE = 'STATE_CHANGE',
   API_CALL = 'API_CALL',
+  API_REQUEST = 'API_REQUEST',
+  USER_AUTH = 'USER_AUTH',
   AI_MESSAGE = 'AI_MESSAGE',
   ARTIFACT_CREATION = 'ARTIFACT_CREATION',
   COMPONENT_RENDER = 'COMPONENT_RENDER',
+  COMPONENT_ERROR = 'COMPONENT_ERROR',
   SIDEBAR_INTERACTION = 'SIDEBAR_INTERACTION',
   EVENT_EMISSION = 'EVENT_EMISSION',
   CHAT_FLOW = 'CHAT_FLOW'
@@ -125,13 +128,15 @@ class MainAppLogger {
       [LogCategory.APP_TRIGGER]: '🎯',
       [LogCategory.STATE_CHANGE]: '🔄',
       [LogCategory.API_CALL]: '🌐',
+      [LogCategory.API_REQUEST]: '🌐',
+      [LogCategory.USER_AUTH]: '🔐',
       [LogCategory.AI_MESSAGE]: '🤖',
       [LogCategory.ARTIFACT_CREATION]: '📦',
       [LogCategory.COMPONENT_RENDER]: '🎨',
+      [LogCategory.COMPONENT_ERROR]: '💥',
       [LogCategory.SIDEBAR_INTERACTION]: '📋',
       [LogCategory.EVENT_EMISSION]: '📡',
-      [LogCategory.CHAT_FLOW]: '💬',
-      [LogCategory.COMPONENT_ERROR]: '💥'
+      [LogCategory.CHAT_FLOW]: '💬'
     };
 
     const timestamp = new Date(entry.timestamp).toISOString().split('T')[1].slice(0, -1);

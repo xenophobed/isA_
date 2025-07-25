@@ -1,36 +1,57 @@
 /**
  * ============================================================================
- * 聊天布局组件 (ChatLayout.tsx)
+ * 聊天布局组件 (ChatLayout.tsx) - 纯UI布局组件
  * ============================================================================
  * 
- * 【核心功能】
- * - 提供聊天界面的整体布局结构
- * - 集成聊天内容区域和输入区域
- * - 管理侧边栏显示和响应式布局
- * - 协调消息发送和文件上传功能
+ * 【核心职责】
+ * - 提供聊天界面的纯UI布局结构和响应式设计
+ * - 管理侧边栏显示状态和布局切换逻辑
+ * - 协调各个UI区域的空间分配和视觉效果
+ * - 处理界面交互事件的传递和路由
  * 
- * 【布局结构】
- * - Header: 应用头部
- * - Left Sidebar: 会话管理
- * - Chat Content: 消息显示区域
- * - Input Area: 消息输入区域
- * - Right Sidebar: 应用功能区
+ * 【关注点分离】
+ * ✅ 负责：
+ *   - UI布局结构和响应式设计
+ *   - 侧边栏显示和隐藏逻辑
+ *   - CSS样式和视觉效果管理
+ *   - 界面事件的传递和路由
+ *   - 组件间的空间分配
  * 
- * 【消息处理】
- * 第78行：调用 chatActions.sendMessage(content, client, enrichedMetadata)
- * 第98行：调用 chatActions.sendMultimodalMessage(content, files, client, enrichedMetadata)
+ * ❌ 不负责：
+ *   - 业务逻辑处理（由modules处理）
+ *   - 数据状态管理（由stores处理）
+ *   - AI客户端操作（由modules通过hooks处理）
+ *   - 消息发送逻辑（由modules处理）
+ *   - 认证和用户管理（由modules处理）
  * 
- * 【重要】这里只是调用发送，不处理消息显示
- * 消息显示由 ChatContentLayout → ConversationStreamModule 处理
+ * 【布局架构】
+ * - Header: 应用头部导航
+ * - Left Sidebar: 会话管理和历史
+ * - Chat Content: 消息列表和显示
+ * - Input Area: 消息输入和文件上传
+ * - Right Sidebar: 应用功能和工具
+ * 
+ * 【数据流向】
+ * props → UI渲染
+ * UI事件 → callback props → modules → business logic
  */
 import React, { useState, memo, useCallback, useMemo } from 'react';
 import { ChatContentLayout } from './ChatContentLayout';
-import { InputAreaLayout } from '../input/InputAreaLayout';
-import { useChatMessages, useChatActions } from '../../../stores/useAppStore';
-import { useSimpleAI } from '../../../providers/SimpleAIProvider';
-import { useAuth } from '../../../hooks/useAuth';
+import { InputAreaLayout } from './InputAreaLayout';
+
+// Pure interface - no dependency on stores
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  metadata?: Record<string, any>;
+  isStreaming?: boolean;
+  streamingStatus?: string;
+}
 
 export interface ChatLayoutProps {
+  // Layout configuration
   headerContent?: React.ReactNode;
   showHeader?: boolean;
   sidebarContent?: React.ReactNode;
@@ -40,19 +61,31 @@ export interface ChatLayoutProps {
   rightSidebarContent?: React.ReactNode;
   rightSidebarWidth?: string | number;
   inputSuggestionsContent?: React.ReactNode;
-  conversationProps?: any;
-  inputProps?: any;
   className?: string;
   fullscreen?: boolean;
   onFullscreenToggle?: (fullscreen: boolean) => void;
   showRightSidebar?: boolean;
   sidebarMode?: 'exclusive' | 'inclusive';
   children?: React.ReactNode;
+  
+  // Data props - provided by modules
+  messages?: ChatMessage[];
+  isLoading?: boolean;
+  isTyping?: boolean;
+  
+  // Event callbacks - handled by modules
+  onSendMessage?: (content: string, metadata?: Record<string, any>) => Promise<void>;
+  onSendMultimodal?: (content: string, files: File[], metadata?: Record<string, any>) => Promise<void>;
+  
+  // Configuration props - passed through from modules
+  conversationProps?: any;
+  inputProps?: any;
 }
 
 /**
- * Standalone ChatLayout component for main_app
- * Uses centralized useAppStore and SimpleAIProvider
+ * Pure UI ChatLayout component
+ * Receives all data and callbacks as props from modules
+ * No direct business logic or state management
  */
 export const ChatLayout = memo<ChatLayoutProps>(({
   headerContent,
@@ -71,58 +104,17 @@ export const ChatLayout = memo<ChatLayoutProps>(({
   onFullscreenToggle,
   showRightSidebar = false,
   sidebarMode = 'exclusive',
-  children
+  children,
+  // Data props from modules
+  messages = [],
+  isLoading = false,
+  isTyping = false,
+  
+  // Event callbacks from modules
+  onSendMessage,
+  onSendMultimodal
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(fullscreen);
-  
-  // Get shared AI client and chat actions
-  const client = useSimpleAI();
-  const chatActions = useChatActions();
-  
-  // Get user info from Auth hook
-  const { user } = useAuth();
-  
-  console.log('🔍 ChatLayout: client status:', client ? (client.isDestroyed() ? 'destroyed' : 'active') : 'null');
-  
-  // Create a wrapper that includes the client
-  const sendMessage = useCallback(async (content: string, metadata?: Record<string, any>) => {
-    console.log('📨 ChatLayout: sendMessage called with:', content);
-    if (!client) {
-      console.error('❌ ChatLayout: No AI client available');
-      return;
-    }
-    console.log('📨 ChatLayout: Calling chatActions.sendMessage');
-    
-    // Include user ID in metadata
-    const enrichedMetadata = {
-      ...metadata,
-      user_id: user?.user_id || 'anonymous',
-      session_id: metadata?.session_id || 'default'
-    };
-    
-    await chatActions.sendMessage(content, client, enrichedMetadata);
-    console.log('✅ ChatLayout: chatActions.sendMessage completed');
-  }, [client, chatActions, user]);
-
-  // Create multimodal wrapper for file uploads
-  const sendMultimodalMessage = useCallback(async (content: string, files: File[], metadata?: Record<string, any>) => {
-    console.log('📨 ChatLayout: sendMultimodalMessage called with:', content, files.length, 'files');
-    if (!client) {
-      console.error('❌ ChatLayout: No AI client available');
-      return;
-    }
-    console.log('📨 ChatLayout: Calling chatActions.sendMultimodalMessage');
-    
-    // Include user ID in metadata
-    const enrichedMetadata = {
-      ...metadata,
-      user_id: user?.user_id || 'anonymous',
-      session_id: metadata?.session_id || 'default'
-    };
-    
-    await chatActions.sendMultimodalMessage(content, files, client, enrichedMetadata);
-    console.log('✅ ChatLayout: chatActions.sendMultimodalMessage completed');
-  }, [client, chatActions, user]);
   
   // Handle exclusive sidebar logic
   const actualShowLeftSidebar = useMemo(() => 
@@ -170,7 +162,7 @@ export const ChatLayout = memo<ChatLayoutProps>(({
   const rightSidebarClass = 'isa-chat-sidebar isa-sidebar-right';
   
   return (
-    <div className={`${layoutClass} flex flex-col h-screen text-white overflow-hidden`} style={{ background: 'transparent' }}>
+    <div className={`${layoutClass} flex flex-col h-full text-white overflow-hidden`} style={{ background: 'transparent' }}>
       
       {showHeader && (
         <header className="isa-chat-header h-16 bg-black/20 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-6 z-10">
@@ -188,7 +180,7 @@ export const ChatLayout = memo<ChatLayoutProps>(({
         </header>
       )}
       
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden" style={{ height: showHeader ? 'calc(100% - 4rem)' : '100%' }}>
         {actualShowLeftSidebar && sidebarContent && (
           <aside 
             className={`${sidebarClass} bg-black/20 backdrop-blur-xl border-r border-white/10 flex-shrink-0 order-1 z-10`}
@@ -203,7 +195,9 @@ export const ChatLayout = memo<ChatLayoutProps>(({
           <ChatContentLayout 
             {...conversationProps}
             className="flex-1"
-            messages={useChatMessages()}
+            messages={messages}
+            isLoading={isLoading}
+            isTyping={isTyping}
           />
           
           {/* Input area */}
@@ -217,8 +211,8 @@ export const ChatLayout = memo<ChatLayoutProps>(({
             onAfterSend={inputProps.onAfterSend}
             onError={inputProps.onError}
             onFileSelect={inputProps.onFileSelect}
-            onSend={sendMessage}
-            onSendMultimodal={sendMultimodalMessage}
+            onSend={onSendMessage}
+            onSendMultimodal={onSendMultimodal}
             suggestionsContent={inputSuggestionsContent}
             config={inputProps.config ? { components: inputProps.config } : undefined}
           />

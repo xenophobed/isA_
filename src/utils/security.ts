@@ -227,14 +227,14 @@ class RateLimiter {
   // 清理过期记录 (定期调用)
   cleanup(): void {
     const now = Date.now();
-    for (const [identifier, requests] of this.requests.entries()) {
+    Array.from(this.requests.entries()).forEach(([identifier, requests]) => {
       const validRequests = requests.filter(time => now - time < this.timeWindow);
       if (validRequests.length === 0) {
         this.requests.delete(identifier);
       } else {
         this.requests.set(identifier, validRequests);
       }
-    }
+    });
   }
 }
 

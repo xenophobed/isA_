@@ -15,8 +15,8 @@
  * 【重要】这是纯显示组件，不会创建或修改消息
  */
 import React, { useEffect, useRef } from 'react';
-import { ConversationStreamModule } from '../modules/ConversationStreamModule';
-import { ChatMessage, useChatLoading, useChatTyping } from '../../../stores/useAppStore';
+import { MessageList } from './MessageList';
+import { ChatMessage } from '../../../types/chatTypes';
 
 export interface ChatContentLayoutProps {
   showTimestamps?: boolean;
@@ -30,6 +30,8 @@ export interface ChatContentLayoutProps {
   className?: string;
   children?: React.ReactNode;
   messages?: ChatMessage[];  // Accept messages as prop
+  isLoading?: boolean;       // Accept loading state as prop
+  isTyping?: boolean;        // Accept typing state as prop
 }
 
 /**
@@ -47,13 +49,11 @@ export const ChatContentLayout: React.FC<ChatContentLayoutProps> = ({
   customMessageRenderer,
   className = '',
   children,
-  messages = []  // Use prop instead of context
+  messages = [],  // Use prop instead of context
+  isLoading = false,
+  isTyping = false
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  // Get loading and typing states from centralized store
-  const isLoading = useChatLoading();
-  const isTyping = useChatTyping();
   
   // Get current streaming status from the last message
   const streamingMessage = messages.find(m => m.isStreaming);
@@ -84,7 +84,8 @@ export const ChatContentLayout: React.FC<ChatContentLayoutProps> = ({
         overflow: 'auto !important',
         background: 'transparent !important',
         padding: '1rem !important',
-        display: 'block !important'
+        display: 'block !important',
+        height: '100%'
       }}
     >
       {/* Streaming Status Display - Top Right Corner */}
@@ -103,7 +104,7 @@ export const ChatContentLayout: React.FC<ChatContentLayoutProps> = ({
         </div>
       )}
 
-      <ConversationStreamModule
+      <MessageList
         showTimestamps={showTimestamps}
         showAvatars={showAvatars}
         autoScroll={false} // Handled by this component

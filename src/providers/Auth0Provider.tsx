@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Auth0Provider as Auth0ProviderBase } from '@auth0/auth0-react';
+import { Auth0Provider as Auth0ProviderBase, useAuth0 } from '@auth0/auth0-react';
+import { LoginScreen } from '../components/ui/LoginScreen';
 
 interface Auth0ProviderProps {
   children: React.ReactNode;
@@ -55,7 +56,34 @@ export const Auth0Provider: React.FC<Auth0ProviderProps> = ({ children }) => {
       useRefreshTokens={true}
       cacheLocation="localstorage"
     >
-      {children}
+      <AuthGate>{children}</AuthGate>
     </Auth0ProviderBase>
   );
+};
+
+/**
+ * Auth Gate Component - Handles authentication flow
+ */
+const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isLoading, isAuthenticated, loginWithRedirect } = useAuth0();
+
+  // Show loading while Auth0 is initializing
+  if (isLoading) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-white text-center">
+          <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4" />
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login screen if not authenticated
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={() => loginWithRedirect()} />;
+  }
+
+  // Show main app if authenticated
+  return <>{children}</>;
 };

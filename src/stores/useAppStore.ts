@@ -1,153 +1,74 @@
 /**
  * ============================================================================
- * 全局应用状态管理 (useAppStore.ts)
+ * 主应用状态管理 (useAppStore.ts) - 专注于主应用导航和全局UI状态
  * ============================================================================
  * 
- * 【核心功能】
- * - 使用Zustand进行集中状态管理
- * - 管理聊天消息数组，包括流式消息  
- * - 管理应用切换、侧边栏状态、工件等
- * - 提供统一的聊天操作接口
- * - 处理所有StreamingHandler解析的事件
- * - 根据当前状态决定事件如何分发到UI组件
+ * 【核心职责】
+ * - 管理主应用的导航状态（当前小部件、侧边栏显示）
+ * - 处理全局UI状态（加载、错误、模态框等）
+ * - 管理应用级别的配置和设置
+ * - 协调各个功能模块的交互
  * 
- * 【关键状态】
- * - messages: ChatMessage[] - 聊天消息数组，支持流式消息
- * - currentApp: AppId | null - 当前打开的应用
- * - showRightSidebar: boolean - 右侧边栏显示状态
- * - artifacts: AppArtifact[] - 生成的内容工件
- * - isTyping: boolean - AI输入状态
+ * 【关注点分离】
+ * ✅ 负责：
+ *   - 当前活跃小部件的导航
+ *   - 侧边栏显示状态管理
+ *   - 全局加载和错误状态
+ *   - 应用级UI状态（模态框、仪表板等）
+ *   - 小部件触发输入管理
+ *   - 新聊天会话控制
  * 
- * 【流式消息系统】
- * - startStreamingMessage: 创建带isStreaming=true的消息
- * - appendToStreamingMessage: 追加内容到最后一条流式消息
- * - updateStreamingStatus: 更新流式消息的状态文本
- * - finishStreamingMessage: 标记流式消息完成
+ * ❌ 不负责：
+ *   - 聊天消息管理（由useChatStore处理）
+ *   - 会话管理（由useSessionStore处理）
+ *   - 工件管理（由useArtifactStore处理）
+ *   - 小部件特定状态（由useWidgetStores处理）
+ *   - 流式消息处理（由useChatStore处理）
  * 
- * 【消息结构】
- * ChatMessage {
- *   id: string
- *   role: 'user' | 'assistant'
- *   content: string
- *   timestamp: string
- *   metadata?: object
- *   isStreaming?: boolean - 标记流式消息
- *   streamingStatus?: string - 流式状态描述
- * }
- * 
- * 【重要】这里是消息显示问题的可能源头
+ * 【架构定位】
+ * 这是应用的"交通控制中心"，负责协调各个专门的store，
+ * 但不直接管理具体的业务数据。
  */
+
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { AppArtifact, AppId, PendingArtifact } from '../types/app_types';
+import { AppId } from '../types/appTypes';
 import { logger, LogCategory } from '../utils/logger';
 
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  metadata?: Record<string, any>;
-  isStreaming?: boolean; // 标记是否为流式消息
-  streamingStatus?: string; // 流式状态描述
-}
-
 export interface AppState {
-  // Current active app
+  // 主应用导航
   currentApp: AppId | null;
   showRightSidebar: boolean;
   
-  // Chat state - centralized here
-  messages: ChatMessage[];
-  isTyping: boolean;
-  chatLoading: boolean;
-  
-  // Streaming state - now integrated into messages array
-  
-  // Chat and input state
+  // 小部件交互
   triggeredAppInput: string;
   
-  // Artifacts and generated content
-  artifacts: AppArtifact[];
-  pendingArtifact: PendingArtifact | null;
-  
-  // App-specific states
-  dream: {
-    generatedImage: string | null;
-    isGenerating: boolean;
-    lastParams: any;
-  };
-  
-  hunt: {
-    searchResults: any[];
-    isSearching: boolean;
-    lastQuery: string;
-  };
-  
-  omni: {
-    generatedContent: string | null;
-    isGenerating: boolean;
-    lastParams: any;
-  };
-  
-  // UI state
+  // 全局UI状态
   showLoggingDashboard: boolean;
   chatKey: number;
   
-  // Loading and error states
+  // 全局加载和错误状态
   isLoading: boolean;
   error: string | null;
 }
 
 export interface AppActions {
-  // App navigation
+  // 应用导航
   setCurrentApp: (app: AppId | null) => void;
   setShowRightSidebar: (show: boolean) => void;
   closeApp: () => void;
   reopenApp: (artifactId: string) => void;
   
-  // Chat actions
-  addMessage: (message: ChatMessage) => void;
-  sendMessage: (content: string, client: any, metadata?: Record<string, any>) => Promise<void>;
-  sendMultimodalMessage: (content: string, files: File[], client: any, metadata?: Record<string, any>) => Promise<void>;
-  setIsTyping: (typing: boolean) => void;
-  setChatLoading: (loading: boolean) => void;
-  clearMessages: () => void;
-  
-  // Streaming actions
-  startStreamingMessage: (id: string, status?: string) => void;
-  appendToStreamingMessage: (content: string) => void;
-  finishStreamingMessage: () => void;
-  updateStreamingStatus: (status: string) => void;
-  
-  // Chat and input
+  // 小部件交互
   setTriggeredAppInput: (input: string) => void;
+  
+  // 聊天控制
   startNewChat: () => void;
   
-  // Artifacts
-  setArtifacts: (artifacts: AppArtifact[] | ((prev: AppArtifact[]) => AppArtifact[])) => void;
-  setPendingArtifact: (artifact: AppState['pendingArtifact']) => void;
-  addArtifact: (artifact: AppArtifact) => void;
-  
-  // Dream app actions
-  setDreamGeneratedImage: (image: string | null) => void;
-  setDreamGenerating: (isGenerating: boolean) => void;
-  setDreamParams: (params: any) => void;
-  
-  // Hunt app actions
-  setHuntSearchResults: (results: any[]) => void;
-  setHuntSearching: (isSearching: boolean) => void;
-  setHuntLastQuery: (query: string) => void;
-  
-  // Omni app actions
-  setOmniGeneratedContent: (content: string | null) => void;
-  setOmniGenerating: (isGenerating: boolean) => void;
-  setOmniParams: (params: any) => void;
-  
-  // UI actions
+  // UI状态
   setShowLoggingDashboard: (show: boolean) => void;
   
-  // Loading and error
+  // 全局状态
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
@@ -157,252 +78,16 @@ export type AppStore = AppState & AppActions;
 
 export const useAppStore = create<AppStore>()(
   subscribeWithSelector((set, get) => ({
-    // Initial state
+    // 初始状态
     currentApp: null,
     showRightSidebar: false,
-    messages: [],
-    isTyping: false,
-    chatLoading: false,
     triggeredAppInput: '',
-    artifacts: [],
-    pendingArtifact: null,
-    
-    dream: {
-      generatedImage: null,
-      isGenerating: false,
-      lastParams: null
-    },
-    
-    hunt: {
-      searchResults: [],
-      isSearching: false,
-      lastQuery: ''
-    },
-    
-    omni: {
-      generatedContent: null,
-      isGenerating: false,
-      lastParams: null
-    },
-    
     showLoggingDashboard: false,
     chatKey: 0,
     isLoading: false,
     error: null,
     
-    // Chat Actions
-    addMessage: (message) => {
-      set((state) => ({
-        messages: [...state.messages, message]
-      }));
-      logger.info(LogCategory.CHAT_FLOW, 'Message added to store', { 
-        messageId: message.id, 
-        role: message.role, 
-        contentLength: message.content.length 
-      });
-    },
-
-    sendMessage: async (content, client, metadata = {}) => {
-      if (!client) {
-        logger.error(LogCategory.CHAT_FLOW, 'No AI client provided to sendMessage');
-        return;
-      }
-
-      const { setChatLoading, setIsTyping } = get();
-      
-      setChatLoading(true);
-      setIsTyping(true);
-      
-      try {
-        // 使用新的回调系统和StreamingHandler解析器
-        await client.sendMessageWithCallback(content, {
-          onData: (event: any) => {
-            // 使用全局的StreamingHandler解析器
-            if (window && (window as any).streamingParser) {
-              (window as any).streamingParser(event);
-            } else {
-              console.warn('⚠️ STORE: StreamingHandler parser not available');
-            }
-          },
-          onError: (error: Error) => {
-            logger.error(LogCategory.CHAT_FLOW, 'Streaming error', { error: error.message });
-            setChatLoading(false);
-            setIsTyping(false);
-          },
-          onComplete: () => {
-            console.log('✅ STORE: Streaming completed');
-            setChatLoading(false);
-            setIsTyping(false);
-          }
-        }, metadata);
-      } catch (error) {
-        logger.error(LogCategory.CHAT_FLOW, 'Failed to send message', { error });
-        setChatLoading(false);
-        setIsTyping(false);
-      }
-    },
-
-    sendMultimodalMessage: async (content, files, client, metadata = {}) => {
-      if (!client) {
-        logger.error(LogCategory.CHAT_FLOW, 'No AI client provided to sendMultimodalMessage');
-        return;
-      }
-
-      const { setChatLoading, setIsTyping } = get();
-      
-      setChatLoading(true);
-      setIsTyping(true);
-      
-      try {
-        // 使用新的回调系统和StreamingHandler解析器
-        await client.sendMultimodalMessageWithCallback(content, files, {
-          onData: (event: any) => {
-            // 使用全局的StreamingHandler解析器
-            if (window && (window as any).streamingParser) {
-              (window as any).streamingParser(event);
-            } else {
-              console.warn('⚠️ STORE: StreamingHandler parser not available');
-            }
-          },
-          onError: (error: Error) => {
-            logger.error(LogCategory.CHAT_FLOW, 'Multimodal streaming error', { error: error.message });
-            setChatLoading(false);
-            setIsTyping(false);
-          },
-          onComplete: () => {
-            console.log('✅ STORE: Multimodal streaming completed');
-            setChatLoading(false);
-            setIsTyping(false);
-          }
-        }, metadata);
-        
-        logger.info(LogCategory.CHAT_FLOW, 'Multimodal message sent successfully', {
-          contentLength: content.length,
-          fileCount: files.length,
-          fileTypes: files.map(f => f.type)
-        });
-      } catch (error) {
-        logger.error(LogCategory.CHAT_FLOW, 'Failed to send multimodal message', { error });
-        setChatLoading(false);
-        setIsTyping(false);
-      }
-    },
-
-    setIsTyping: (typing) => {
-      set({ isTyping: typing });
-    },
-
-    setChatLoading: (loading) => {
-      set({ chatLoading: loading });
-    },
-
-    clearMessages: () => {
-      set({ messages: [] });
-      logger.info(LogCategory.CHAT_FLOW, 'Messages cleared');
-    },
-
-    // Streaming Actions
-    startStreamingMessage: (id, status = '正在生成回应') => {
-      set((state) => {
-        // 检查是否已经有流式消息，避免重复创建
-        const hasStreamingMessage = state.messages.some(m => m.isStreaming);
-        if (hasStreamingMessage) {
-          console.warn('⚠️ STORE: Streaming message already exists, skipping creation');
-          return state;
-        }
-        
-        return {
-          messages: [...state.messages, {
-            id,
-            role: 'assistant',
-            content: '',
-            timestamp: new Date().toISOString(),
-            isStreaming: true,
-            streamingStatus: status
-          }]
-        };
-      });
-      logger.debug(LogCategory.CHAT_FLOW, 'Streaming message started', { id, status });
-    },
-
-    appendToStreamingMessage: (content) => {
-      set((state) => {
-        console.log('📝 STORE: appendToStreamingMessage called with content:', content);
-        console.log('📋 STORE: Current messages count:', state.messages.length);
-        
-        const lastMessage = state.messages[state.messages.length - 1];
-        
-        if (!lastMessage) {
-          console.log('❌ STORE: No messages in array - cannot append');
-          return state;
-        }
-        
-        console.log('📋 STORE: Last message details:', {
-          id: lastMessage.id,
-          role: lastMessage.role,
-          isStreaming: lastMessage.isStreaming,
-          contentLength: lastMessage.content.length,
-          hasStreamingStatus: !!lastMessage.streamingStatus
-        });
-        
-        if (!lastMessage.isStreaming) {
-          console.log('❌ STORE: Last message is not streaming - cannot append');
-          return state;
-        }
-        
-        const newContent = lastMessage.content + content;
-        console.log('✅ STORE: Appending content successfully', { 
-          messageId: lastMessage.id,
-          appendedContent: content,
-          oldLength: lastMessage.content.length,
-          newLength: newContent.length,
-          totalContent: newContent.substring(0, 50) + '...'
-        });
-        
-        const updatedMessages = [...state.messages];
-        updatedMessages[updatedMessages.length - 1] = {
-          ...lastMessage,
-          content: newContent
-        };
-        
-        return { messages: updatedMessages };
-      });
-    },
-
-    finishStreamingMessage: () => {
-      set((state) => {
-        const lastMessage = state.messages[state.messages.length - 1];
-        if (!lastMessage || !lastMessage.isStreaming) return state;
-        
-        const updatedMessages = [...state.messages];
-        updatedMessages[updatedMessages.length - 1] = {
-          ...lastMessage,
-          isStreaming: false,
-          streamingStatus: undefined
-        };
-        
-        return { messages: updatedMessages };
-      });
-      logger.debug(LogCategory.CHAT_FLOW, 'Streaming message finished');
-    },
-
-    updateStreamingStatus: (status) => {
-      set((state) => {
-        const lastMessage = state.messages[state.messages.length - 1];
-        if (!lastMessage || !lastMessage.isStreaming) return state;
-        
-        const updatedMessages = [...state.messages];
-        updatedMessages[updatedMessages.length - 1] = {
-          ...lastMessage,
-          streamingStatus: status
-        };
-        
-        return { messages: updatedMessages };
-      });
-      logger.debug(LogCategory.CHAT_FLOW, 'Streaming status updated', { status });
-    },
-
-    // App Actions
+    // 应用导航
     setCurrentApp: (app) => {
       const oldApp = get().currentApp;
       logger.trackStateChange('currentApp', oldApp, app, 'useAppStore');
@@ -421,17 +106,23 @@ export const useAppStore = create<AppStore>()(
       const currentApp = get().currentApp;
       logger.info(LogCategory.SIDEBAR_INTERACTION, 'Closing app', { currentApp });
       
-      set((state) => ({
+      set({
         showRightSidebar: false,
         currentApp: null,
-        triggeredAppInput: '',
-        artifacts: state.artifacts.map(a => ({ ...a, isOpen: false }))
-      }));
+        triggeredAppInput: ''
+      });
+      
+      // 关闭所有工件 - 通过工件store处理
+      const { closeAllArtifacts } = require('./useArtifactStore').useArtifactStore.getState();
+      closeAllArtifacts();
     },
     
     reopenApp: (artifactId) => {
-      const artifacts = get().artifacts;
-      const artifact = artifacts.find(a => a.id === artifactId);
+      // 从工件store获取工件信息
+      const { useArtifacts } = require('./useArtifactStore');
+      const artifacts = useArtifacts.getState ? useArtifacts.getState() : [];
+      const artifact = artifacts.find((a: any) => a.id === artifactId);
+      
       if (!artifact) return;
 
       logger.info(LogCategory.SIDEBAR_INTERACTION, 'Reopening app from artifact', { 
@@ -440,17 +131,18 @@ export const useAppStore = create<AppStore>()(
         appName: artifact.appName
       });
 
-      set((state) => ({
+      set({
         currentApp: artifact.appId as AppId,
         showRightSidebar: true,
-        triggeredAppInput: artifact.userInput,
-        artifacts: state.artifacts.map(a => ({
-          ...a,
-          isOpen: a.id === artifactId
-        }))
-      }));
+        triggeredAppInput: artifact.userInput
+      });
+      
+      // 打开特定工件 - 通过工件store处理
+      const { openArtifact } = require('./useArtifactStore').useArtifactStore.getState();
+      openArtifact(artifactId);
     },
     
+    // 小部件交互
     setTriggeredAppInput: (input) => {
       const oldValue = get().triggeredAppInput;
       const currentApp = get().currentApp;
@@ -461,6 +153,7 @@ export const useAppStore = create<AppStore>()(
       set({ triggeredAppInput: input });
     },
     
+    // 聊天控制
     startNewChat: () => {
       logger.info(LogCategory.CHAT_FLOW, 'Starting new chat session');
       set((state) => ({
@@ -472,101 +165,13 @@ export const useAppStore = create<AppStore>()(
       }));
     },
     
-    setArtifacts: (artifacts) => {
-      const newArtifacts = typeof artifacts === 'function' ? artifacts(get().artifacts) : artifacts;
-      logger.trackStateChange('artifacts', undefined, Array.isArray(newArtifacts) ? newArtifacts.length : 'function', 'useAppStore');
-      set({ artifacts: newArtifacts });
-    },
-    
-    setPendingArtifact: (artifact) => {
-      const oldValue = get().pendingArtifact;
-      logger.trackStateChange('pendingArtifact', oldValue?.messageId, artifact?.messageId, 'useAppStore');
-      if (artifact) {
-        logger.debug(LogCategory.ARTIFACT_CREATION, 'Pending artifact set', { 
-          type: artifact.imageUrl ? 'image' : 'text',
-          messageId: artifact.messageId,
-          userInput: artifact.userInput?.substring(0, 50)
-        });
-      }
-      set({ pendingArtifact: artifact });
-    },
-    
-    addArtifact: (artifact) => {
-      logger.trackArtifactCreation(artifact);
-      set((state) => ({
-        artifacts: [...state.artifacts, artifact]
-      }));
-    },
-    
-    // Dream app actions
-    setDreamGeneratedImage: (image) => {
-      const oldValue = get().dream.generatedImage;
-      logger.trackStateChange('dreamGeneratedImage', oldValue, image, 'useAppStore');
-      if (image) {
-        logger.debug(LogCategory.ARTIFACT_CREATION, 'Dream image generated', { imageUrl: image });
-      }
-      set((state) => ({
-        dream: { ...state.dream, generatedImage: image }
-      }));
-    },
-    
-    setDreamGenerating: (isGenerating) => {
-      set((state) => ({
-        dream: { ...state.dream, isGenerating }
-      }));
-    },
-    
-    setDreamParams: (params) => {
-      set((state) => ({
-        dream: { ...state.dream, lastParams: params }
-      }));
-    },
-    
-    // Hunt app actions
-    setHuntSearchResults: (results) => {
-      set((state) => ({
-        hunt: { ...state.hunt, searchResults: results }
-      }));
-    },
-    
-    setHuntSearching: (isSearching) => {
-      set((state) => ({
-        hunt: { ...state.hunt, isSearching }
-      }));
-    },
-    
-    setHuntLastQuery: (query) => {
-      set((state) => ({
-        hunt: { ...state.hunt, lastQuery: query }
-      }));
-    },
-    
-    // Omni app actions
-    setOmniGeneratedContent: (content) => {
-      set((state) => ({
-        omni: { ...state.omni, generatedContent: content }
-      }));
-    },
-    
-    setOmniGenerating: (isGenerating) => {
-      set((state) => ({
-        omni: { ...state.omni, isGenerating }
-      }));
-    },
-    
-    setOmniParams: (params) => {
-      set((state) => ({
-        omni: { ...state.omni, lastParams: params }
-      }));
-    },
-    
-    // UI actions
+    // UI状态
     setShowLoggingDashboard: (show) => {
       logger.trackSidebarInteraction(show ? 'logging_dashboard_opened' : 'logging_dashboard_closed');
       set({ showLoggingDashboard: show });
     },
     
-    // Loading and error
+    // 全局状态
     setLoading: (loading) => {
       set({ isLoading: loading });
     },
@@ -584,30 +189,25 @@ export const useAppStore = create<AppStore>()(
   }))
 );
 
-// Selectors for common use cases
+// 主应用选择器
 export const useCurrentApp = () => useAppStore(state => state.currentApp);
 export const useShowRightSidebar = () => useAppStore(state => state.showRightSidebar);
-export const useArtifacts = () => useAppStore(state => state.artifacts);
-export const useDreamState = () => useAppStore(state => state.dream);
-export const useHuntState = () => useAppStore(state => state.hunt);
-export const useOmniState = () => useAppStore(state => state.omni);
+export const useTriggeredAppInput = () => useAppStore(state => state.triggeredAppInput);
 export const useAppLoading = () => useAppStore(state => state.isLoading);
 export const useAppError = () => useAppStore(state => state.error);
+export const useShowLoggingDashboard = () => useAppStore(state => state.showLoggingDashboard);
+export const useChatKey = () => useAppStore(state => state.chatKey);
 
-// Chat selectors
-export const useChatMessages = () => useAppStore(state => state.messages);
-export const useChatTyping = () => useAppStore(state => state.isTyping);
-export const useChatLoading = () => useAppStore(state => state.chatLoading);
-// 移除独立的流式消息hook，现在流式消息直接在messages中
-export const useChatActions = () => useAppStore(state => ({
-  addMessage: state.addMessage,
-  sendMessage: state.sendMessage,  // Note: requires (content, client, metadata)
-  sendMultimodalMessage: state.sendMultimodalMessage,  // Note: requires (content, files, client, metadata)
-  setIsTyping: state.setIsTyping,
-  setChatLoading: state.setChatLoading,
-  clearMessages: state.clearMessages,
-  startStreamingMessage: state.startStreamingMessage,
-  finishStreamingMessage: state.finishStreamingMessage,
-  appendToStreamingMessage: state.appendToStreamingMessage,
-  updateStreamingStatus: state.updateStreamingStatus
+// 主应用操作
+export const useAppActions = () => useAppStore(state => ({
+  setCurrentApp: state.setCurrentApp,
+  setShowRightSidebar: state.setShowRightSidebar,
+  closeApp: state.closeApp,
+  reopenApp: state.reopenApp,
+  setTriggeredAppInput: state.setTriggeredAppInput,
+  startNewChat: state.startNewChat,
+  setShowLoggingDashboard: state.setShowLoggingDashboard,
+  setLoading: state.setLoading,
+  setError: state.setError,
+  clearError: state.clearError
 }));
