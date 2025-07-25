@@ -26,9 +26,15 @@ const IndexPage: React.FC<IndexPageProps> = ({ isMarketingSite, hostname }) => {
 
 export const getServerSideProps: GetServerSideProps<IndexPageProps> = async (context) => {
   const hostname = context.req.headers.host || '';
-  const isMarketingSite = hostname === 'www.iapro.ai';
+  const isMarketingSite = hostname === 'www.iapro.ai' || hostname.includes('www.');
   
-  console.log(`🔍 Server-side detection: hostname=${hostname}, isMarketingSite=${isMarketingSite}`);
+  // 详细日志记录
+  console.log(`🔍 Server-side detection:`, {
+    hostname,
+    allHeaders: context.req.headers,
+    isMarketingSite,
+    userAgent: context.req.headers['user-agent']
+  });
   
   return {
     props: {
