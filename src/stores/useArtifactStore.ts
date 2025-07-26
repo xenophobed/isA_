@@ -78,11 +78,21 @@ export const useArtifactStore = create<ArtifactStore>()(
     
     // 工件操作
     addArtifact: (artifact) => {
-      set((state) => ({
-        artifacts: [...state.artifacts, artifact]
-      }));
+      set((state) => {
+        // Check if artifact with same ID already exists
+        const existingIndex = state.artifacts.findIndex(a => a.id === artifact.id);
+        if (existingIndex >= 0) {
+          // Update existing artifact
+          const newArtifacts = [...state.artifacts];
+          newArtifacts[existingIndex] = artifact;
+          return { artifacts: newArtifacts };
+        } else {
+          // Add new artifact
+          return { artifacts: [...state.artifacts, artifact] };
+        }
+      });
       logger.trackArtifactCreation(artifact);
-      logger.debug(LogCategory.ARTIFACT_CREATION, 'Artifact added to artifact store', { 
+      logger.debug(LogCategory.ARTIFACT_CREATION, 'Artifact added/updated in artifact store', { 
         artifactId: artifact.id,
         appId: artifact.appId,
         title: artifact.title

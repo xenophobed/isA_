@@ -86,7 +86,7 @@ export interface ChatServiceCallbacks {
   onMessageStart?: (messageId: string, status?: string) => void;
   onMessageContent?: (content: string) => void;
   onMessageStatus?: (status: string) => void; 
-  onMessageComplete?: () => void;
+  onMessageComplete?: (completeMessage?: string) => void; // Now receives complete message content
   onError?: (error: Error) => void;
   onArtifactCreated?: (artifact: { id?: string; type: string; content: string }) => void;
 }

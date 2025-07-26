@@ -1,87 +1,112 @@
 /**
  * ============================================================================
- * Hunt Widget UI (HuntWidget.tsx) - Refactored to use BaseWidget
+ * Hunt Widget UI (HuntWidget.tsx) - Refactored to match DreamWidget structure
  * ============================================================================
  * 
  * Core Responsibilities:
- * - Web tools service interface using standardized BaseWidget layout
- * - Network search, web crawling, and automation capabilities
- * - Analysis type selection and comprehensive analysis functions
+ * - AI Search Intelligence Service interface using standardized BaseWidget layout
+ * - Multiple search modes with smart mode detection
+ * - Advanced search configuration and analysis options
  * - Pure UI component with business logic handled by module
  * 
  * Benefits of BaseWidget integration:
  * - Standardized three-area layout (Output, Input, Management)
  * - Built-in search results history management
- * - Consistent edit and management actions for web content
- * - Streaming status display for search progress
- * - Web-specific actions (bookmark, share, analyze)
+ * - Consistent edit and management actions for search results
+ * - Streaming status display support for search progress
+ * - Search-specific actions (bookmark, share, analyze)
  */
 import React, { useState } from 'react';
 import { HuntWidgetParams } from '../../../types/widgetTypes';
 import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction } from './BaseWidget';
+import { processHuntWidget } from '../../core/WidgetHandler';
 
-// Web Tools modes based on documentation (copied from hunt_sidebar.tsx)
-interface WebTool {
+// AI Search Intelligence Service modes (based on admin categories)
+interface SearchMode {
   id: string;
   name: string;
   description: string;
   icon: string;
-  placeholder: string;
-  features: string[];
+  category: 'search' | 'crawler' | 'automation' | 'other';
   estimatedTime: string;
+  useCase: string;
+  keywords: string[];
+  isActive: boolean; // Only search modes are active for now
 }
 
-const webTools: WebTool[] = [
+const searchModes: SearchMode[] = [
+  // General should be first (default)
   {
-    id: 'web_search',
-    name: 'Web Search',
-    description: 'Search the web for information with advanced capabilities',
-    icon: '🔍',
-    placeholder: 'Search for products, reviews, prices, trends...',
-    features: ['Multiple perspectives', 'Trending content', 'Research topics'],
-    estimatedTime: '1-3 seconds'
+    id: 'general',
+    name: 'General',
+    description: 'General web search across all content types',
+    icon: '🌐',
+    category: 'search',
+    estimatedTime: '1-3 seconds',
+    useCase: 'Perfect for: General information, news, websites, AI topics',
+    keywords: ['search', 'find', 'information', 'news', 'website', 'general', 'ai', 'artificial', 'intelligence', 'tech', 'technology'],
+    isActive: true
   },
   {
-    id: 'web_crawl',
-    name: 'Web Crawl',
-    description: 'Intelligently analyze and extract data from web pages',
-    icon: '🕷️',
-    placeholder: 'URL to analyze or compare (comma-separated for multiple)',
-    features: ['Product specs', 'Price extraction', 'Content analysis', 'Multi-site comparison'],
-    estimatedTime: '1-15 seconds'
+    id: 'ecommerce',
+    name: 'E-commerce',
+    description: 'Search products, prices, reviews across shopping platforms',
+    icon: '🛍️',
+    category: 'search',
+    estimatedTime: '2-5 seconds',
+    useCase: 'Perfect for: Product research, price comparison, reviews',
+    keywords: ['buy', 'price', 'product', 'shop', 'review', 'compare', 'purchase', 'store'],
+    isActive: true
   },
   {
-    id: 'web_automation',
-    name: 'Web Automation',
-    description: 'Automate browser interactions and complex workflows',
-    icon: '🤖',
-    placeholder: 'Task: search for airpods, fill contact form...',
-    features: ['Form filling', 'Navigation', 'Data collection', 'Workflow testing'],
-    estimatedTime: '15-30 seconds'
+    id: 'academic',
+    name: 'Academic',
+    description: 'Search scholarly articles, research papers, citations',
+    icon: '🎓',
+    category: 'search',
+    estimatedTime: '3-8 seconds',
+    useCase: 'Perfect for: Research, citations, academic sources',
+    keywords: ['research', 'paper', 'study', 'academic', 'scholar', 'citation', 'journal', 'publication'],
+    isActive: true
+  },
+  {
+    id: 'social',
+    name: 'Social',
+    description: 'Search social media, forums, community discussions',
+    icon: '💬',
+    category: 'search',
+    estimatedTime: '2-6 seconds',
+    useCase: 'Perfect for: Trends, opinions, social sentiment',
+    keywords: ['social', 'trend', 'discussion', 'forum', 'community', 'opinion', 'twitter', 'reddit'],
+    isActive: true
   }
 ];
 
-// Analysis types for richer outputs (copied from hunt_sidebar.tsx)
-const analysisTypes = [
-  { id: 'product_analysis', name: 'Product Analysis', icon: '📱', desc: 'Specs, pricing, reviews' },
-  { id: 'sentiment_analysis', name: 'Sentiment Analysis', icon: '😊', desc: 'User opinions, ratings' },
-  { id: 'market_research', name: 'Market Research', icon: '📊', desc: 'Trends, competitors' },
-  { id: 'price_comparison', name: 'Price Comparison', icon: '💰', desc: 'Best deals, price history' },
-  { id: 'social_analysis', name: 'Social Analysis', icon: '🌐', desc: 'Social mentions, buzz' },
-  { id: 'feature_comparison', name: 'Feature Comparison', icon: '⚖️', desc: 'Side-by-side analysis' }
-];
+// Smart mode detection based on user input (similar to DreamWidget)
+const detectBestMode = (input: string): SearchMode => {
+  const lowerInput = input.toLowerCase();
+  
+  // Find active modes that match keywords
+  const possibleModes = searchModes.filter(mode => {
+    const keywordMatch = mode.keywords.some(keyword => lowerInput.includes(keyword));
+    return keywordMatch && mode.isActive;
+  });
+  
+  // Return best match or default to e-commerce search
+  return possibleModes[0] || searchModes[0];
+};
 
 interface HuntWidgetProps {
-  isSearching: boolean;
-  searchResults: any[];
-  lastQuery: string;
+  isSearching?: boolean;
+  searchResults?: any[];
+  lastQuery?: string;
   triggeredInput?: string;
   outputHistory?: OutputHistoryItem[];
   currentOutput?: OutputHistoryItem | null;
   isStreaming?: boolean;
   streamingContent?: string;
-  onSearch: (params: HuntWidgetParams) => Promise<void>;
-  onClearResults: () => void;
+  onSearch?: (params: HuntWidgetParams) => Promise<void>;
+  onClearResults?: () => void;
   onSelectOutput?: (item: OutputHistoryItem) => void;
   onClearHistory?: () => void;
 }
@@ -89,192 +114,207 @@ interface HuntWidgetProps {
 /**
  * Hunt Widget Input Area - Content that goes inside BaseWidget
  */
-const HuntInputArea: React.FC<HuntWidgetProps> = ({
-  isSearching,
-  searchResults,
-  lastQuery,
+const HuntInputArea: React.FC<{
+  isSearching?: boolean;
+  searchResults?: any[];
+  lastQuery?: string;
+  triggeredInput?: string;
+  onSearch?: (params: HuntWidgetParams) => Promise<void>;
+  onClearResults?: () => void;
+}> = ({
+  isSearching = false,
+  searchResults = [],
+  lastQuery = '',
   triggeredInput,
   onSearch,
   onClearResults
 }) => {
-  const [selectedTool, setSelectedTool] = useState<WebTool>(webTools[0]);
-  const [input, setInput] = useState('');
-  const [selectedAnalysis, setSelectedAnalysis] = useState<string[]>(['product_analysis']);
+  // Modern state management with simplified parameters
+  const [query, setQuery] = useState('');
+  const [selectedMode, setSelectedMode] = useState<SearchMode>(searchModes[0]);
+  const [searchDepth, setSearchDepth] = useState('standard');
+  const [resultFormat, setResultFormat] = useState('summary');
 
-  // Handle analysis type selection
-  const toggleAnalysisType = (analysisId: string) => {
-    setSelectedAnalysis(prev => 
-      prev.includes(analysisId) 
-        ? prev.filter(id => id !== analysisId)
-        : [...prev, analysisId]
-    );
-  };
+  // Get recommended mode without auto-switching
+  const [recommendedMode, setRecommendedMode] = React.useState<SearchMode | null>(null);
+  
+  React.useEffect(() => {
+    if (query.trim()) {
+      const bestMode = detectBestMode(query);
+      if (bestMode.id !== selectedMode.id) {
+        setRecommendedMode(bestMode);
+        console.log('🔍 Mode recommendation available:', bestMode.id);
+      } else {
+        setRecommendedMode(null);
+      }
+    } else {
+      setRecommendedMode(null);
+    }
+  }, [query, selectedMode.id]);
 
-  // Execute web tool based on Web Tools Documentation
-  const handleWebToolExecution = async () => {
-    if (!input.trim() || !onSearch || isSearching) return;
+  // Handle search processing using WidgetHandler
+  const handleSearchProcessing = async () => {
+    if (!query.trim() || isSearching) return;
+    
+    // Check if mode is active
+    if (!selectedMode.isActive) {
+      alert(`${selectedMode.name} is coming soon! Please try one of the active search modes.`);
+      return;
+    }
 
-    console.log('🔍 Starting web tool execution:', selectedTool.id);
-
+    console.log('🔍 Starting search processing with mode:', selectedMode.name);
+    
     try {
       const params: HuntWidgetParams = {
-        query: input.trim(),
-        category: selectedTool.id
+        query: query,
+        category: selectedMode.id,
+        // Add simplified search-specific parameters
+        search_depth: searchDepth,
+        result_format: resultFormat
       };
       
-      await onSearch(params);
-      console.log('🚀 Web Tools: Request sent with tool:', selectedTool.name);
+      // Use WidgetHandler instead of direct store/onSearch
+      await processHuntWidget(params);
+      
+      console.log('🚀 Search processing request sent with mode:', selectedMode.name);
     } catch (error) {
-      console.error('Web tool execution failed:', error);
+      console.error('Search processing failed:', error);
     }
   };
 
   return (
-    <div className="space-y-3 p-3">
-      {/* Compact Tool Header */}
+    <div className="space-y-4 p-3">
+      {/* Compact Mode Header */}
       <div className="flex items-center gap-3 p-2 bg-blue-500/10 rounded border border-blue-500/20">
-        <span className="text-lg">{selectedTool.icon}</span>
+        <span className="text-lg">{selectedMode.icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-white truncate">{selectedTool.name}</div>
-          <div className="flex gap-2 text-xs text-white/50">
-            <span>{selectedTool.estimatedTime}</span>
-            <span>{selectedTool.features.length} features</span>
+          <div className="text-sm font-medium text-white truncate">{selectedMode.name}</div>
+          <div className="flex gap-3 text-xs text-white/50">
+            <span>{selectedMode.estimatedTime}</span>
+            <span>{selectedMode.isActive ? 'Active' : 'Coming Soon'}</span>
           </div>
         </div>
       </div>
 
-      {/* Compact Input */}
-      <div>
+      {/* Compact Input Area */}
+      <div className="space-y-3">
         <textarea
-          value={input}
+          value={query}
           onChange={(e) => {
-            setInput(e.target.value);
-            console.log('🔍 Hunt input changed:', e.target.value.length);
+            const newValue = e.target.value;
+            if (newValue !== query) {
+              console.log('🔍 Search query changed');
+            }
+            setQuery(newValue);
           }}
-          placeholder={selectedTool.placeholder}
+          placeholder={selectedMode.isActive 
+            ? `Search for ${selectedMode.name.toLowerCase()}...`
+            : "Enter your search query..."}
           className="w-full p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
           rows={2}
         />
       </div>
 
-      {/* Compact Tool Selector */}
+      {/* Mode Recommendation Alert */}
+      {recommendedMode && (
+        <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/20 rounded">
+          <span className="text-sm">💡</span>
+          <div className="flex-1 text-xs text-green-300">
+            Suggested: <span className="font-medium">{recommendedMode.name}</span> mode for better results
+          </div>
+          <button
+            onClick={() => {
+              setSelectedMode(recommendedMode);
+              setRecommendedMode(null);
+              console.log('🔍 Accepted recommendation:', recommendedMode.name);
+            }}
+            className="px-2 py-1 bg-green-500/20 hover:bg-green-500/30 rounded text-xs text-green-300"
+          >
+            Use
+          </button>
+          <button
+            onClick={() => setRecommendedMode(null)}
+            className="px-1 py-1 hover:bg-white/10 rounded text-xs text-white/50"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Compact Mode Selector */}
       <div>
-        <div className="text-xs text-white/60 mb-1">🛠️ Web Tools</div>
-        <div className="grid grid-cols-3 gap-1">
-          {webTools.map((tool) => (
+        <div className="text-xs text-white/60 mb-2">🎯 Select Search Mode ({searchModes.length} modes)</div>
+        <div className="grid grid-cols-2 gap-1">
+          {searchModes.filter(mode => mode.isActive).map((mode) => (
             <button
-              key={tool.id}
+              key={mode.id}
               onClick={() => {
-                setSelectedTool(tool);
-                console.log('🔍 Web tool selected:', tool.name);
+                setSelectedMode(mode);
+                console.log('🔍 Mode selected:', mode.name);
               }}
-              className={`p-2 rounded border transition-all text-center ${
-                selectedTool.id === tool.id
+              className={`p-1.5 rounded border transition-all text-center ${
+                selectedMode.id === mode.id
                   ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
-                  : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
+                  : mode.isActive 
+                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white cursor-pointer'
+                    : 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
               }`}
-              title={`${tool.name} - ${tool.description} (${tool.estimatedTime})`}
+              title={`${mode.name} - ${mode.description}${!mode.isActive ? ' (Coming Soon)' : ''}`}
+              disabled={!mode.isActive}
             >
-              <div className="text-sm mb-1">{tool.icon}</div>
-              <div className="text-xs font-medium truncate">{tool.name.split(' ')[0]}</div>
+              <div className="text-xs mb-0.5">{mode.icon}</div>
+              <div className="text-xs font-medium truncate leading-tight">{mode.name}</div>
+              {!mode.isActive && <div className="text-xs text-white/30">Soon</div>}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Compact Analysis Types */}
-      <div>
-        <div className="text-xs text-white/60 mb-1">📊 Analysis ({selectedAnalysis.length} selected)</div>
-        <div className="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto">
-          {analysisTypes.map((analysis) => (
-            <button
-              key={analysis.id}
-              onClick={() => toggleAnalysisType(analysis.id)}
-              className={`p-1 rounded border transition-all text-left ${
-                selectedAnalysis.includes(analysis.id)
-                  ? 'bg-green-500/20 border-green-500/50 text-green-300'
-                  : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
-              }`}
-              title={analysis.desc}
-            >
-              <div className="flex items-center gap-1">
-                <span className="text-xs">{analysis.icon}</span>
-                <span className="text-xs font-medium truncate">{analysis.name}</span>
-              </div>
-            </button>
-          ))}
+      {/* Advanced Search Options - Simplified */}
+      {selectedMode && selectedMode.isActive && (
+        <div className="space-y-2">
+          <div className="text-xs text-white/60">⚙️ Advanced Options</div>
+          
+          <div>
+            <label className="block text-xs text-white/60 mb-1">Search Depth</label>
+            <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={searchDepth} onChange={(e) => setSearchDepth(e.target.value)}>
+              <option value="standard">Standard</option>
+              <option value="comprehensive">Comprehensive</option>
+              <option value="deep_analysis">Deep Analysis</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-xs text-white/60 mb-1">Result Format</label>
+            <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={resultFormat} onChange={(e) => setResultFormat(e.target.value)}>
+              <option value="summary">Summary</option>
+              <option value="detailed">Detailed</option>
+              <option value="comparison">Comparison Table</option>
+            </select>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Compact Execute Button */}
+      {/* Enhanced Process Button */}
       <button
-        onClick={handleWebToolExecution}
-        disabled={isSearching || !input.trim()}
-        className={`w-full p-2 bg-gradient-to-r from-blue-500 to-green-500 rounded text-white font-medium transition-all text-sm hover:from-blue-600 hover:to-green-600 flex items-center justify-center gap-2 ${
+        onClick={handleSearchProcessing}
+        disabled={isSearching || !query.trim() || !selectedMode.isActive}
+        className={`w-full p-3 bg-gradient-to-r from-blue-500 to-green-500 rounded text-white font-medium transition-all hover:from-blue-600 hover:to-green-600 flex items-center justify-center gap-2 text-sm ${
           isSearching ? 'animate-pulse' : ''
         } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         {isSearching ? (
           <>
             <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-            Processing...
+            Searching...
           </>
         ) : (
           <>
-            <span>{selectedTool.icon}</span>
-            Hunt
+            <span>{selectedMode.icon}</span>
+            Search with {selectedMode.name}
           </>
         )}
       </button>
-
-      {/* Processing Status */}
-      {isSearching && (
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded p-2">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-            <span className="text-xs text-blue-300">
-              Processing {selectedTool.name}...
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Search Templates */}
-      <div>
-        <div className="text-xs text-white/60 mb-1">💡 Quick Searches</div>
-        <div className="grid grid-cols-1 gap-1">
-          <button
-            onClick={() => {
-              setInput("Find best wireless earbuds under $100");
-              setSelectedTool(webTools[0]);
-              setSelectedAnalysis(['product_analysis', 'price_comparison']);
-            }}
-            className="p-1 bg-white/5 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition-all text-left"
-          >
-            🎧 Best wireless earbuds
-          </button>
-          <button
-            onClick={() => {
-              setInput("Compare iPhone vs Android reviews");
-              setSelectedTool(webTools[0]);
-              setSelectedAnalysis(['sentiment_analysis', 'feature_comparison']);
-            }}
-            className="p-1 bg-white/5 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition-all text-left"
-          >
-            📱 Phone comparison
-          </button>
-          <button
-            onClick={() => {
-              setInput("Track price history for Tesla Model 3");
-              setSelectedTool(webTools[1]);
-              setSelectedAnalysis(['price_comparison', 'market_research']);
-            }}
-            className="p-1 bg-white/5 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition-all text-left"
-          >
-            🚗 Price tracking
-          </button>
-        </div>
-      </div>
     </div>
   );
 };
@@ -283,9 +323,9 @@ const HuntInputArea: React.FC<HuntWidgetProps> = ({
  * Hunt Widget with BaseWidget - New standardized layout
  */
 export const HuntWidget: React.FC<HuntWidgetProps> = ({
-  isSearching,
-  searchResults,
-  lastQuery,
+  isSearching = false,
+  searchResults = [],
+  lastQuery = '',
   triggeredInput,
   outputHistory = [],
   currentOutput = null,
@@ -297,87 +337,71 @@ export const HuntWidget: React.FC<HuntWidgetProps> = ({
   onClearHistory
 }) => {
   
-  // Custom edit actions for search results
+  // Search-specific edit actions for search results - simplified like DreamWidget
   const editActions: EditAction[] = [
     {
-      id: 'bookmark',
-      label: 'Bookmark',
-      icon: '🔖',
+      id: 'open',
+      label: 'Open',
+      icon: '🔗',
       onClick: (content) => {
-        // Save search result as bookmark
-        console.log('Bookmarking search result:', content);
-        // Could integrate with browser bookmarks or local storage
-      }
-    },
-    {
-      id: 'share_link',
-      label: 'Share',
-      icon: '📤',
-      onClick: (content) => {
-        // Share search result URL or content
-        if (typeof content === 'object' && content !== null) {
-          const shareText = JSON.stringify(content, null, 2);
-          navigator.clipboard.writeText(shareText);
+        // Open search result URL in new tab
+        if (typeof content === 'object' && content?.url) {
+          window.open(content.url, '_blank');
+        } else if (typeof content === 'string' && content.startsWith('http')) {
+          window.open(content, '_blank');
         }
       }
     },
     {
-      id: 'analyze_further',
-      label: 'Analyze',
-      icon: '🔍',
+      id: 'copy',
+      label: 'Copy',
+      icon: '📋',
       onClick: (content) => {
-        // Trigger further analysis of the search result
-        console.log('Analyzing search result further:', content);
+        // Copy search result content to clipboard
+        if (typeof content === 'object' && content?.text) {
+          navigator.clipboard.writeText(content.text);
+        } else if (typeof content === 'string') {
+          navigator.clipboard.writeText(content);
+        }
       }
     }
   ];
 
-  // Custom management actions for web search
-  const managementActions: ManagementAction[] = [
+  // Hunt-specific management actions for bottom menu
+  const managementActions = [
     {
-      id: 'web_search',
+      id: 'search',
       label: 'Search',
       icon: '🔍',
-      onClick: () => onSearch({ 
-        query: 'Quick web search'
-      }),
-      disabled: isSearching
+      onClick: () => console.log('🔍 Search mode active'),
+      variant: 'primary' as const,
+      disabled: false
     },
     {
-      id: 'web_crawl',
-      label: 'Crawl',
+      id: 'crawler',
+      label: 'Crawler',
       icon: '🕷️',
-      onClick: () => onSearch({ 
-        query: 'Web crawl analysis'
-      }),
-      disabled: isSearching
+      onClick: () => console.log('🕷️ Crawler mode - coming soon'),
+      disabled: true
     },
     {
       id: 'automation',
-      label: 'Automate',
+      label: 'Automation', 
       icon: '🤖',
-      onClick: () => onSearch({ 
-        query: 'Web automation task'
-      }),
-      disabled: isSearching
+      onClick: () => console.log('🤖 Automation mode - coming soon'),
+      disabled: true
     },
     {
-      id: 'clear',
-      label: 'Clear',
-      icon: '🗑️',
-      onClick: () => {
-        onClearResults();
-        onClearHistory?.();
-      },
-      variant: 'danger' as const,
-      disabled: isSearching
+      id: 'other',
+      label: 'Other',
+      icon: '⚙️',
+      onClick: () => console.log('⚙️ Other tools - coming soon'),
+      disabled: true
     }
   ];
 
   return (
     <BaseWidget
-      title="Web Hunt"
-      icon="🕷️"
       isProcessing={isSearching}
       outputHistory={outputHistory}
       currentOutput={currentOutput}

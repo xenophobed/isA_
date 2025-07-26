@@ -151,7 +151,8 @@ export const useWidget = () => {
       case 'hunt':
         return {
           searchResults: huntState.searchResults,
-          lastQuery: huntState.lastQuery
+          lastQuery: huntState.lastQuery,
+          currentStatus: huntState.currentStatus
         };
       case 'omni':
         return {

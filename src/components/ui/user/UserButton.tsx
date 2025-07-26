@@ -24,9 +24,22 @@ interface UserButtonProps {
 export const UserButton: React.FC<UserButtonProps> = ({ onToggleDrawer }) => {
   const userHandler = useUserHandler();
 
-  // Don't render if not authenticated or no user
+  // Debug: Log user handler state
+  console.log('🔍 UserButton Debug:', {
+    isAuthenticated: userHandler.isAuthenticated,
+    hasUser: !!userHandler.user,
+    isLoading: userHandler.isLoading,
+    error: userHandler.error
+  });
+
+  // Don't render if not authenticated or no user (temporarily disabled for debugging)
   if (!userHandler.isAuthenticated || !userHandler.user) {
-    return null;
+    // Show debug info instead of null
+    return (
+      <div className="w-full p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 text-xs">
+        Debug: Auth={String(userHandler.isAuthenticated)}, User={String(!!userHandler.user)}, Loading={String(userHandler.isLoading)}
+      </div>
+    );
   }
 
   const user = userHandler.user;

@@ -158,7 +158,7 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
     config.onProcessStart?.(params);
     
     try {
-      // Use WidgetHandler to route request
+      // Use WidgetHandler to route request with streaming callbacks
       console.log(`🔄 ${config.type.toUpperCase()}_MODULE: Routing request via WidgetHandler`);
       logger.info(LogCategory.ARTIFACT_CREATION, `${config.type} module routing request via WidgetHandler`, { params });
       
@@ -188,7 +188,7 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
       setIsProcessing(false);
       setIsStreaming(false);
     }
-  }, [config, addToHistory, updateCurrentOutput]);
+  }, [config, addToHistory, updateCurrentOutput, onResultGenerated]);
   
   // Handle triggered input processing
   useEffect(() => {
@@ -204,36 +204,77 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
     }
   }, [triggeredInput, isProcessing, config, startProcessing]);
   
-  // Simulate processing completion (this would be replaced by actual state monitoring)
+  // Real-time monitoring of widget store states (replace placeholder timer with actual state monitoring)
+  const widget = useWidget();
+  const widgetState = widget.currentWidgetState;
+  const widgetData = widget.currentWidgetData;
+  
   useEffect(() => {
-    if (isProcessing && currentOutput) {
-      // This is a placeholder - in real implementation, you'd monitor actual widget state
-      const timer = setTimeout(() => {
-        updateCurrentOutput({
-          type: 'text',
-          title: `${config.type} processing completed`,
-          content: 'Processing completed successfully',
-          isStreaming: false
-        });
+    // Monitor actual widget state changes instead of using placeholder timer
+    if (config.type === widget.currentApp) {
+      const wasProcessing = isProcessing;
+      const isCurrentlyProcessing = widgetState !== 'idle';
+      
+      // If processing just completed
+      if (wasProcessing && !isCurrentlyProcessing && currentOutput) {
+        console.log(`✅ ${config.type.toUpperCase()}_MODULE: Real processing completed, updating output`);
+        
+        // Get actual result from widget data
+        let finalResult = null;
+        let outputType = 'text';
+        let outputContent = 'Processing completed successfully';
+        
+        if (config.type === 'dream' && widgetData?.generatedImage) {
+          finalResult = { imageUrl: widgetData.generatedImage, prompt: widgetData.params?.prompt };
+          outputType = 'image';
+          outputContent = widgetData.generatedImage;
+          console.log(`🎨 ${config.type.toUpperCase()}_MODULE: Found generated image, updating output:`, { imageUrl: widgetData.generatedImage });
+        } else if (config.type === 'hunt' && widgetData?.searchResults && widgetData.searchResults.length > 0) {
+          finalResult = { searchResults: widgetData.searchResults, query: widgetData.lastQuery };
+          outputType = 'data';
+          outputContent = widgetData.searchResults[0]?.content || JSON.stringify(widgetData.searchResults);
+          console.log(`🔍 ${config.type.toUpperCase()}_MODULE: Found search results, updating output:`, { 
+            resultCount: widgetData.searchResults.length,
+            firstResult: widgetData.searchResults[0]?.title 
+          });
+        } else if (config.type === 'omni' && widgetData?.generatedContent) {
+          finalResult = { content: widgetData.generatedContent, params: widgetData.params };
+          outputType = 'text';
+          outputContent = widgetData.generatedContent;
+        }
+        
+        // Update output with actual results
+        if (currentOutput) {
+          const updatedOutput = {
+            ...currentOutput,
+            type: outputType as any,
+            title: `${config.type} processing completed`,
+            content: outputContent,
+            isStreaming: false
+          };
+          
+          setCurrentOutput(updatedOutput);
+          
+          // Update in history as well
+          setOutputHistory(prev =>
+            prev.map(item => item.id === currentOutput.id ? updatedOutput : item)
+          );
+        }
         
         setIsProcessing(false);
         setIsStreaming(false);
+        setStreamingContent('');
         
-        // Notify parent
-        const result = {
-          success: true,
-          output: currentOutput
-        } as unknown as TResult;
+        // Notify parent with real results
+        if (finalResult) {
+          config.onProcessComplete?.(finalResult as TResult);
+          onResultGenerated?.(finalResult as TResult);
+        }
         
-        config.onProcessComplete?.(result);
-        onResultGenerated?.(result);
-        
-        logger.info(LogCategory.ARTIFACT_CREATION, `${config.type} processing completed, parent notified`);
-      }, 3000);
-      
-      return () => clearTimeout(timer);
+        logger.info(LogCategory.ARTIFACT_CREATION, `${config.type} real processing completed, parent notified`);
+      }
     }
-  }, [isProcessing, currentOutput, config, onResultGenerated, updateCurrentOutput]);
+  }, [isProcessing, widgetState, widgetData?.generatedImage, widgetData?.searchResults, widgetData?.generatedContent, widgetData?.lastQuery, currentOutput?.id, config.type, widget.currentApp]);
   
   // Clear output history
   const handleClearHistory = useCallback(() => {
@@ -305,7 +346,8 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
   
   // Combine with custom actions
   const editActions = [...defaultEditActions, ...(config.editActions || [])];
-  const managementActions = [...defaultManagementActions, ...(config.managementActions || [])];
+  // Use only widget-specific management actions to avoid duplication and maintain exactly 4 buttons
+  const managementActions = config.managementActions || [];
   
   // Support both render prop pattern and direct children
   if (typeof children === 'function') {

@@ -84,25 +84,13 @@ export const ChatContentLayout: React.FC<ChatContentLayoutProps> = ({
         overflow: 'auto !important',
         background: 'transparent !important',
         padding: '1rem !important',
-        display: 'block !important',
-        height: '100%'
+        display: 'flex !important',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        height: '100%',
+        width: '100%'
       }}
     >
-      {/* Streaming Status Display - Top Right Corner */}
-      {streamingMessage && streamingStatus && (
-        <div className="fixed top-20 right-4 z-50 bg-blue-500/20 border border-blue-500/30 backdrop-blur-lg rounded-lg px-4 py-2 shadow-lg">
-          <div className="flex items-center gap-2 text-blue-300 text-sm">
-            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-            <span>{streamingStatus}</span>
-          </div>
-        </div>
-      )}
-      {/* Debug: Always show when there's a streaming message */}
-      {streamingMessage && (
-        <div className="fixed top-32 right-4 z-50 bg-red-500/20 border border-red-500/30 backdrop-blur-lg rounded-lg px-4 py-2 shadow-lg text-xs">
-          DEBUG: isStreaming={String(streamingMessage.isStreaming)}, status="{streamingMessage.streamingStatus}", content={streamingMessage.content.length}
-        </div>
-      )}
 
       <MessageList
         showTimestamps={showTimestamps}

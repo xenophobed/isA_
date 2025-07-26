@@ -20,23 +20,64 @@ import React, { useState } from 'react';
 import { KnowledgeWidgetParams } from '../../../types/widgetTypes';
 import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction } from './BaseWidget';
 
-// User-friendly workflow state (copied from knowledge_sidebar.tsx)
-interface KnowledgeState {
-  activeTab: 'add' | 'ask' | 'browse';
-  selectedFiles: File[];
-  query: string;
-  documentCount: number;
-  recentDocuments: DocumentItem[];
+// Knowledge processing modes
+interface KnowledgeMode {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  estimatedTime: string;
+  useCase: string;
+  keywords: string[];
+  isActive: boolean;
 }
 
-interface DocumentItem {
-  id: string;
-  title: string;
-  preview: string;
-  type: string;
-  uploadedAt: string;
-  size: string;
-}
+const knowledgeModes: KnowledgeMode[] = [
+  {
+    id: 'document',
+    name: 'Document',
+    description: 'Process and analyze text documents',
+    icon: '📄',
+    estimatedTime: '2-5 seconds',
+    useCase: 'Perfect for: PDFs, Word docs, text analysis',
+    keywords: ['document', 'text', 'pdf', 'word', 'analyze', 'read'],
+    isActive: true
+  },
+  {
+    id: 'graph',
+    name: 'Graph',
+    description: 'Create knowledge graphs and connections',
+    icon: '🕸️',
+    estimatedTime: '5-10 seconds',
+    useCase: 'Perfect for: Relationships, connections, mapping',
+    keywords: ['graph', 'network', 'connection', 'relationship', 'map'],
+    isActive: false
+  },
+  {
+    id: 'image',
+    name: 'Image',
+    description: 'Extract knowledge from images and diagrams',
+    icon: '🖼️',
+    estimatedTime: '3-8 seconds',
+    useCase: 'Perfect for: Charts, diagrams, visual content',
+    keywords: ['image', 'visual', 'chart', 'diagram', 'ocr', 'extract'],
+    isActive: false
+  }
+];
+
+// Smart mode detection based on user input
+const detectBestMode = (input: string): KnowledgeMode => {
+  const lowerInput = input.toLowerCase();
+  
+  // Find active modes that match keywords
+  const possibleModes = knowledgeModes.filter(mode => {
+    const keywordMatch = mode.keywords.some(keyword => lowerInput.includes(keyword));
+    return keywordMatch && mode.isActive;
+  });
+  
+  // Return best match or default to document
+  return possibleModes[0] || knowledgeModes[0];
+};
 
 interface KnowledgeWidgetProps {
   isProcessing: boolean;
@@ -62,362 +103,217 @@ const KnowledgeInputArea: React.FC<KnowledgeWidgetProps> = ({
   onProcess,
   onClearResults
 }) => {
-  // Simple, user-focused state (exact copy from knowledge_sidebar.tsx)
-  const [knowledge, setKnowledge] = useState<KnowledgeState>({
-    activeTab: 'add',
-    selectedFiles: [],
-    query: '',
-    documentCount: 0,
-    recentDocuments: []
-  });
+  // Modern state management
+  const [query, setQuery] = useState('');
+  const [selectedMode, setSelectedMode] = useState<KnowledgeMode>(knowledgeModes[0]);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [processingDepth, setProcessingDepth] = useState('standard');
 
-  // Auto-fill query when triggered (exact copy from knowledge_sidebar.tsx)
+  // Real-time mode recommendations
   React.useEffect(() => {
-    if (triggeredInput) {
-      setKnowledge(prev => ({ 
-        ...prev, 
-        query: triggeredInput,
-        activeTab: triggeredInput.toLowerCase().includes('upload') || triggeredInput.toLowerCase().includes('add') ? 'add' : 'ask'
-      }));
+    if (query.trim()) {
+      const bestMode = detectBestMode(query);
+      if (bestMode.id !== selectedMode.id) {
+        setSelectedMode(bestMode);
+        console.log('🧠 Mode recommendation updated:', bestMode.id);
+      }
     }
-  }, [triggeredInput]);
+  }, [query, selectedMode.id]);
 
-  // Update state helper
-  const updateKnowledge = (updates: Partial<KnowledgeState>) => {
-    setKnowledge(prev => ({ ...prev, ...updates }));
-  };
+  // Auto-fill input when triggered
+  React.useEffect(() => {
+    if (triggeredInput && triggeredInput !== query) {
+      setQuery(triggeredInput);
+    }
+  }, [triggeredInput, query]);
 
-  // Handle file selection
-  const handleFileSelection = (files: FileList | null) => {
+  // Handle file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
     if (files) {
       const fileArray = Array.from(files);
-      updateKnowledge({ selectedFiles: fileArray });
+      console.log('🧠 Files uploaded:', fileArray.length);
+      setUploadedFiles(fileArray);
     }
   };
 
-  // Add documents to knowledge base (adapted from knowledge_sidebar.tsx)
-  const handleAddDocuments = async () => {
-    if (knowledge.selectedFiles.length === 0 || !onProcess || isProcessing) return;
+  // Handle knowledge processing
+  const handleKnowledgeProcessing = async () => {
+    if (!query.trim() || !onProcess || isProcessing) return;
+    
+    // Check if mode requires files but none are uploaded
+    if (selectedMode.id !== 'document' && uploadedFiles.length === 0) {
+      alert(`${selectedMode.name} mode requires uploaded files. Please upload files first.`);
+      return;
+    }
 
+    // Check if mode is active
+    if (!selectedMode.isActive) {
+      alert(`${selectedMode.name} is coming soon! Please try the Document mode.`);
+      return;
+    }
+
+    console.log('🧠 Starting knowledge processing with mode:', selectedMode.name);
+    
     try {
       const params: KnowledgeWidgetParams = {
-        task: 'add_documents',
-        files: knowledge.selectedFiles
+        task: selectedMode.id,
+        query: query,
+        files: uploadedFiles.length > 0 ? uploadedFiles : undefined,
+        // Add mode-specific parameters
+        processing_depth: processingDepth
       };
       
       await onProcess(params);
       
-      // Clear selected files after processing
-      updateKnowledge({ selectedFiles: [], activeTab: 'ask' });
+      console.log('🚀 Knowledge processing request sent with mode:', selectedMode.name);
     } catch (error) {
-      console.error('Failed to add documents:', error);
+      console.error('Knowledge processing failed:', error);
     }
   };
 
-  // Ask questions about documents (adapted from knowledge_sidebar.tsx)
-  const handleAskQuestion = async () => {
-    if (!knowledge.query.trim() || !onProcess || isProcessing) return;
-
-    try {
-      const params: KnowledgeWidgetParams = {
-        task: 'ask_question',
-        query: knowledge.query
-      };
-      
-      await onProcess(params);
-    } catch (error) {
-      console.error('Failed to get answer:', error);
-    }
-  };
-
-  // Browse and manage documents (adapted from knowledge_sidebar.tsx)
-  const handleBrowseDocuments = async () => {
-    if (!onProcess || isProcessing) return;
-
-    try {
-      const params: KnowledgeWidgetParams = {
-        task: 'browse_documents'
-      };
-      
-      await onProcess(params);
-    } catch (error) {
-      console.error('Failed to browse documents:', error);
-    }
-  };
-
-  // Tab configuration (exact copy from knowledge_sidebar.tsx)
-  const tabs = [
-    { 
-      id: 'add', 
-      name: 'Add Documents', 
-      icon: '📄', 
-      description: 'Upload your files to get started'
-    },
-    { 
-      id: 'ask', 
-      name: 'Ask Questions', 
-      icon: '💬', 
-      description: 'Get answers from your documents'
-    },
-    { 
-      id: 'browse', 
-      name: 'Browse & Manage', 
-      icon: '📚', 
-      description: 'See what you\'ve added'
-    }
-  ];
-
-  // Quick question suggestions (exact copy from knowledge_sidebar.tsx)
-  const quickQuestions = [
-    "What are the main points in my documents?",
-    "Find all mentions of [topic]",
-    "Summarize the key findings",
-    "What are the important dates?",
-    "Compare different documents",
-    "Extract all action items"
-  ];
-
-  // Supported file types with user-friendly descriptions (exact copy from knowledge_sidebar.tsx)
-  const supportedTypes = [
-    { ext: 'pdf', name: 'PDF Documents', icon: '📄', desc: 'Reports, papers, manuals' },
-    { ext: 'docx', name: 'Word Documents', icon: '📝', desc: 'Letters, proposals, notes' },
-    { ext: 'txt', name: 'Text Files', icon: '📃', desc: 'Plain text, logs, code' },
-    { ext: 'md', name: 'Markdown Files', icon: '📋', desc: 'Documentation, notes' }
-  ];
 
   return (
-    <div className="space-y-3 h-full flex flex-col p-3">
-      {/* Compact Header */}
+    <div className="space-y-4 p-3">
+      {/* Compact Mode Header - like other widgets */}
       <div className="flex items-center gap-3 p-2 bg-purple-500/10 rounded border border-purple-500/20">
-        <span className="text-lg">🧠</span>
+        <span className="text-lg">{selectedMode.icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-white">Knowledge Hub</div>
-          <div className="text-xs text-white/60">
-            {knowledge.documentCount > 0 
-              ? `${knowledge.documentCount} docs ready`
-              : 'Add docs for instant answers'
-            }
+          <div className="text-sm font-medium text-white truncate">{selectedMode.name}</div>
+          <div className="flex gap-3 text-xs text-white/50">
+            <span>{selectedMode.estimatedTime}</span>
+            <span>Knowledge Management</span>
           </div>
         </div>
       </div>
 
-      {/* Compact Tab Navigation */}
-      <div className="flex bg-white/5 rounded p-1">
-        {tabs.map((tab) => (
+      {/* Compact Input Area with Upload Button */}
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <textarea
+            value={query}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              if (newValue !== query) {
+                console.log('🧠 Query changed');
+              }
+              setQuery(newValue);
+            }}
+            placeholder={`Describe your ${selectedMode.name.toLowerCase()} request...`}
+            className="flex-1 p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
+            rows={2}
+          />
           <button
-            key={tab.id}
-            onClick={() => updateKnowledge({ activeTab: tab.id as any })}
-            className={`flex-1 p-2 rounded text-xs transition-all ${
-              knowledge.activeTab === tab.id
-                ? 'bg-white text-black font-medium'
-                : 'text-white/80 hover:bg-white/10'
-            }`}
-            title={tab.description}
+            onClick={() => document.getElementById('knowledge-upload')?.click()}
+            className="px-3 py-2 bg-white/5 border border-white/10 rounded text-white/80 hover:bg-white/10 transition-all text-xs flex items-center gap-1"
           >
-            <div className="text-sm mb-1">{tab.icon}</div>
-            <div className="font-medium truncate">{tab.name}</div>
+            📁 Upload
           </button>
-        ))}
-      </div>
+        </div>
 
-      {/* Compact Add Documents Tab */}
-      {knowledge.activeTab === 'add' && (
-        <div className="space-y-3 flex-1">
-          <div>
-            {/* Compact File Drop Zone */}
-            <label className="block w-full p-3 border-2 border-dashed border-blue-500/50 bg-blue-500/5 rounded cursor-pointer hover:border-blue-500 hover:bg-blue-500/10 transition-all">
-              <div className="text-center">
-                <div className="text-lg mb-2">
-                  {knowledge.selectedFiles.length > 0 ? '✅' : '📁'}
-                </div>
-                <div className="text-xs font-medium text-white/80 mb-1">
-                  {knowledge.selectedFiles.length > 0 
-                    ? `${knowledge.selectedFiles.length} file${knowledge.selectedFiles.length > 1 ? 's' : ''} selected`
-                    : 'Drop files or click to browse'
-                  }
-                </div>
-                <div className="text-xs text-white/60">
-                  PDF, Word, Text files
-                </div>
-              </div>
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.docx,.doc,.txt,.md"
-                onChange={(e) => handleFileSelection(e.target.files)}
-                className="hidden"
-              />
-            </label>
-
-            {/* Compact Selected Files Preview */}
-            {knowledge.selectedFiles.length > 0 && (
-              <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
-                <div className="text-xs text-white/60">Selected:</div>
-                {knowledge.selectedFiles.map((file, index) => (
-                  <div key={index} className="flex items-center gap-2 p-1 bg-white/5 rounded">
-                    <span className="text-xs">📄</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs text-white truncate">{file.name}</div>
-                      <div className="text-xs text-white/60">{(file.size / 1024).toFixed(1)}KB</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Compact Add Button */}
-            {knowledge.selectedFiles.length > 0 && (
-              <button
-                onClick={handleAddDocuments}
-                disabled={isProcessing}
-                className={`w-full mt-2 p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded text-white font-medium transition-all text-sm ${
-                  isProcessing ? 'animate-pulse' : 'hover:from-blue-600 hover:to-purple-600'
-                } disabled:opacity-50`}
-              >
-                {isProcessing ? 'Processing...' : `Add ${knowledge.selectedFiles.length} file${knowledge.selectedFiles.length > 1 ? 's' : ''}`}
-              </button>
-            )}
-          </div>
-
-          {/* Compact Supported Files */}
-          <div className="grid grid-cols-2 gap-1">
-            {supportedTypes.map((type) => (
-              <div key={type.ext} className="p-2 bg-white/5 rounded">
-                <div className="flex items-center gap-1 mb-1">
-                  <span className="text-sm">{type.icon}</span>
-                  <span className="text-xs font-medium text-white truncate">{type.name}</span>
-                </div>
-                <div className="text-xs text-white/60">{type.desc}</div>
+        {/* Hidden File Input */}
+        <input
+          type="file"
+          accept=".pdf,.docx,.doc,.txt,.md"
+          multiple
+          onChange={handleFileUpload}
+          className="hidden"
+          id="knowledge-upload"
+        />
+        
+        {/* Show uploaded files info */}
+        {uploadedFiles.length > 0 && (
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            <div className="text-xs text-white/60">{uploadedFiles.length} file(s) selected:</div>
+            {uploadedFiles.map((file, index) => (
+              <div key={index} className="flex items-center gap-2 p-2 bg-white/5 border border-white/10 rounded">
+                <span className="text-sm">📁</span>
+                <span className="text-white/70 text-xs">{file.name}</span>
+                <button 
+                  onClick={() => setUploadedFiles(prev => prev.filter((_, i) => i !== index))}
+                  className="ml-auto text-white/40 hover:text-white/70 text-xs"
+                >
+                  ✕
+                </button>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Compact Ask Questions Tab */}
-      {knowledge.activeTab === 'ask' && (
-        <div className="space-y-3 flex-1">
-          <div>
-            <textarea
-              value={knowledge.query}
-              onChange={(e) => updateKnowledge({ query: e.target.value })}
-              placeholder="What would you like to know? e.g., 'What are the main conclusions?'"
-              className="w-full p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
-              rows={2}
-            />
-
+      {/* Compact Mode Selector */}
+      <div>
+        <div className="text-xs text-white/60 mb-2">🎯 Select Mode</div>
+        <div className="grid grid-cols-3 gap-1">
+          {knowledgeModes.map((mode) => (
             <button
-              onClick={handleAskQuestion}
-              disabled={!knowledge.query.trim() || isProcessing}
-              className={`w-full mt-2 p-2 bg-gradient-to-r from-green-500 to-blue-500 rounded text-white font-medium transition-all text-sm ${
-                isProcessing ? 'animate-pulse' : 'hover:from-green-600 hover:to-blue-600'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              key={mode.id}
+              onClick={() => {
+                if (mode.isActive) {
+                  setSelectedMode(mode);
+                  console.log('🧠 Mode selected:', mode.name);
+                } else {
+                  console.log('🧠 Mode disabled:', mode.name);
+                }
+              }}
+              disabled={!mode.isActive}
+              className={`p-1.5 rounded border transition-all text-center ${
+                selectedMode.id === mode.id
+                  ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+                  : mode.isActive 
+                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white cursor-pointer'
+                    : 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
+              }`}
+              title={`${mode.name} - ${mode.description}${!mode.isActive ? ' (Coming Soon)' : ''}`}
             >
-              {isProcessing ? 'Finding Answer...' : 'Get Answer'}
+              <div className="text-xs mb-0.5">{mode.icon}</div>
+              <div className="text-xs font-medium truncate leading-tight">{mode.name}</div>
+              {!mode.isActive && <div className="text-xs text-white/30">Soon</div>}
             </button>
-          </div>
+          ))}
+        </div>
+      </div>
 
-          {/* Compact Quick Questions */}
+      {/* Advanced Options - Only Processing Depth */}
+      {selectedMode && (
+        <div className="space-y-2">
+          <div className="text-xs text-white/60">⚙️ Advanced Options</div>
+          
           <div>
-            <div className="text-xs text-white/60 mb-1">💬 Try asking:</div>
-            <div className="grid grid-cols-1 gap-1 max-h-32 overflow-y-auto">
-              {quickQuestions.map((question, index) => (
-                <button
-                  key={index}
-                  onClick={() => updateKnowledge({ query: question })}
-                  className="p-1 bg-white/5 rounded text-xs text-white/80 hover:bg-blue-500/20 transition-all text-left"
-                >
-                  {question}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Compact Help */}
-          <div className="p-2 bg-green-500/10 border border-green-500/20 rounded">
-            <div className="text-green-300 text-xs font-medium mb-1">💡 Features</div>
-            <div className="text-green-200/80 text-xs space-y-1">
-              <div>• Plain English questions</div>
-              <div>• Answers with sources</div>
-              <div>• Cross-document analysis</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Compact Browse & Manage Tab */}
-      {knowledge.activeTab === 'browse' && (
-        <div className="space-y-3 flex-1">
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-white/60">📚 Library</div>
-            <button
-              onClick={handleBrowseDocuments}
-              disabled={isProcessing}
-              className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded text-blue-400 text-xs transition-all disabled:opacity-50"
+            <label className="block text-xs text-white/60 mb-1">Processing Depth</label>
+            <select 
+              className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" 
+              value={processingDepth} 
+              onChange={(e) => setProcessingDepth(e.target.value)}
             >
-              Refresh
-            </button>
-          </div>
-
-          {/* Compact Document Library */}
-          {knowledge.documentCount === 0 ? (
-            <div className="text-center py-4">
-              <div className="text-2xl mb-2">📚</div>
-              <div className="text-white/60 text-xs mb-2">No documents yet</div>
-              <button
-                onClick={() => updateKnowledge({ activeTab: 'add' })}
-                className="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded text-blue-400 text-xs transition-all"
-              >
-                Add Documents
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-1 max-h-40 overflow-y-auto">
-              {knowledge.recentDocuments.map((doc) => (
-                <div key={doc.id} className="p-2 bg-white/5 rounded border border-white/10">
-                  <div className="flex items-start gap-2">
-                    <span className="text-sm">📄</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-white truncate">{doc.title}</div>
-                      <div className="text-xs text-white/60 mt-1 line-clamp-1">{doc.preview}</div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-white/40">{doc.uploadedAt}</span>
-                        <span className="text-xs text-white/40">{doc.size}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Compact Quick Actions */}
-          <div className="grid grid-cols-2 gap-1">
-            <button className="p-2 bg-white/5 hover:bg-white/10 rounded transition-all">
-              <div className="text-xs font-medium text-white">🔍 Search</div>
-              <div className="text-xs text-white/60 mt-1">Find across docs</div>
-            </button>
-            <button className="p-2 bg-white/5 hover:bg-white/10 rounded transition-all">
-              <div className="text-xs font-medium text-white">📊 Summary</div>
-              <div className="text-xs text-white/60 mt-1">Overview</div>
-            </button>
+              <option value="standard">Standard</option>
+              <option value="comprehensive">Comprehensive</option>
+              <option value="deep">Deep Analysis</option>
+            </select>
           </div>
         </div>
       )}
 
-      {/* Compact Processing Status */}
-      {isProcessing && (
-        <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
-            <span className="text-xs text-blue-300">
-              {knowledge.activeTab === 'add' && 'Processing documents...'}
-              {knowledge.activeTab === 'ask' && 'Finding answer...'}
-              {knowledge.activeTab === 'browse' && 'Loading library...'}
-            </span>
-          </div>
-        </div>
-      )}
+      {/* Enhanced Process Button */}
+      <button
+        onClick={handleKnowledgeProcessing}
+        disabled={isProcessing || !query.trim()}
+        className={`w-full p-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded text-white font-medium transition-all hover:from-purple-600 hover:to-blue-600 flex items-center justify-center gap-2 text-sm ${
+          isProcessing ? 'animate-pulse' : ''
+        } disabled:opacity-50 disabled:cursor-not-allowed`}
+      >
+        {isProcessing ? (
+          <>
+            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            Processing...
+          </>
+        ) : (
+          <>
+            <span>{selectedMode.icon}</span>
+            Process with {selectedMode.name}
+          </>
+        )}
+      </button>
     </div>
   );
 };
@@ -480,55 +376,43 @@ export const KnowledgeWidget: React.FC<KnowledgeWidgetProps> = ({
     }
   ];
 
-  // Custom management actions for knowledge
+  // Custom management actions for knowledge - only analyze mode active
   const managementActions: ManagementAction[] = [
     {
-      id: 'add_docs',
-      label: 'Add',
-      icon: '📤',
+      id: 'analyze',
+      label: 'Analyze',
+      icon: '🔍',
       onClick: () => onProcess({ 
-        action: 'add_documents',
-        query: 'Add new documents'
+        task: 'analyze',
+        query: 'Analyze documents for insights and patterns'
       }),
-      disabled: isProcessing
+      disabled: false
     },
     {
-      id: 'ask_question',
-      label: 'Ask',
-      icon: '❓',
-      onClick: () => onProcess({ 
-        action: 'ask_question',
-        query: 'What is the main topic?'
-      }),
-      disabled: isProcessing
+      id: 'search',
+      label: 'Search',
+      icon: '🔎',
+      onClick: () => console.log('🔎 Search mode - coming soon'),
+      disabled: true
     },
     {
-      id: 'browse_docs',
-      label: 'Browse',
+      id: 'manage',
+      label: 'Manage',
       icon: '📚',
-      onClick: () => onProcess({ 
-        action: 'browse_documents',
-        query: 'Browse document library'
-      }),
-      disabled: isProcessing
+      onClick: () => console.log('📚 Manage mode - coming soon'),
+      disabled: true
     },
     {
-      id: 'clear',
-      label: 'Clear',
-      icon: '🗑️',
-      onClick: () => {
-        onClearResults();
-        onClearHistory?.();
-      },
-      variant: 'danger' as const,
-      disabled: isProcessing
+      id: 'other',
+      label: 'Other',
+      icon: '📄',
+      onClick: () => console.log('📄 Other mode - coming soon'),
+      disabled: true
     }
   ];
 
   return (
     <BaseWidget
-      title="Knowledge Base"
-      icon="📚"
       isProcessing={isProcessing}
       outputHistory={outputHistory}
       currentOutput={currentOutput}

@@ -5,8 +5,8 @@
  * 
  * Core Responsibilities:
  * - Data workflow management system using standardized BaseWidget layout
- * - Upload, query, and combined mode operations
- * - Support for CSV, Excel, JSON, database file processing
+ * - Query, visualization, and ML mode operations
+ * - Support for CSV, database, URL, and other data sources
  * - Pure UI component with business logic handled by module
  * 
  * Benefits of BaseWidget integration:
@@ -19,25 +19,71 @@
 import React, { useState } from 'react';
 import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction } from './BaseWidget';
 
-// Data processing workflow state (copied from data_scientist_sidebar.tsx)
-interface DataWorkflow {
-  mode: 'upload' | 'query' | 'combined';
-  dataSource: {
-    file?: File;
-    path?: string;
-    type?: string;
-    status: 'none' | 'uploading' | 'processing' | 'ready' | 'error';
-  };
-  query: string;
-  sqliteDbPath?: string;
-  pgvectorDb?: string;
+// Data analysis modes
+interface DataMode {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  estimatedTime: string;
+  useCase: string;
+  keywords: string[];
+  isActive: boolean;
 }
+
+const dataModes: DataMode[] = [
+  {
+    id: 'query',
+    name: 'Data Query',
+    description: 'Query and explore your data with natural language',
+    icon: '🔍',
+    estimatedTime: '2-5 seconds',
+    useCase: 'Perfect for: Data exploration, filtering, aggregation',
+    keywords: ['query', 'search', 'filter', 'find', 'explore', 'analyze'],
+    isActive: true
+  },
+  {
+    id: 'visualization',
+    name: 'Visualization',
+    description: 'Create charts and visual representations of data',
+    icon: '📊',
+    estimatedTime: '3-8 seconds',
+    useCase: 'Perfect for: Charts, graphs, dashboards, reports',
+    keywords: ['chart', 'graph', 'plot', 'visual', 'dashboard', 'report'],
+    isActive: false
+  },
+  {
+    id: 'ml',
+    name: 'Machine Learning',
+    description: 'Apply ML models for predictions and insights',
+    icon: '🤖',
+    estimatedTime: '10-30 seconds',
+    useCase: 'Perfect for: Predictions, clustering, classification',
+    keywords: ['predict', 'model', 'ml', 'machine', 'learning', 'ai'],
+    isActive: false
+  }
+];
+
+// Smart mode detection based on user input
+const detectBestMode = (input: string): DataMode => {
+  const lowerInput = input.toLowerCase();
+  
+  // Find active modes that match keywords
+  const possibleModes = dataModes.filter(mode => {
+    const keywordMatch = mode.keywords.some(keyword => lowerInput.includes(keyword));
+    return keywordMatch && mode.isActive;
+  });
+  
+  // Return best match or default to query
+  return possibleModes[0] || dataModes[0];
+};
 
 interface DataScientistWidgetParams {
   data?: File | string;
   analysisType?: 'descriptive' | 'predictive' | 'prescriptive' | 'exploratory';
   visualizationType?: 'chart' | 'graph' | 'table' | 'dashboard';
   query?: string;
+  mode?: string;
 }
 
 interface DataScientistWidgetResult {
@@ -83,290 +129,189 @@ const DataScientistInputArea: React.FC<DataScientistWidgetProps> = ({
   onAnalyzeData,
   onClearAnalysis
 }) => {
-  // Data workflow state (exact copy from data_scientist_sidebar.tsx)
-  const [workflow, setWorkflow] = useState<DataWorkflow>({
-    mode: 'combined',
-    dataSource: {
-      status: 'none'
-    },
-    query: ''
-  });
+  // Modern state management
+  const [query, setQuery] = useState('');
+  const [selectedMode, setSelectedMode] = useState<DataMode>(dataModes[0]);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [analysisDepth, setAnalysisDepth] = useState('standard');
 
-  // Update workflow state
-  const updateWorkflow = (updates: Partial<DataWorkflow>) => {
-    setWorkflow(prev => ({ ...prev, ...updates }));
-  };
+  // Real-time mode recommendations
+  React.useEffect(() => {
+    if (query.trim()) {
+      const bestMode = detectBestMode(query);
+      if (bestMode.id !== selectedMode.id) {
+        setSelectedMode(bestMode);
+        console.log('🔬 Mode recommendation updated:', bestMode.id);
+      }
+    }
+  }, [query, selectedMode.id]);
 
   // Handle file upload
-  const handleFileUpload = (files: FileList | null) => {
-    if (files && files[0]) {
-      const file = files[0];
-      const fileType = file.name.split('.').pop()?.toLowerCase();
-      
-      setWorkflow(prev => ({
-        ...prev,
-        dataSource: {
-          file: file,
-          type: fileType,
-          status: 'ready'
-        }
-      }));
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      console.log('🔬 Data file uploaded:', file.name);
+      setUploadedFile(file);
     }
   };
 
-  // Data ingestion (Function 1)
-  const handleDataIngestion = async () => {
-    if (!workflow.dataSource.file || isAnalyzing) return;
-
+  // Handle data analysis processing
+  const handleDataAnalysis = async () => {
+    if (!query.trim() || !onAnalyzeData || isAnalyzing) return;
+    
+    console.log('🔬 Starting data analysis with mode:', selectedMode.name);
+    
     try {
-      updateWorkflow({
-        dataSource: { ...workflow.dataSource, status: 'processing' }
-      });
-
       const params: DataScientistWidgetParams = {
-        data: workflow.dataSource.file,
-        query: 'Ingest and process data source'
+        query: query,
+        mode: selectedMode.id,
+        data: uploadedFile || undefined,
+        analysisType: selectedMode.id === 'ml' ? 'predictive' : 'exploratory'
       };
       
       await onAnalyzeData(params);
-
-      updateWorkflow({
-        dataSource: { ...workflow.dataSource, status: 'ready' }
-      });
-    } catch (error) {
-      console.error('Data ingestion failed:', error);
-      updateWorkflow({
-        dataSource: { ...workflow.dataSource, status: 'error' }
-      });
-    }
-  };
-
-  // Query processing (Function 2)
-  const handleQueryProcessing = async () => {
-    if (!workflow.query.trim() || isAnalyzing) return;
-
-    try {
-      const params: DataScientistWidgetParams = {
-        query: workflow.query
-      };
       
-      await onAnalyzeData(params);
+      console.log('🚀 Data analysis request sent with mode:', selectedMode.name);
     } catch (error) {
-      console.error('Query processing failed:', error);
+      console.error('Data analysis failed:', error);
     }
   };
-
-  // Combined workflow (Function 1 + Function 2)
-  const handleCombinedAnalysis = async () => {
-    if (!workflow.dataSource.file || !workflow.query.trim() || isAnalyzing) return;
-
-    try {
-      updateWorkflow({
-        dataSource: { ...workflow.dataSource, status: 'processing' }
-      });
-
-      const params: DataScientistWidgetParams = {
-        data: workflow.dataSource.file,
-        query: workflow.query
-      };
-      
-      await onAnalyzeData(params);
-
-      updateWorkflow({
-        dataSource: { ...workflow.dataSource, status: 'ready' }
-      });
-    } catch (error) {
-      console.error('Combined analysis failed:', error);
-      updateWorkflow({
-        dataSource: { ...workflow.dataSource, status: 'error' }
-      });
-    }
-  };
-
-  // Supported file types (exact copy from data_scientist_sidebar.tsx)
-  const supportedTypes = [
-    { ext: 'csv', name: 'CSV Files', icon: '📊' },
-    { ext: 'xlsx', name: 'Excel Files', icon: '📈' },
-    { ext: 'json', name: 'JSON Files', icon: '📋' },
-    { ext: 'db', name: 'Database Files', icon: '🗄️' }
-  ];
-
-  // Quick analysis templates (exact copy from data_scientist_sidebar.tsx)
-  const quickQueries = [
-    'Show me the trends in this data',
-    'Find anomalies and outliers',
-    'What are the key insights?',
-    'Summarize the data by categories',
-    'Show top 10 records by value',
-    'Calculate averages and totals'
-  ];
 
   return (
-    <div className="space-y-4 h-full flex flex-col p-3">
-      {/* Workflow Mode Selection */}
+    <div className="space-y-4 p-3">
+      {/* Compact Mode Header - like other widgets */}
+      <div className="flex items-center gap-3 p-2 bg-cyan-500/10 rounded border border-cyan-500/20">
+        <span className="text-lg">{selectedMode.icon}</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-white truncate">{selectedMode.name}</div>
+          <div className="flex gap-3 text-xs text-white/50">
+            <span>{selectedMode.estimatedTime}</span>
+            <span>Data Analysis</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Compact Input Area with Upload Button */}
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <textarea
+            value={query}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              if (newValue !== query) {
+                console.log('🔬 Query changed');
+              }
+              setQuery(newValue);
+            }}
+            placeholder={`Describe your ${selectedMode.name.toLowerCase()} request...`}
+            className="flex-1 p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
+            rows={2}
+          />
+          <button
+            onClick={() => document.getElementById('data-upload')?.click()}
+            className="px-3 py-2 bg-white/5 border border-white/10 rounded text-white/80 hover:bg-white/10 transition-all text-xs flex items-center gap-1"
+          >
+            📁 Upload
+          </button>
+        </div>
+
+        {/* Hidden File Input */}
+        <input
+          type="file"
+          accept=".csv,.xlsx,.xls,.json,.db,.sqlite"
+          onChange={handleFileUpload}
+          className="hidden"
+          id="data-upload"
+        />
+        
+        {/* Show uploaded file info */}
+        {uploadedFile && (
+          <div className="flex items-center gap-2 p-2 bg-white/5 border border-white/10 rounded">
+            <span className="text-sm">📁</span>
+            <span className="text-white/70 text-xs">{uploadedFile.name}</span>
+            <button 
+              onClick={() => setUploadedFile(null)}
+              className="ml-auto text-white/40 hover:text-white/70 text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Compact Mode Selector */}
       <div>
-        <label className="text-sm font-medium text-white/80 mb-2 block">🔬 Analysis Mode</label>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { id: 'combined', name: 'End-to-End', icon: '🚀', desc: 'Upload + Query' },
-            { id: 'upload', name: 'Data Prep', icon: '📤', desc: 'Ingest Only' },
-            { id: 'query', name: 'Query Only', icon: '💬', desc: 'Existing Data' }
-          ].map((mode) => (
+        <div className="text-xs text-white/60 mb-2">🎯 Select Mode</div>
+        <div className="grid grid-cols-3 gap-1">
+          {dataModes.map((mode) => (
             <button
               key={mode.id}
-              onClick={() => updateWorkflow({ mode: mode.id as any })}
-              className={`p-2 rounded-lg text-xs transition-all ${
-                workflow.mode === mode.id
-                  ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white'
-                  : 'bg-white/5 text-white/80 hover:bg-white/10'
+              onClick={() => {
+                if (mode.isActive) {
+                  setSelectedMode(mode);
+                  console.log('🔬 Mode selected:', mode.name);
+                } else {
+                  console.log('🔬 Mode disabled:', mode.name);
+                }
+              }}
+              disabled={!mode.isActive}
+              className={`p-1.5 rounded border transition-all text-center ${
+                selectedMode.id === mode.id
+                  ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+                  : mode.isActive 
+                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white cursor-pointer'
+                    : 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
               }`}
+              title={`${mode.name} - ${mode.description}${!mode.isActive ? ' (Coming Soon)' : ''}`}
             >
-              <div className="text-center">
-                <div className="text-lg">{mode.icon}</div>
-                <div className="font-medium">{mode.name}</div>
-                <div className="text-xs opacity-80">{mode.desc}</div>
-              </div>
+              <div className="text-xs mb-0.5">{mode.icon}</div>
+              <div className="text-xs font-medium truncate leading-tight">{mode.name}</div>
+              {!mode.isActive && <div className="text-xs text-white/30">Soon</div>}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Data Upload Section */}
-      {(workflow.mode === 'upload' || workflow.mode === 'combined') && (
-        <div>
-          <label className="text-sm font-medium text-white/80 mb-2 block">📁 Data Source</label>
+      {/* Advanced Options - Only Analysis Depth */}
+      {selectedMode && (
+        <div className="space-y-2">
+          <div className="text-xs text-white/60">⚙️ Advanced Options</div>
           
-          {/* File Upload */}
-          <label className="block w-full p-4 border-2 border-dashed border-cyan-500/50 bg-cyan-500/5 rounded-lg cursor-pointer hover:border-cyan-500 hover:bg-cyan-500/10 transition-all">
-            <div className="text-center">
-              <div className="text-2xl mb-2">
-                {workflow.dataSource.status === 'ready' ? '✅' : '📁'}
-              </div>
-              <div className="text-sm font-medium text-white/80">
-                {workflow.dataSource.file ? workflow.dataSource.file.name : 'Upload Data File'}
-              </div>
-              <div className="text-xs text-white/60 mt-1">
-                {workflow.dataSource.file ? `${(workflow.dataSource.file.size / 1024).toFixed(1)}KB` : 'CSV, Excel, JSON, Database'}
-              </div>
-            </div>
-            <input
-              type="file"
-              accept=".csv,.xlsx,.xls,.json,.db,.sqlite"
-              onChange={(e) => handleFileUpload(e.target.files)}
-              className="hidden"
-            />
-          </label>
-
-          {/* Supported File Types */}
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            {supportedTypes.map((type) => (
-              <div key={type.ext} className="flex items-center gap-2 p-2 bg-white/5 rounded text-xs">
-                <span>{type.icon}</span>
-                <span className="text-white/80">{type.name}</span>
-              </div>
-            ))}
+          <div>
+            <label className="block text-xs text-white/60 mb-1">Analysis Depth</label>
+            <select 
+              className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" 
+              value={analysisDepth} 
+              onChange={(e) => setAnalysisDepth(e.target.value)}
+            >
+              <option value="standard">Standard</option>
+              <option value="comprehensive">Comprehensive</option>
+              <option value="deep">Deep Analysis</option>
+            </select>
           </div>
         </div>
       )}
 
-      {/* Query Input Section */}
-      {(workflow.mode === 'query' || workflow.mode === 'combined') && (
-        <div className="flex-1 min-h-0">
-          <label className="text-sm font-medium text-white/80 mb-2 block">💬 Natural Language Query</label>
-          <textarea
-            value={workflow.query}
-            onChange={(e) => updateWorkflow({ query: e.target.value })}
-            placeholder="Ask anything about your data... e.g., 'Show revenue trends by month' or 'Find customers from China'"
-            className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-cyan-500 resize-none h-20"
-          />
-
-          {/* Quick Query Templates */}
-          <div className="mt-2">
-            <div className="text-xs text-white/60 mb-2">Quick queries:</div>
-            <div className="grid grid-cols-2 gap-1">
-              {quickQueries.map((query, index) => (
-                <button
-                  key={index}
-                  onClick={() => updateWorkflow({ query })}
-                  className="p-1 bg-white/5 rounded text-xs text-white/70 hover:bg-cyan-500/20 transition-all text-left"
-                >
-                  {query}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Action Buttons */}
-      <div className="space-y-2">
-        {workflow.mode === 'upload' && (
-          <button
-            onClick={handleDataIngestion}
-            disabled={!workflow.dataSource.file || isAnalyzing}
-            className={`w-full p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg text-white font-medium flex items-center justify-center gap-2 transition-all ${
-              isAnalyzing ? 'animate-pulse' : 'hover:from-blue-600 hover:to-cyan-600'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            {isAnalyzing ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                Processing Data...
-              </>
-            ) : (
-              <>
-                <span>📤</span>
-                Ingest Data
-              </>
-            )}
-          </button>
+      {/* Enhanced Process Button */}
+      <button
+        onClick={handleDataAnalysis}
+        disabled={isAnalyzing || !query.trim()}
+        className={`w-full p-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded text-white font-medium transition-all hover:from-cyan-600 hover:to-blue-600 flex items-center justify-center gap-2 text-sm ${
+          isAnalyzing ? 'animate-pulse' : ''
+        } disabled:opacity-50 disabled:cursor-not-allowed`}
+      >
+        {isAnalyzing ? (
+          <>
+            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            Analyzing...
+          </>
+        ) : (
+          <>
+            <span>{selectedMode.icon}</span>
+            Analyze with {selectedMode.name}
+          </>
         )}
-
-        {workflow.mode === 'query' && (
-          <button
-            onClick={handleQueryProcessing}
-            disabled={!workflow.query.trim() || isAnalyzing}
-            className={`w-full p-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg text-white font-medium flex items-center justify-center gap-2 transition-all ${
-              isAnalyzing ? 'animate-pulse' : 'hover:from-purple-600 hover:to-pink-600'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            {isAnalyzing ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                Querying...
-              </>
-            ) : (
-              <>
-                <span>💬</span>
-                Execute Query
-              </>
-            )}
-          </button>
-        )}
-
-        {workflow.mode === 'combined' && (
-          <button
-            onClick={handleCombinedAnalysis}
-            disabled={!workflow.dataSource.file || !workflow.query.trim() || isAnalyzing}
-            className={`w-full p-3 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-lg text-white font-medium flex items-center justify-center gap-2 transition-all ${
-              isAnalyzing ? 'animate-pulse' : 'hover:from-cyan-600 hover:to-purple-600'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            {isAnalyzing ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                Analyzing...
-              </>
-            ) : (
-              <>
-                <span>🚀</span>
-                Analyze Data
-              </>
-            )}
-          </button>
-        )}
-      </div>
-
+      </button>
     </div>
   );
 };
@@ -392,8 +337,8 @@ export const DataScientistWidget: React.FC<DataScientistWidgetProps> = ({
   const editActions: EditAction[] = [
     {
       id: 'export_csv',
-      label: 'Export CSV',
-      icon: '📊',
+      label: 'Export',
+      icon: '💾',
       onClick: (content) => {
         // Convert data to CSV and download
         if (typeof content === 'object' && content !== null) {
@@ -411,75 +356,51 @@ export const DataScientistWidget: React.FC<DataScientistWidgetProps> = ({
     {
       id: 'visualize',
       label: 'Visualize',
-      icon: '📈',
+      icon: '📊',
       onClick: (content) => {
         // Open visualization for data
         console.log('Opening visualization for data:', content);
       }
-    },
-    {
-      id: 'copy_sql',
-      label: 'Copy SQL',
-      icon: '🗄️',
-      onClick: (content) => {
-        // Extract and copy SQL query if available
-        if (typeof content === 'object' && content !== null) {
-          const sqlQuery = JSON.stringify(content, null, 2);
-          navigator.clipboard.writeText(sqlQuery);
-        }
-      }
     }
   ];
 
-  // Custom management actions for data science
+  // Custom management actions for data science - only csv file active
   const managementActions: ManagementAction[] = [
     {
-      id: 'upload_mode',
-      label: 'Upload',
-      icon: '📤',
+      id: 'csv_file',
+      label: 'CSV File',
+      icon: '📁',
       onClick: () => onAnalyzeData({ 
-        analysisType: 'descriptive',
-        query: 'Process uploaded data'
+        query: 'Process CSV file data',
+        analysisType: 'descriptive'
       }),
-      disabled: isAnalyzing
+      disabled: false
     },
     {
-      id: 'query_mode',
-      label: 'Query',
-      icon: '💬',
-      onClick: () => onAnalyzeData({ 
-        query: 'Analyze existing data',
-        analysisType: 'exploratory'
-      }),
-      disabled: isAnalyzing
+      id: 'db',
+      label: 'DB',
+      icon: '🗋',
+      onClick: () => console.log('🗋 Database mode - coming soon'),
+      disabled: true
     },
     {
-      id: 'combined_mode',
-      label: 'Combined',
-      icon: '🚀',
-      onClick: () => onAnalyzeData({ 
-        query: 'End-to-end analysis',
-        analysisType: 'prescriptive'
-      }),
-      disabled: isAnalyzing
+      id: 'url',
+      label: 'URL',
+      icon: '🔗',
+      onClick: () => console.log('🔗 URL mode - coming soon'),
+      disabled: true
     },
     {
-      id: 'clear',
-      label: 'Clear',
-      icon: '🗑️',
-      onClick: () => {
-        onClearAnalysis();
-        onClearHistory?.();
-      },
-      variant: 'danger' as const,
-      disabled: isAnalyzing
+      id: 'other',
+      label: 'Other',
+      icon: '📄',
+      onClick: () => console.log('📄 Other mode - coming soon'),
+      disabled: true
     }
   ];
 
   return (
     <BaseWidget
-      title="Data Analytics"
-      icon="🔬"
       isProcessing={isAnalyzing}
       outputHistory={outputHistory}
       currentOutput={currentOutput}

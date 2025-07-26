@@ -24,19 +24,18 @@
  * 【架构流向】
  * ChatLayout → RightSidebarLayout → WidgetModule → Widget UI
  */
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
+import { useSortedWidgets, useGetWidgetUsage } from '../../../stores/useAppStore';
 
 // Import Widget Modules (Business Logic + UI)
 import { DreamWidgetModule } from '../../../modules/widgets/DreamWidgetModule';
 import { HuntWidgetModule } from '../../../modules/widgets/HuntWidgetModule';
-import { AssistantWidgetModule } from '../../../modules/widgets/AssistantWidgetModule';
 import { OmniWidgetModule } from '../../../modules/widgets/OmniWidgetModule';
 import { KnowledgeWidgetModule } from '../../../modules/widgets/KnowledgeWidgetModule';
 import { DataScientistWidgetModule } from '../../../modules/widgets/DataScientistWidgetModule';
 import { DreamWidget } from '../widgets/DreamWidget';
 import { HuntWidget } from '../widgets/HuntWidget';
 import { OmniWidget } from '../widgets/OmniWidget';
-import { AssistantWidget } from '../widgets/AssistantWidget';
 import { DataScientistWidget } from '../widgets/DataScientistWidget';
 import { KnowledgeWidget } from '../widgets/KnowledgeWidget';
 
@@ -47,6 +46,7 @@ interface RightSidebarLayoutProps {
   showRightSidebar: boolean;
   triggeredAppInput: string;
   onCloseApp: () => void;
+  onBackToList?: () => void;
   onAppSelect?: (appId: string) => void;
 }
 
@@ -64,9 +64,11 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
   showRightSidebar,
   triggeredAppInput,
   onCloseApp,
+  onBackToList,
   onAppSelect
 }) => {
-  // Pure layout component - no hooks or business logic needed
+  // ⚠️ 必须在所有条件性 return 之前调用所有 hooks
+  const sortedWidgets = useSortedWidgets();
   
   logger.trackComponentRender('RightSidebarLayout', { 
     currentApp, 
@@ -76,11 +78,11 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
   
   console.log('📱 RIGHT_SIDEBAR: Rendering right sidebar', { currentApp, showRightSidebar });
   
-  // Get widget content based on current app (Module + UI rendering)
-  const getWidgetContent = () => {
+  // Use useMemo to cache widget content and prevent unnecessary re-renders
+  const widgetContent = useMemo(() => {
     if (!currentApp) return null;
     
-    console.log('📱 RIGHT_SIDEBAR: Rendering widget for app:', currentApp);
+    console.log('📱 RIGHT_SIDEBAR: Creating widget content for app:', currentApp);
     
     // Use Widget Modules that manage business logic + UI
     switch (currentApp) {
@@ -88,9 +90,6 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
         return (
           <DreamWidgetModule 
             triggeredInput={triggeredAppInput}
-            onImageGenerated={(imageUrl, prompt) => {
-              console.log('🎨 RIGHT_SIDEBAR: Dream image generated:', { imageUrl, prompt });
-            }}
           >
             {(moduleProps) => (
               <DreamWidget 
@@ -113,16 +112,9 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
               console.log('🔍 RIGHT_SIDEBAR: Hunt search completed:', result);
             }}
           >
-            {(moduleProps) => (
-              <HuntWidget 
-                isSearching={moduleProps.isSearching}
-                searchResults={moduleProps.searchResults}
-                lastQuery={moduleProps.lastQuery}
-                onSearch={moduleProps.onSearch}
-                onClearResults={moduleProps.onClearResults}
-                triggeredInput={triggeredAppInput}
-              />
-            )}
+            <HuntWidget 
+              triggeredInput={triggeredAppInput}
+            />
           </HuntWidgetModule>
         );
       
@@ -134,37 +126,10 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
               console.log('⚡ RIGHT_SIDEBAR: Omni content generated:', result);
             }}
           >
-            {(moduleProps) => (
-              <OmniWidget 
-                isGenerating={moduleProps.isGenerating}
-                generatedContent={moduleProps.generatedContent}
-                lastParams={moduleProps.lastParams}
-                onGenerateContent={moduleProps.onGenerateContent}
-                onClearContent={moduleProps.onClearContent}
-                triggeredInput={triggeredAppInput}
-              />
-            )}
+            <OmniWidget 
+              triggeredInput={triggeredAppInput}
+            />
           </OmniWidgetModule>
-        );
-        
-      case 'assistant':
-        return (
-          <AssistantWidgetModule 
-            triggeredInput={triggeredAppInput}
-            onResponseGenerated={(result) => {
-              console.log('🤖 RIGHT_SIDEBAR: Assistant response generated:', result);
-            }}
-          >
-            {(moduleProps) => (
-              <AssistantWidget 
-                isProcessing={moduleProps.isProcessing}
-                conversationContext={moduleProps.conversationContext}
-                onSendMessage={moduleProps.onSendMessage}
-                onClearContext={moduleProps.onClearContext}
-                triggeredInput={triggeredAppInput}
-              />
-            )}
-          </AssistantWidgetModule>
         );
       
       case 'knowledge':
@@ -175,15 +140,9 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
               console.log('🧠 RIGHT_SIDEBAR: Knowledge analysis completed:', result);
             }}
           >
-            {(moduleProps) => (
-              <KnowledgeWidget 
-                isProcessing={moduleProps.isProcessing}
-                result={moduleProps.searchResult}
-                onProcess={moduleProps.onSearchKnowledge}
-                onClearResults={moduleProps.onClearResults}
-                triggeredInput={triggeredAppInput}
-              />
-            )}
+            <KnowledgeWidget 
+              triggeredInput={triggeredAppInput}
+            />
           </KnowledgeWidgetModule>
         );
       
@@ -195,15 +154,9 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
               console.log('📊 RIGHT_SIDEBAR: DataScientist analysis completed:', result);
             }}
           >
-            {(moduleProps) => (
-              <DataScientistWidget 
-                isAnalyzing={moduleProps.isAnalyzing}
-                analysisResult={moduleProps.analysisResult}
-                onAnalyzeData={moduleProps.onAnalyzeData}
-                onClearAnalysis={moduleProps.onClearAnalysis}
-                triggeredInput={triggeredAppInput}
-              />
-            )}
+            <DataScientistWidget 
+              triggeredInput={triggeredAppInput}
+            />
           </DataScientistWidgetModule>
         );
       
@@ -211,9 +164,7 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
         logger.warn(LogCategory.COMPONENT_RENDER, 'Unknown widget type', { currentApp });
         return <div className="p-4 text-gray-400">Unknown widget: {currentApp}</div>;
     }
-  };
-  
-  const widgetContent = getWidgetContent();
+  }, [currentApp, triggeredAppInput]); // Only recreate when currentApp or triggeredAppInput changes
   
   // Simple widget configs (no hooks needed)
   const getWidgetInfo = (appId: string) => {
@@ -221,7 +172,6 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
       dream: { icon: '🎨', title: 'DreamForge AI' },
       hunt: { icon: '🔍', title: 'HuntAI' },
       omni: { icon: '⚡', title: 'Omni Content' },
-      assistant: { icon: '🤖', title: 'AI Assistant' },
       'data-scientist': { icon: '📊', title: 'DataWise Analytics' },
       knowledge: { icon: '🧠', title: 'Knowledge Hub' }
     };
@@ -241,15 +191,20 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
           </h2>
           <button
             onClick={() => {
-              logger.trackSidebarInteraction('widget_close_clicked', currentApp || undefined, { 
+              logger.trackSidebarInteraction('widget_back_to_list_clicked', currentApp || undefined, { 
                 widgetTitle: widgetInfo.title 
               });
-              onCloseApp();
+              // Use onBackToList if available, otherwise fall back to onCloseApp
+              if (onBackToList) {
+                onBackToList();
+              } else {
+                onCloseApp();
+              }
             }}
             className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center text-white transition-all"
-            title="Close Widget (will preserve any generated content)"
+            title="Back to Widget List"
           >
-            ✕
+            ←
           </button>
         </div>
         
@@ -280,49 +235,153 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
       <div className="space-y-4">
         <p className="text-white/60 text-sm mb-4">Choose an AI widget to get started:</p>
         
-        <div className="grid gap-3">
-          {Object.entries({
-            dream: { title: 'DreamForge AI', icon: '🎨', desc: 'AI-powered image generation', status: 'new' },
-            hunt: { title: 'HuntAI', icon: '🔍', desc: 'Product search and comparison', status: 'new' },
-            assistant: { title: 'AI Assistant', icon: '🤖', desc: 'General AI assistance', status: 'new' },
-            omni: { title: 'Omni Content', icon: '⚡', desc: 'Multi-purpose content creation', status: 'new' },
-            'data-scientist': { title: 'DataWise Analytics', icon: '📊', desc: 'Data analysis and insights', status: 'new' },
-            knowledge: { title: 'Knowledge Hub', icon: '🧠', desc: 'Advanced document analysis with vector and graph RAG', status: 'new' }
-          }).map(([appId, app]) => (
-            <button
-              key={appId}
-              onClick={() => {
-                logger.trackSidebarInteraction('widget_selected_from_list', appId);
-                console.log('🚀 Widget selected:', appId);
-                onAppSelect?.(appId);
-              }}
-              className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg transition-all text-left group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="text-2xl">{app.icon}</div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <div className="text-white font-medium text-sm">{app.title}</div>
-                    {app.status === 'new' && (
-                      <span className="px-2 py-0.5 text-xs bg-green-500/20 text-green-300 rounded-full border border-green-500/30">
-                        New Architecture
-                      </span>
+        {(() => {
+          const widgetInfo = {
+            dream: { title: 'DreamForge AI', icon: '🎨', desc: 'AI-powered image generation' },
+            hunt: { title: 'HuntAI', icon: '🔍', desc: 'Product search and comparison' },
+            omni: { title: 'Omni Content', icon: '⚡', desc: 'Multi-purpose content creation' },
+            'data-scientist': { title: 'DataWise Analytics', icon: '📊', desc: 'Data analysis and insights' },
+            knowledge: { title: 'Knowledge Hub', icon: '🧠', desc: 'Advanced document analysis with vector and graph RAG' }
+          };
+          
+          // 使用已经在组件顶部获取的 sortedWidgets
+          const activeWidgets = sortedWidgets.filter(w => w.usage.hasArtifacts);
+          const otherWidgets = sortedWidgets.filter(w => !w.usage.hasArtifacts);
+          
+          const formatLastUsed = (timestamp: string | null) => {
+            if (!timestamp) return null;
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now.getTime() - date.getTime();
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+            
+            if (minutes < 1) return 'just now';
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            if (days < 7) return `${days}d ago`;
+            return date.toLocaleDateString();
+          };
+          
+          const renderWidget = ({ id: appId, usage }, isActive = false, isFeatured = false) => {
+            const app = widgetInfo[appId];
+            if (!app) return null;
+            
+            return (
+              <button
+                key={appId}
+                onClick={() => {
+                  logger.trackSidebarInteraction('widget_selected_from_list', appId);
+                  console.log('🚀 Widget selected:', appId);
+                  onAppSelect?.(appId);
+                }}
+                className={`border rounded-xl transition-all text-left group overflow-hidden ${
+                  isFeatured ? 'p-6 col-span-2' : 'p-4'
+                } ${
+                  isActive 
+                    ? 'bg-gradient-to-br from-purple-500/15 via-blue-500/10 to-purple-500/5 border-purple-400/40 hover:border-purple-400/60 shadow-lg shadow-purple-500/10'
+                    : 'bg-white/5 hover:bg-white/10 border-white/10 hover:border-white/20'
+                }`}
+              >
+                <div className={`flex ${isFeatured ? 'flex-col items-start' : 'items-center'} gap-3`}>
+                  <div className={`${isFeatured ? 'text-4xl' : 'text-2xl'} relative flex-shrink-0`}>
+                    {app.icon}
+                    {usage.hasArtifacts && (
+                      <div className={`absolute -top-1 -right-1 ${isFeatured ? 'w-4 h-4' : 'w-3 h-3'} bg-gradient-to-r from-purple-400 to-blue-400 rounded-full animate-pulse`} />
                     )}
                   </div>
-                  <div className="text-white/60 text-xs mt-1">{app.desc}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <div className={`text-white font-semibold ${isFeatured ? 'text-lg' : 'text-sm'}`}>{app.title}</div>
+                      {usage.hasArtifacts && (
+                        <span className="px-2 py-0.5 text-xs bg-purple-500/25 text-purple-200 rounded-full border border-purple-400/40 font-medium">
+                          ✨ Active
+                        </span>
+                      )}
+                      {usage.usageCount > 0 && !usage.hasArtifacts && (
+                        <span className="px-2 py-0.5 text-xs bg-gray-500/20 text-gray-300 rounded-full border border-gray-500/30">
+                          {usage.usageCount}x used
+                        </span>
+                      )}
+                    </div>
+                    <div className={`text-white/60 ${isFeatured ? 'text-sm mb-3' : 'text-xs mb-2'} ${isFeatured ? 'leading-relaxed' : ''}`}>
+                      {app.desc}
+                    </div>
+                    <div className="flex items-center gap-4 text-xs">
+                      {usage.lastUsed && (
+                        <div className="text-white/40 flex items-center gap-1">
+                          <span className="opacity-60">📅</span>
+                          {formatLastUsed(usage.lastUsed)}
+                        </div>
+                      )}
+                      {usage.usageCount > 0 && (
+                        <div className="text-white/40 flex items-center gap-1">
+                          <span className="opacity-60">🔥</span>
+                          {usage.usageCount} uses
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {!isFeatured && (
+                    <div className="text-white/40 group-hover:text-white/60 transition-colors flex-shrink-0">
+                      →
+                    </div>
+                  )}
                 </div>
-                <div className="text-white/40 group-hover:text-white/60 transition-colors">
-                  →
+              </button>
+            );
+          };
+          
+          return (
+            <div className="space-y-6">
+              {/* Featured/Active Widgets */}
+              {activeWidgets.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="text-white/80 text-sm font-semibold">✨ Active Tools</div>
+                    <div className="flex-1 h-px bg-gradient-to-r from-purple-500/30 to-transparent"></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {activeWidgets.slice(0, 2).map((widget, index) => 
+                      renderWidget(widget, true, index === 0 && activeWidgets.length === 1)
+                    )}
+                  </div>
+                  {activeWidgets.length > 2 && (
+                    <div className="grid grid-cols-1 gap-3 mt-3">
+                      {activeWidgets.slice(2).map(widget => renderWidget(widget, true, false))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            </button>
-          ))}
-        </div>
+              )}
+              
+              {/* Other Widgets */}
+              {otherWidgets.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="text-white/60 text-sm font-medium">
+                      {activeWidgets.length > 0 ? '🛠️ Available Tools' : '🚀 AI Tools'}
+                    </div>
+                    <div className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent"></div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    {otherWidgets.map(widget => renderWidget(widget, false, false))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         
-        <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-          <div className="text-blue-300 text-sm font-medium mb-2">💡 Pro Tip</div>
-          <div className="text-blue-200/80 text-xs">
-            You can also trigger widgets by typing keywords like "create image", "search product", or "generate content" in the chat!
+        <div className="mt-6 p-4 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-400/20 rounded-xl">
+          <div className="text-blue-300 text-sm font-medium mb-2 flex items-center gap-2">
+            <span className="text-base">💡</span>
+            Pro Tips
+          </div>
+          <div className="text-blue-200/80 text-xs space-y-1">
+            <div>• Type keywords like <code className="px-1 py-0.5 bg-white/10 rounded text-blue-200">"create image"</code> to trigger widgets</div>
+            <div>• ✨ Active tools have generated content and appear first</div>
+            <div>• Tools are sorted by recent usage for quick access</div>
           </div>
         </div>
       </div>

@@ -37,6 +37,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { logger, LogCategory } from '../utils/logger';
 import { chatService } from '../api/chatService';
+import { useAppStore } from './useAppStore';
 
 // Dream Widget State
 interface DreamWidgetState {
@@ -91,21 +92,29 @@ export const useDreamWidgetStore = create<DreamWidgetStore>()(
     triggerDreamGeneration: async (params) => {
       const { setDreamGenerating, setDreamParams, setDreamGeneratedImage } = get();
       
+      // 记录widget使用（用户真正使用了功能）
+      const { recordWidgetUsage } = useAppStore.getState();
+      recordWidgetUsage('dream');
+      
       // Set generating state and params
       setDreamGenerating(true);
       setDreamParams(params);
       
       try {
-        // Build dream-specific prompt
-        const dreamPrompt = `Generate an image with the following specifications:
-Prompt: ${params.prompt}
-Style: ${params.style || 'realistic'}
-Size: ${params.size || '1024x1024'}
-Quality: ${params.quality || 'standard'}
-
-Please create a high-quality image that matches these requirements and return it as an image artifact.`;
+        // Check if we have template parameters from DreamWidgetModule
+        if (params.templateParams) {
+          console.log('🎨 DREAM_STORE: Using template params from module:', params.templateParams);
+        } else {
+          console.log('🎨 DREAM_STORE: No template params from module, using fallback');
+        }
         
-        logger.info(LogCategory.ARTIFACT_CREATION, 'Starting dream generation via chatService', { params });
+        // Use simple prompt - just the user's input, no formatting
+        const dreamPrompt = params.prompt || 'Generate an image';
+        
+        logger.info(LogCategory.ARTIFACT_CREATION, 'Starting dream generation via chatService', { 
+          params,
+          hasTemplateParams: !!params.templateParams
+        });
         
         // Call chatService following useChatStore pattern
         await chatService.sendMessage(dreamPrompt, {
@@ -115,13 +124,51 @@ Please create a high-quality image that matches these requirements and return it
           onMessageContent: (contentChunk) => {
             logger.debug(LogCategory.ARTIFACT_CREATION, 'Dream generation content chunk', { contentChunk });
           },
-          onMessageComplete: () => {
+          onMessageComplete: (completeMessage) => {
+            setDreamGenerating(false); // 停止生成状态
+            
+            // 从完整消息中提取图片URL
+            if (completeMessage) {
+              const imageRegex = /!\[.*?\]\((https?:\/\/[^\)]+)\)/g;
+              const imageMatches = completeMessage.match(imageRegex);
+              
+              if (imageMatches && imageMatches.length > 0) {
+                const urlMatch = imageMatches[0].match(/\((https?:\/\/[^\)]+)\)/);
+                if (urlMatch && urlMatch[1]) {
+                  const imageUrl = urlMatch[1];
+                  setDreamGeneratedImage(imageUrl);
+                  
+                  // 标记widget有artifacts
+                  const { markWidgetWithArtifacts } = useAppStore.getState();
+                  markWidgetWithArtifacts('dream');
+                  
+                  logger.info(LogCategory.ARTIFACT_CREATION, 'Dream image extracted from complete message', { 
+                    imageUrl: imageUrl,
+                    messageLength: completeMessage.length
+                  });
+                } else {
+                  console.log('🎨 DREAM_STORE: No valid image URL found in complete message');
+                }
+              } else {
+                console.log('🎨 DREAM_STORE: No image markdown found in complete message');
+              }
+            } else {
+              console.log('🎨 DREAM_STORE: No complete message provided');
+            }
+            
             logger.info(LogCategory.ARTIFACT_CREATION, 'Dream generation message completed');
           },
           onArtifactCreated: (artifact) => {
-            if (artifact.type === 'image' && artifact.content) {
+            // 保留作为备用，但主要逻辑已转移到onMessageComplete
+            if (artifact.type === 'image' && artifact.content && !get().generatedImage) {
+              console.log('🎨 DREAM_STORE: Fallback - using artifact for image (onMessageComplete may have failed)');
               setDreamGeneratedImage(artifact.content);
-              logger.info(LogCategory.ARTIFACT_CREATION, 'Dream image artifact created', { 
+              
+              // 标记widget有artifacts
+              const { markWidgetWithArtifacts } = useAppStore.getState();
+              markWidgetWithArtifacts('dream');
+              
+              logger.info(LogCategory.ARTIFACT_CREATION, 'Dream image artifact created (fallback)', { 
                 artifactId: artifact.id,
                 imageUrl: artifact.content 
               });
@@ -135,11 +182,15 @@ Please create a high-quality image that matches these requirements and return it
             });
           }
         }, {
-          session_id: 'dream_widget',
-          user_id: 'widget_user',
-          template_parameters: {
-            widget_type: 'dream',
-            ...params
+          session_id: `dream_widget_${Date.now()}`,
+          user_id: 'user_123', // TODO: Get from auth store
+          template_parameters: params.templateParams || {
+            template_id: 'text_to_image_prompt',
+            prompt_args: {
+              prompt: params.prompt || dreamPrompt,
+              style_preset: params.style_preset || params.style || 'photorealistic',
+              quality: params.quality || 'high'
+            }
           }
         });
         
@@ -156,12 +207,14 @@ interface HuntWidgetState {
   searchResults: any[];
   isSearching: boolean;
   lastQuery: string;
+  currentStatus: string; // 添加当前状态字段
 }
 
 interface HuntWidgetActions {
   setHuntSearchResults: (results: any[]) => void;
   setHuntSearching: (isSearching: boolean) => void;
   setHuntLastQuery: (query: string) => void;
+  setHuntCurrentStatus: (status: string) => void; // 添加状态设置方法
   clearHuntData: () => void;
   triggerHuntSearch: (params: any) => Promise<void>;
 }
@@ -174,6 +227,7 @@ export const useHuntWidgetStore = create<HuntWidgetStore>()(
     searchResults: [],
     isSearching: false,
     lastQuery: '',
+    currentStatus: '',
     
     // Hunt操作
     setHuntSearchResults: (results) => {
@@ -193,6 +247,11 @@ export const useHuntWidgetStore = create<HuntWidgetStore>()(
       logger.debug(LogCategory.ARTIFACT_CREATION, 'Hunt last query updated', { query });
     },
     
+    setHuntCurrentStatus: (status) => {
+      set({ currentStatus: status });
+      logger.debug(LogCategory.ARTIFACT_CREATION, 'Hunt current status updated', { status });
+    },
+    
     clearHuntData: () => {
       set({ searchResults: [], isSearching: false, lastQuery: '' });
       logger.debug(LogCategory.ARTIFACT_CREATION, 'Hunt widget data cleared');
@@ -202,21 +261,51 @@ export const useHuntWidgetStore = create<HuntWidgetStore>()(
     triggerHuntSearch: async (params) => {
       const { setHuntSearching, setHuntLastQuery, setHuntSearchResults } = get();
       
+      // 记录widget使用（用户真正使用了功能）
+      const { recordWidgetUsage } = useAppStore.getState();
+      recordWidgetUsage('hunt');
+      
       // Set searching state and query
       setHuntSearching(true);
       setHuntLastQuery(params.query || '');
       
       try {
-        // Build hunt-specific prompt
-        const huntPrompt = `Search for products matching: "${params.query}"
-${params.category ? `Category: ${params.category}` : ''}
-${params.priceRange ? `Price Range: ${params.priceRange.min} - ${params.priceRange.max}` : ''}
-${params.filters ? `Additional Filters: ${JSON.stringify(params.filters)}` : ''}
+        // Check if we have template parameters from HuntWidgetModule
+        if (params.templateParams) {
+          console.log('🔍 HUNT_STORE: Using template params from module:', params.templateParams);
+        } else {
+          console.log('🔍 HUNT_STORE: No template params from module, using fallback');
+        }
+        
+        // Use simple prompt - just the user's search query
+        const huntPrompt = params.query || 'Search for information';
+        
+        logger.info(LogCategory.ARTIFACT_CREATION, 'Starting hunt search via chatService', { 
+          params,
+          hasTemplateParams: !!params.templateParams
+        });
+        
+        // Use template parameters from HuntWidgetModule (like Dream does)
+        let templateParams;
+        if (params.templateParams) {
+          templateParams = {
+            prompt_name: params.templateParams.template_id,
+            prompt_args: params.templateParams.prompt_args
+          };
+          console.log('🔍 HUNT_STORE: Using template params from module:', templateParams);
+        } else {
+          // Fallback for direct calls without module
+          templateParams = {
+            prompt_name: 'hunt_general_prompt',
+            prompt_args: {
+              query: params.query || huntPrompt,
+              search_depth: params.search_depth || 'standard',
+              result_format: params.result_format || 'summary'
+            }
+          };
+          console.log('🔍 HUNT_STORE: Using fallback template params:', templateParams);
+        }
 
-Please provide detailed search results with product information, prices, and comparisons as a search_results artifact.`;
-        
-        logger.info(LogCategory.ARTIFACT_CREATION, 'Starting hunt search via chatService', { params });
-        
         // Call chatService following useChatStore pattern
         await chatService.sendMessage(huntPrompt, {
           onMessageStart: (messageId, status) => {
@@ -225,21 +314,94 @@ Please provide detailed search results with product information, prices, and com
           onMessageContent: (contentChunk) => {
             logger.debug(LogCategory.ARTIFACT_CREATION, 'Hunt search content chunk', { contentChunk });
           },
-          onMessageComplete: () => {
+          onMessageStatus: (status) => {
+            // 这里接收SSEParser提供的详细状态信息
+            console.log('🔍 HUNT_STORE: Received status update:', status);
+            const { setHuntCurrentStatus } = get();
+            setHuntCurrentStatus(status);
+            logger.debug(LogCategory.ARTIFACT_CREATION, 'Hunt search status update', { status });
+          },
+          onMessageComplete: (completeMessage) => {
+            // Process the complete search response from chatService
+            if (completeMessage && completeMessage.trim()) {
+              console.log('🔍 HUNT_STORE: Processing complete search response from chatService:', completeMessage.substring(0, 200) + '...');
+              
+              // Create search result from the complete AI response
+              const searchResult = {
+                title: `Search Results for: ${params.query}`,
+                description: completeMessage.length > 200 ? completeMessage.substring(0, 200) + '...' : completeMessage,
+                content: completeMessage,
+                query: params.query,
+                timestamp: new Date().toISOString(),
+                type: 'search_response'
+              };
+              
+              setHuntSearchResults([searchResult]);
+              logger.info(LogCategory.ARTIFACT_CREATION, 'Hunt search completed with complete message from chatService', { 
+                query: params.query,
+                responseLength: completeMessage.length 
+              });
+            } else {
+              // Fallback if no complete message was provided
+              console.log('🔍 HUNT_STORE: No complete message provided, creating placeholder result');
+              const placeholderResult = {
+                title: `Search Results for: ${params.query}`,
+                description: 'Search completed but no content was returned.',
+                content: 'Search completed but no content was returned.',
+                query: params.query,
+                timestamp: new Date().toISOString(),
+                type: 'search_response'
+              };
+              
+              setHuntSearchResults([placeholderResult]);
+            }
+            
             setHuntSearching(false);
             logger.info(LogCategory.ARTIFACT_CREATION, 'Hunt search message completed');
           },
           onArtifactCreated: (artifact) => {
-            if (artifact.type === 'search_results' && artifact.content) {
-              try {
-                const results = JSON.parse(artifact.content);
-                setHuntSearchResults(results);
-                logger.info(LogCategory.ARTIFACT_CREATION, 'Hunt search results artifact created', { 
+            // Handle any additional artifacts (images, structured data) from SSEParser
+            if (artifact.content) {
+              console.log('🔍 HUNT_STORE: Additional artifact created:', artifact.type, artifact.id);
+              
+              // 标记widget有artifacts
+              const { markWidgetWithArtifacts } = useAppStore.getState();
+              markWidgetWithArtifacts('hunt');
+              
+              if (artifact.type === 'image') {
+                // Add image artifact to search results
+                const imageResult = {
+                  title: 'Image Result',
+                  description: 'Generated or found image',
+                  content: artifact.content,
+                  url: artifact.content,
+                  type: 'image'
+                };
+                
+                setHuntSearchResults(prev => [...prev, imageResult]);
+                logger.info(LogCategory.ARTIFACT_CREATION, 'Hunt image artifact added to results', { 
                   artifactId: artifact.id,
-                  resultCount: results.length 
+                  imageUrl: artifact.content 
                 });
-              } catch (parseError) {
-                logger.error(LogCategory.ARTIFACT_CREATION, 'Failed to parse hunt search results', { parseError });
+              } else if (artifact.type === 'data') {
+                // Add structured data artifact to search results
+                try {
+                  const dataResult = JSON.parse(artifact.content);
+                  const structuredResult = {
+                    title: 'Structured Data',
+                    description: 'Parsed structured search data',
+                    content: artifact.content,
+                    data: dataResult,
+                    type: 'structured_data'
+                  };
+                  
+                  setHuntSearchResults(prev => [...prev, structuredResult]);
+                  logger.info(LogCategory.ARTIFACT_CREATION, 'Hunt structured data artifact added to results', { 
+                    artifactId: artifact.id 
+                  });
+                } catch (parseError) {
+                  console.error('Failed to parse structured data artifact:', parseError);
+                }
               }
             }
           },
@@ -251,12 +413,10 @@ Please provide detailed search results with product information, prices, and com
             });
           }
         }, {
-          session_id: 'hunt_widget',
-          user_id: 'widget_user',
-          template_parameters: {
-            widget_type: 'hunt',
-            ...params
-          }
+          session_id: `hunt_widget_${Date.now()}`,
+          user_id: 'user_123', // TODO: Get from auth store
+          prompt_name: templateParams.prompt_name,
+          prompt_args: templateParams.prompt_args
         });
         
       } catch (error) {
@@ -314,41 +474,95 @@ export const useOmniWidgetStore = create<OmniWidgetStore>()(
       logger.debug(LogCategory.ARTIFACT_CREATION, 'Omni widget data cleared');
     },
     
-    // New method: Trigger omni content generation via chatService
+    // New method: Trigger omni content generation via chatService with template
     triggerOmniGeneration: async (params) => {
       const { setOmniGenerating, setOmniParams, setOmniGeneratedContent } = get();
+      
+      // 记录widget使用（用户真正使用了功能）
+      const { recordWidgetUsage } = useAppStore.getState();
+      recordWidgetUsage('omni');
       
       // Set generating state and params
       setOmniGenerating(true);
       setOmniParams(params);
       
       try {
-        // Build omni-specific prompt
-        const omniPrompt = `Generate ${params.contentType || 'text'} content for: ${params.prompt}
-${params.tone ? `Tone: ${params.tone}` : ''}
-${params.length ? `Length: ${params.length}` : ''}
-${params.style ? `Style: ${params.style}` : ''}
-
-Please create comprehensive content that meets these specifications and return it as a text artifact.`;
+        // Check if we have template parameters from OmniWidgetModule
+        if (params.templateParams) {
+          console.log('⚡ OMNI_STORE: Using template params from module:', params.templateParams);
+        } else {
+          console.log('⚡ OMNI_STORE: No template params from module, using fallback');
+        }
         
-        logger.info(LogCategory.ARTIFACT_CREATION, 'Starting omni generation via chatService', { params });
+        logger.info(LogCategory.ARTIFACT_CREATION, 'Starting omni generation via chatService with template', { 
+          params,
+          hasTemplateParams: !!params.templateParams
+        });
         
-        // Call chatService following useChatStore pattern
-        await chatService.sendMessage(omniPrompt, {
+        // Use template parameters from OmniWidgetModule (like Dream and Hunt)
+        let templateParams;
+        if (params.templateParams) {
+          templateParams = {
+            prompt_name: params.templateParams.template_id,
+            prompt_args: params.templateParams.prompt_args
+          };
+          console.log('⚡ OMNI_STORE: Using template params from module:', templateParams);
+        } else {
+          // Fallback for direct calls without module
+          templateParams = {
+            prompt_name: 'general_content_prompt',
+            prompt_args: {
+              subject: params.topic || params.subject || params.prompt || 'Content generation request',
+              content_type: params.contentType || 'text',
+              tone: params.tone || 'professional',
+              length: params.length || 'medium',
+              depth: 'deep',
+              reference_text: params.context || 'Generate comprehensive content based on the given topic'
+            }
+          };
+          console.log('⚡ OMNI_STORE: Using fallback template params:', templateParams);
+        }
+        
+        // Call chatService with template parameters (following new API format)
+        await chatService.sendMessage(params.prompt || 'Generate content', {
           onMessageStart: (messageId, status) => {
             logger.debug(LogCategory.ARTIFACT_CREATION, 'Omni generation message started', { messageId, status });
           },
           onMessageContent: (contentChunk) => {
             logger.debug(LogCategory.ARTIFACT_CREATION, 'Omni generation content chunk', { contentChunk });
           },
-          onMessageComplete: () => {
+          onMessageComplete: (completeMessage) => {
             setOmniGenerating(false);
+            
+            // 从完整消息中获取生成的内容
+            if (completeMessage && completeMessage.trim()) {
+              setOmniGeneratedContent(completeMessage);
+              
+              // 标记widget有artifacts
+              const { markWidgetWithArtifacts } = useAppStore.getState();
+              markWidgetWithArtifacts('omni');
+              
+              logger.info(LogCategory.ARTIFACT_CREATION, 'Omni content extracted from complete message', { 
+                contentLength: completeMessage.length,
+                contentPreview: completeMessage.substring(0, 100) + '...'
+              });
+            } else {
+              console.log('⚡ OMNI_STORE: No complete message content provided');
+            }
+            
             logger.info(LogCategory.ARTIFACT_CREATION, 'Omni generation message completed');
           },
           onArtifactCreated: (artifact) => {
-            if (artifact.content) {
+            // 保留作为备用，但主要逻辑已转移到onMessageComplete
+            if (artifact.content && !get().generatedContent) {
+              console.log('⚡ OMNI_STORE: Fallback - using artifact for content (onMessageComplete may have failed)');
               setOmniGeneratedContent(artifact.content);
-              logger.info(LogCategory.ARTIFACT_CREATION, 'Omni content artifact created', { 
+              
+              // 标记widget有artifacts
+              const { markWidgetWithArtifacts } = useAppStore.getState();
+              markWidgetWithArtifacts('omni');
+              
+              logger.info(LogCategory.ARTIFACT_CREATION, 'Omni content artifact created (fallback)', { 
                 artifactId: artifact.id,
                 contentLength: artifact.content.length 
               });
@@ -362,12 +576,10 @@ Please create comprehensive content that meets these specifications and return i
             });
           }
         }, {
-          session_id: 'omni_widget',
-          user_id: 'widget_user',
-          template_parameters: {
-            widget_type: 'omni',
-            ...params
-          }
+          session_id: `omni_widget_${Date.now()}`,
+          user_id: 'user_123', // TODO: Get from auth store
+          prompt_name: templateParams.prompt_name,
+          prompt_args: templateParams.prompt_args
         });
         
       } catch (error) {
@@ -424,6 +636,13 @@ export const useAssistantWidgetStore = create<AssistantWidgetStore>()(
       setAssistantContext(params);
       
       try {
+        // Check if we have template parameters from AssistantWidgetModule
+        if (params.templateParams) {
+          console.log('🤖 ASSISTANT_STORE: Using template params from module:', params.templateParams);
+        } else {
+          console.log('🤖 ASSISTANT_STORE: No template params from module, using fallback');
+        }
+        
         // Build assistant-specific prompt
         const assistantPrompt = `Assistant request: ${params.query || params.prompt}
 ${params.context ? `Context: ${params.context}` : ''}
@@ -431,7 +650,32 @@ ${params.task ? `Task: ${params.task}` : ''}
 
 Please provide helpful assistance based on this request.`;
         
-        logger.info(LogCategory.ARTIFACT_CREATION, 'Starting assistant request via chatService', { params });
+        logger.info(LogCategory.ARTIFACT_CREATION, 'Starting assistant request via chatService', { 
+          params,
+          hasTemplateParams: !!params.templateParams
+        });
+        
+        // Use template parameters from AssistantWidgetModule (like other widgets)
+        let templateParams;
+        if (params.templateParams) {
+          templateParams = {
+            prompt_name: params.templateParams.template_id,
+            prompt_args: params.templateParams.prompt_args
+          };
+          console.log('🤖 ASSISTANT_STORE: Using template params from module:', templateParams);
+        } else {
+          // Fallback for direct calls without module
+          templateParams = {
+            prompt_name: 'general_content_prompt',
+            prompt_args: {
+              subject: params.query || params.prompt || params.message || 'Assistant request',
+              depth: 'medium',
+              reference_text: params.context || '',
+              user_message: params.query || params.message || 'Please provide assistance'
+            }
+          };
+          console.log('🤖 ASSISTANT_STORE: Using fallback template params:', templateParams);
+        }
         
         // Call chatService following useChatStore pattern
         await chatService.sendMessage(assistantPrompt, {
@@ -441,19 +685,48 @@ Please provide helpful assistance based on this request.`;
           onMessageContent: (contentChunk) => {
             logger.debug(LogCategory.ARTIFACT_CREATION, 'Assistant request content chunk', { contentChunk });
           },
-          onMessageComplete: () => {
+          onMessageComplete: (completeMessage) => {
             setAssistantProcessing(false);
+            
+            // 从完整消息中获取助手响应
+            if (completeMessage && completeMessage.trim()) {
+              // Update context with the assistant response
+              setAssistantContext({
+                ...params,
+                response: completeMessage,
+                timestamp: new Date().toISOString()
+              });
+              
+              // 标记widget有artifacts
+              const { markWidgetWithArtifacts } = useAppStore.getState();
+              markWidgetWithArtifacts('assistant');
+              
+              logger.info(LogCategory.ARTIFACT_CREATION, 'Assistant response extracted from complete message', { 
+                contentLength: completeMessage.length,
+                contentPreview: completeMessage.substring(0, 100) + '...'
+              });
+            } else {
+              console.log('🤖 ASSISTANT_STORE: No complete message content provided');
+            }
+            
             logger.info(LogCategory.ARTIFACT_CREATION, 'Assistant request message completed');
           },
           onArtifactCreated: (artifact) => {
-            if (artifact.content) {
+            // 保留作为备用，但主要逻辑已转移到onMessageComplete
+            if (artifact.content && !get().conversationContext?.response) {
+              console.log('🤖 ASSISTANT_STORE: Fallback - using artifact for response (onMessageComplete may have failed)');
               // Update context with the assistant response
               setAssistantContext({
                 ...params,
                 response: artifact.content,
                 timestamp: new Date().toISOString()
               });
-              logger.info(LogCategory.ARTIFACT_CREATION, 'Assistant response artifact created', { 
+              
+              // 标记widget有artifacts
+              const { markWidgetWithArtifacts } = useAppStore.getState();
+              markWidgetWithArtifacts('assistant');
+              
+              logger.info(LogCategory.ARTIFACT_CREATION, 'Assistant response artifact created (fallback)', { 
                 artifactId: artifact.id,
                 contentLength: artifact.content.length 
               });
@@ -467,12 +740,10 @@ Please provide helpful assistance based on this request.`;
             });
           }
         }, {
-          session_id: 'assistant_widget',
-          user_id: 'widget_user',
-          template_parameters: {
-            widget_type: 'assistant',
-            ...params
-          }
+          session_id: `assistant_widget_${Date.now()}`,
+          user_id: 'user_123', // TODO: Get from auth store
+          prompt_name: templateParams.prompt_name,
+          prompt_args: templateParams.prompt_args
         });
         
       } catch (error) {
@@ -534,11 +805,22 @@ export const useDataScientistWidgetStore = create<DataScientistWidgetStore>()(
     triggerDataScientistAnalysis: async (params) => {
       const { setDataScientistAnalyzing, setDataScientistParams, setDataScientistAnalysisResult } = get();
       
+      // 记录widget使用（用户真正使用了功能）
+      const { recordWidgetUsage } = useAppStore.getState();
+      recordWidgetUsage('data-scientist');
+      
       // Set analyzing state and params
       setDataScientistAnalyzing(true);
       setDataScientistParams(params);
       
       try {
+        // Check if we have template parameters from DataScientistWidgetModule
+        if (params.templateParams) {
+          console.log('📊 DATA_SCIENTIST_STORE: Using template params from module:', params.templateParams);
+        } else {
+          console.log('📊 DATA_SCIENTIST_STORE: No template params from module, using fallback');
+        }
+        
         // Build data scientist-specific prompt
         const dataScientistPrompt = `Perform data analysis with the following specifications:
 Query: ${params.query || 'General data analysis'}
@@ -548,7 +830,32 @@ ${params.data ? `Data: ${typeof params.data === 'string' ? params.data : 'File p
 
 Please provide comprehensive data analysis including insights, recommendations, and visualizations as a data_analysis artifact.`;
         
-        logger.info(LogCategory.ARTIFACT_CREATION, 'Starting data scientist analysis via chatService', { params });
+        logger.info(LogCategory.ARTIFACT_CREATION, 'Starting data scientist analysis via chatService', { 
+          params,
+          hasTemplateParams: !!params.templateParams
+        });
+        
+        // Use template parameters from DataScientistWidgetModule (like Dream and Hunt)
+        let templateParams;
+        if (params.templateParams) {
+          templateParams = {
+            prompt_name: params.templateParams.template_id,
+            prompt_args: params.templateParams.prompt_args
+          };
+          console.log('📊 DATA_SCIENTIST_STORE: Using template params from module:', templateParams);
+        } else {
+          // Fallback for direct calls without module
+          templateParams = {
+            prompt_name: 'csv_analyze_prompt',
+            prompt_args: {
+              query: params.query || dataScientistPrompt,
+              analysis_type: params.analysisType || 'exploratory',
+              visualization_type: params.visualizationType || 'chart',
+              data_context: params.data ? 'CSV data provided' : 'Request for data analysis'
+            }
+          };
+          console.log('📊 DATA_SCIENTIST_STORE: Using fallback template params:', templateParams);
+        }
         
         // Call chatService following useChatStore pattern
         await chatService.sendMessage(dataScientistPrompt, {
@@ -558,16 +865,60 @@ Please provide comprehensive data analysis including insights, recommendations, 
           onMessageContent: (contentChunk) => {
             logger.debug(LogCategory.ARTIFACT_CREATION, 'DataScientist analysis content chunk', { contentChunk });
           },
-          onMessageComplete: () => {
+          onMessageComplete: (completeMessage) => {
             setDataScientistAnalyzing(false);
+            
+            // 从完整消息中获取分析结果
+            if (completeMessage && completeMessage.trim()) {
+              // 标记widget有artifacts
+              const { markWidgetWithArtifacts } = useAppStore.getState();
+              markWidgetWithArtifacts('data-scientist');
+              
+              try {
+                // 尝试解析为JSON
+                const analysisResult = JSON.parse(completeMessage);
+                setDataScientistAnalysisResult(analysisResult);
+                logger.info(LogCategory.ARTIFACT_CREATION, 'DataScientist analysis extracted from complete message (JSON)', { 
+                  hasInsights: !!analysisResult.analysis?.insights?.length,
+                  contentLength: completeMessage.length
+                });
+              } catch (parseError) {
+                // 如果不是JSON，作为纯文本存储并构建标准格式
+                setDataScientistAnalysisResult({
+                  analysis: {
+                    summary: completeMessage,
+                    insights: [],
+                    recommendations: []
+                  },
+                  visualizations: [],
+                  statistics: {
+                    dataPoints: 0,
+                    columns: []
+                  }
+                });
+                logger.info(LogCategory.ARTIFACT_CREATION, 'DataScientist analysis extracted from complete message (text)', { 
+                  contentLength: completeMessage.length,
+                  contentPreview: completeMessage.substring(0, 100) + '...'
+                });
+              }
+            } else {
+              console.log('📊 DATASCIENTIST_STORE: No complete message content provided');
+            }
+            
             logger.info(LogCategory.ARTIFACT_CREATION, 'DataScientist analysis message completed');
           },
           onArtifactCreated: (artifact) => {
-            if (artifact.content) {
+            // 保留作为备用，但主要逻辑已转移到onMessageComplete
+            if (artifact.content && !get().analysisResult) {
+              console.log('📊 DATASCIENTIST_STORE: Fallback - using artifact for analysis (onMessageComplete may have failed)');
+              // 标记widget有artifacts
+              const { markWidgetWithArtifacts } = useAppStore.getState();
+              markWidgetWithArtifacts('data-scientist');
+              
               try {
                 const analysisResult = JSON.parse(artifact.content);
                 setDataScientistAnalysisResult(analysisResult);
-                logger.info(LogCategory.ARTIFACT_CREATION, 'DataScientist analysis artifact created', { 
+                logger.info(LogCategory.ARTIFACT_CREATION, 'DataScientist analysis artifact created (fallback, JSON)', { 
                   artifactId: artifact.id,
                   hasInsights: !!analysisResult.analysis?.insights?.length 
                 });
@@ -585,7 +936,7 @@ Please provide comprehensive data analysis including insights, recommendations, 
                     columns: []
                   }
                 });
-                logger.info(LogCategory.ARTIFACT_CREATION, 'DataScientist text analysis artifact created', { 
+                logger.info(LogCategory.ARTIFACT_CREATION, 'DataScientist text analysis artifact created (fallback)', { 
                   artifactId: artifact.id
                 });
               }
@@ -599,17 +950,198 @@ Please provide comprehensive data analysis including insights, recommendations, 
             });
           }
         }, {
-          session_id: 'data_scientist_widget',
-          user_id: 'widget_user',
-          template_parameters: {
-            widget_type: 'data_scientist',
-            ...params
-          }
+          session_id: `data_scientist_widget_${Date.now()}`,
+          user_id: 'user_123', // TODO: Get from auth store
+          prompt_name: templateParams.prompt_name,
+          prompt_args: templateParams.prompt_args
         });
         
       } catch (error) {
         setDataScientistAnalyzing(false);
         logger.error(LogCategory.ARTIFACT_CREATION, 'DataScientist analysis request failed', { error, params });
+      }
+    }
+  }))
+);
+
+// Knowledge Widget State
+interface KnowledgeWidgetState {
+  documents: any[];
+  isProcessing: boolean;
+  lastParams: any;
+  analysisResult: string | null;
+}
+
+interface KnowledgeWidgetActions {
+  setKnowledgeDocuments: (documents: any[]) => void;
+  setKnowledgeProcessing: (isProcessing: boolean) => void;
+  setKnowledgeParams: (params: any) => void;
+  setKnowledgeAnalysisResult: (result: string | null) => void;
+  clearKnowledgeData: () => void;
+  triggerKnowledgeAnalysis: (params: any) => Promise<void>;
+}
+
+export type KnowledgeWidgetStore = KnowledgeWidgetState & KnowledgeWidgetActions;
+
+export const useKnowledgeWidgetStore = create<KnowledgeWidgetStore>()(
+  subscribeWithSelector((set, get) => ({
+    // 初始状态
+    documents: [],
+    isProcessing: false,
+    lastParams: null,
+    analysisResult: null,
+    
+    // Knowledge操作
+    setKnowledgeDocuments: (documents) => {
+      set({ documents });
+      logger.debug(LogCategory.ARTIFACT_CREATION, 'Knowledge documents updated', { 
+        documentCount: documents.length 
+      });
+    },
+    
+    setKnowledgeProcessing: (isProcessing) => {
+      set({ isProcessing });
+      logger.debug(LogCategory.ARTIFACT_CREATION, 'Knowledge processing state changed', { isProcessing });
+    },
+    
+    setKnowledgeParams: (params) => {
+      set({ lastParams: params });
+      logger.debug(LogCategory.ARTIFACT_CREATION, 'Knowledge params updated', { params });
+    },
+    
+    setKnowledgeAnalysisResult: (result) => {
+      set({ analysisResult: result });
+      logger.debug(LogCategory.ARTIFACT_CREATION, 'Knowledge analysis result updated', { 
+        hasResult: !!result 
+      });
+    },
+    
+    clearKnowledgeData: () => {
+      set({ documents: [], isProcessing: false, lastParams: null, analysisResult: null });
+      logger.debug(LogCategory.ARTIFACT_CREATION, 'Knowledge widget data cleared');
+    },
+    
+    // New method: Trigger knowledge analysis via chatService
+    triggerKnowledgeAnalysis: async (params) => {
+      const { setKnowledgeProcessing, setKnowledgeParams, setKnowledgeAnalysisResult, setKnowledgeDocuments } = get();
+      
+      // 记录widget使用（用户真正使用了功能）
+      const { recordWidgetUsage } = useAppStore.getState();
+      recordWidgetUsage('knowledge');
+      
+      // Set processing state and params
+      setKnowledgeProcessing(true);
+      setKnowledgeParams(params);
+      
+      try {
+        // Check if we have template parameters from KnowledgeWidgetModule
+        if (params.templateParams) {
+          console.log('📚 KNOWLEDGE_STORE: Using template params from module:', params.templateParams);
+        } else {
+          console.log('📚 KNOWLEDGE_STORE: No template params from module, using fallback');
+        }
+        
+        // Build knowledge-specific prompt
+        const knowledgePrompt = `Analyze the following document(s) and provide insights:
+Query: ${params.query || 'General document analysis'}
+${params.documents ? `Documents: ${params.documents.length} file(s) provided` : ''}
+${params.analysisType ? `Analysis Type: ${params.analysisType}` : ''}
+
+Please provide comprehensive analysis and insights based on the provided content.`;
+        
+        logger.info(LogCategory.ARTIFACT_CREATION, 'Starting knowledge analysis via chatService', { 
+          params,
+          hasTemplateParams: !!params.templateParams
+        });
+        
+        // Use template parameters from KnowledgeWidgetModule (like other widgets)
+        let templateParams;
+        if (params.templateParams) {
+          templateParams = {
+            prompt_name: params.templateParams.template_id,
+            prompt_args: params.templateParams.prompt_args
+          };
+          console.log('📚 KNOWLEDGE_STORE: Using template params from module:', templateParams);
+        } else {
+          // Fallback for direct calls without module
+          templateParams = {
+            prompt_name: 'document_analysis_prompt',
+            prompt_args: {
+              query: params.query || knowledgePrompt,
+              analysis_type: params.analysisType || 'comprehensive',
+              document_context: params.documents ? `${params.documents.length} documents provided` : 'Document analysis request'
+            }
+          };
+          console.log('📚 KNOWLEDGE_STORE: Using fallback template params:', templateParams);
+        }
+        
+        // Store documents if provided
+        if (params.documents && params.documents.length > 0) {
+          setKnowledgeDocuments(params.documents);
+        }
+        
+        // Call chatService following useChatStore pattern
+        await chatService.sendMessage(knowledgePrompt, {
+          onMessageStart: (messageId, status) => {
+            logger.debug(LogCategory.ARTIFACT_CREATION, 'Knowledge analysis message started', { messageId, status });
+          },
+          onMessageContent: (contentChunk) => {
+            logger.debug(LogCategory.ARTIFACT_CREATION, 'Knowledge analysis content chunk', { contentChunk });
+          },
+          onMessageComplete: (completeMessage) => {
+            setKnowledgeProcessing(false);
+            
+            // 从完整消息中获取分析结果
+            if (completeMessage && completeMessage.trim()) {
+              setKnowledgeAnalysisResult(completeMessage);
+              
+              // 标记widget有artifacts
+              const { markWidgetWithArtifacts } = useAppStore.getState();
+              markWidgetWithArtifacts('knowledge');
+              
+              logger.info(LogCategory.ARTIFACT_CREATION, 'Knowledge analysis extracted from complete message', { 
+                contentLength: completeMessage.length,
+                contentPreview: completeMessage.substring(0, 100) + '...'
+              });
+            } else {
+              console.log('📚 KNOWLEDGE_STORE: No complete message content provided');
+            }
+            
+            logger.info(LogCategory.ARTIFACT_CREATION, 'Knowledge analysis message completed');
+          },
+          onArtifactCreated: (artifact) => {
+            // 保留作为备用，但主要逻辑已转移到onMessageComplete
+            if (artifact.content && !get().analysisResult) {
+              console.log('📚 KNOWLEDGE_STORE: Fallback - using artifact for analysis (onMessageComplete may have failed)');
+              setKnowledgeAnalysisResult(artifact.content);
+              
+              // 标记widget有artifacts
+              const { markWidgetWithArtifacts } = useAppStore.getState();
+              markWidgetWithArtifacts('knowledge');
+              
+              logger.info(LogCategory.ARTIFACT_CREATION, 'Knowledge analysis artifact created (fallback)', { 
+                artifactId: artifact.id,
+                contentLength: artifact.content.length 
+              });
+            }
+          },
+          onError: (error) => {
+            setKnowledgeProcessing(false);
+            logger.error(LogCategory.ARTIFACT_CREATION, 'Knowledge analysis failed', { 
+              error: error.message, 
+              params 
+            });
+          }
+        }, {
+          session_id: `knowledge_widget_${Date.now()}`,
+          user_id: 'user_123', // TODO: Get from auth store
+          prompt_name: templateParams.prompt_name,
+          prompt_args: templateParams.prompt_args
+        });
+        
+      } catch (error) {
+        setKnowledgeProcessing(false);
+        logger.error(LogCategory.ARTIFACT_CREATION, 'Knowledge analysis request failed', { error, params });
       }
     }
   }))
@@ -634,7 +1166,8 @@ export const useDreamActions = () => useDreamWidgetStore(state => ({
 export const useHuntState = () => useHuntWidgetStore(state => ({
   searchResults: state.searchResults,
   isSearching: state.isSearching,
-  lastQuery: state.lastQuery
+  lastQuery: state.lastQuery,
+  currentStatus: state.currentStatus
 }));
 
 export const useHuntActions = () => useHuntWidgetStore(state => ({
@@ -688,6 +1221,23 @@ export const useDataScientistActions = () => useDataScientistWidgetStore(state =
   triggerDataScientistAnalysis: state.triggerDataScientistAnalysis
 }));
 
+// Widget选择器 - Knowledge
+export const useKnowledgeState = () => useKnowledgeWidgetStore(state => ({
+  documents: state.documents,
+  isProcessing: state.isProcessing,
+  lastParams: state.lastParams,
+  analysisResult: state.analysisResult
+}));
+
+export const useKnowledgeActions = () => useKnowledgeWidgetStore(state => ({
+  setKnowledgeDocuments: state.setKnowledgeDocuments,
+  setKnowledgeProcessing: state.setKnowledgeProcessing,
+  setKnowledgeParams: state.setKnowledgeParams,
+  setKnowledgeAnalysisResult: state.setKnowledgeAnalysisResult,
+  clearKnowledgeData: state.clearKnowledgeData,
+  triggerKnowledgeAnalysis: state.triggerKnowledgeAnalysis
+}));
+
 // 统一的Widget清理操作
 export const clearAllWidgetData = () => {
   useDreamWidgetStore.getState().clearDreamData();
@@ -695,5 +1245,6 @@ export const clearAllWidgetData = () => {
   useOmniWidgetStore.getState().clearOmniData();
   useAssistantWidgetStore.getState().clearAssistantData();
   useDataScientistWidgetStore.getState().clearDataScientistData();
+  useKnowledgeWidgetStore.getState().clearKnowledgeData();
   logger.debug(LogCategory.ARTIFACT_CREATION, 'All widget data cleared');
 };

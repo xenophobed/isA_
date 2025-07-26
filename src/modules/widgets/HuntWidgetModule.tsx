@@ -1,186 +1,244 @@
 /**
  * ============================================================================
- * Hunt Widget Module (HuntWidgetModule.tsx) - Hunt小部件的业务逻辑模块
+ * Hunt Widget Module (HuntWidgetModule.tsx) - Refactored with BaseWidgetModule
  * ============================================================================
  * 
- * 【核心职责】
- * - 处理Hunt小部件的所有业务逻辑
- * - 管理产品搜索和比较的流程
- * - 封装搜索参数处理和结果管理
- * - 向纯UI组件提供数据和事件回调
+ * Core Responsibilities:
+ * - Uses BaseWidgetModule for standardized widget management
+ * - Provides Hunt-specific configuration and customizations
+ * - Manages AI search business logic with 4 specialized search modes
+ * - Integrates seamlessly with BaseWidget UI components
  * 
- * 【关注点分离】
- * ✅ 负责：
- *   - Hunt小部件业务逻辑的统一管理
- *   - 搜索API和状态管理的集成
- *   - 产品搜索请求的协调
- *   - 用户输入的处理和验证
- *   - 搜索结果的处理和格式化
- * 
- * ❌ 不负责：
- *   - UI布局和样式处理（由HuntWidget UI组件处理）
- *   - 组件的直接渲染（由UI components处理）
- *   - 底层数据存储（由stores处理）
- *   - 网络通信（由api处理）
- * 
- * 【数据流向】
- * WidgetManager → HuntWidgetModule → HuntWidget UI
- * hooks → HuntWidgetModule → 事件回调 → stores → api/services
+ * Benefits of BaseWidgetModule integration:
+ * - Automatic output history management for search results
+ * - Built-in edit and management actions
+ * - Streaming status display
+ * - Standard error handling and logging
+ * - Consistent UI patterns across all widgets
  */
-import React, { useCallback, useEffect } from 'react';
-import { useWidget, useWidgetActions } from '../../hooks/useWidget';
+import React, { ReactNode } from 'react';
+import { BaseWidgetModule, createWidgetConfig } from './BaseWidgetModule';
 import { HuntWidgetParams, HuntWidgetResult } from '../../types/widgetTypes';
-import { logger, LogCategory } from '../../utils/logger';
-import { widgetHandler } from '../../components/core/WidgetHandler';
+import { EditAction, ManagementAction } from '../../components/ui/widgets/BaseWidget';
+import { useHuntState } from '../../stores/useWidgetStores';
 
 interface HuntWidgetModuleProps {
   triggeredInput?: string;
   onSearchCompleted?: (results: HuntWidgetResult) => void;
-  children: (moduleProps: {
-    isSearching: boolean;
-    searchResults: any[];
-    lastQuery: string;
-    onSearch: (params: HuntWidgetParams) => Promise<void>;
-    onClearResults: () => void;
-  }) => React.ReactNode;
+  children: ReactNode;
 }
 
 /**
- * Hunt Widget Module - Business logic module for Hunt widget
+ * Hunt Widget Module - Template mapping and configuration for 4 search modes
  * 
- * This module:
- * - Uses hooks to get hunt widget state and AI client
- * - Handles all product search business logic
- * - Manages user input processing and validation
- * - Passes pure data and callbacks to Hunt UI component
- * - Keeps Hunt UI component pure
+ * Search Modes:
+ * - ecommerce: E-commerce focused search (hunt_ecommerce_prompt)
+ * - academic: Academic research search (hunt_academic_prompt) 
+ * - social: Social media and community search (hunt_social_prompt)
+ * - general: General web search (hunt_general_prompt)
+ */
+
+// Hunt mode to MCP template mapping
+const HUNT_TEMPLATE_MAPPING = {
+  'ecommerce': {
+    template_id: 'hunt_ecommerce_prompt',
+    focus: 'product_research'
+  },
+  'academic': {
+    template_id: 'hunt_academic_prompt', 
+    focus: 'scholarly_research'
+  },
+  'social': {
+    template_id: 'hunt_social_prompt',
+    focus: 'social_sentiment'
+  },
+  'general': {
+    template_id: 'hunt_general_prompt',
+    focus: 'general_information'
+  }
+};
+
+// Hunt-specific template parameter preparation (像DreamModule一样)
+const prepareHuntTemplateParams = (params: HuntWidgetParams) => {
+  const { query, category = 'general', search_depth = 'standard', result_format = 'summary' } = params;
+  
+  const mapping = HUNT_TEMPLATE_MAPPING[category] || HUNT_TEMPLATE_MAPPING['general'];
+  
+  // Build prompt_args - query must be first!
+  const prompt_args = {
+    query: query || 'Search for information',
+    search_depth: search_depth,
+    result_format: result_format
+  };
+  
+  console.log('🔍 HUNT_MODULE: Prepared template params for mode', category, ':', {
+    template_id: mapping.template_id,
+    prompt_args
+  });
+  
+  return {
+    template_id: mapping.template_id,
+    prompt_args
+  };
+};
+
+// Hunt widget configuration
+const huntWidgetConfig = createWidgetConfig({
+  type: 'hunt',
+  title: 'HuntAI Search Intelligence',
+  icon: '🔍',
+  sessionIdPrefix: 'hunt_widget',
+  maxHistoryItems: 20,
+  
+  // Extract parameters from triggered input
+  extractParamsFromInput: (input: string) => ({
+    query: input.trim(),
+    category: 'general', // Default to general search
+    search_depth: 'standard',
+    result_format: 'summary'
+  }),
+  editActions: [
+    {
+      id: 'open_source',
+      label: 'Open',
+      icon: '🔗',
+      onClick: (content) => {
+        if (typeof content === 'object' && content?.url) {
+          window.open(content.url, '_blank');
+        }
+      }
+    },
+    {
+      id: 'copy_content', 
+      label: 'Copy',
+      icon: '📋',
+      onClick: (content) => {
+        const text = typeof content === 'object' ? content?.text || JSON.stringify(content) : content;
+        navigator.clipboard.writeText(text);
+      }
+    },
+    {
+      id: 'bookmark',
+      label: 'Save',
+      icon: '🔖', 
+      onClick: (content) => {
+        console.log('🔖 Bookmarking search result:', content);
+      }
+    }
+  ],
+  managementActions: [
+    {
+      id: 'search',
+      label: 'Search',
+      icon: '🔍',
+      onClick: () => console.log('🔍 Search mode active'),
+      variant: 'primary' as const,
+      disabled: false
+    },
+    {
+      id: 'crawler',
+      label: 'Crawler',
+      icon: '🕷️',
+      onClick: () => console.log('🕷️ Crawler mode - coming soon'),
+      disabled: true
+    },
+    {
+      id: 'automation',
+      label: 'Automation', 
+      icon: '🤖',
+      onClick: () => console.log('🤖 Automation mode - coming soon'),
+      disabled: true
+    },
+    {
+      id: 'other',
+      label: 'Other',
+      icon: '⚙️',
+      onClick: () => console.log('⚙️ Other tools - coming soon'),
+      disabled: true
+    }
+  ]
+});
+
+/**
+ * Hunt Widget Module - Uses BaseWidgetModule with Hunt-specific configuration
  */
 export const HuntWidgetModule: React.FC<HuntWidgetModuleProps> = ({
   triggeredInput,
   onSearchCompleted,
   children
 }) => {
-  // Get hunt widget state using hooks
-  const { huntState } = useWidget();
-  const { hunt: huntActions } = useWidgetActions();
+  // Read state from store
+  const { searchResults, isSearching, lastQuery } = useHuntState();
   
-  console.log('🔍 HUNT_MODULE: Providing data to Hunt UI:', {
-    isSearching: huntState.isSearching,
-    resultCount: huntState.searchResults.length,
-    lastQuery: huntState.lastQuery,
-    triggeredInput: triggeredInput?.substring(0, 50)
+  // Convert searchResults to outputHistory format for BaseWidget display
+  const outputHistory = React.useMemo(() => {
+    // Check if searchResults is a valid array
+    if (!Array.isArray(searchResults) || searchResults.length === 0) {
+      return [];
+    }
+    
+    return searchResults.map((result, index) => ({
+      id: `hunt_result_${Date.now()}_${index}`,
+      timestamp: result.timestamp || new Date().toISOString(),
+      type: 'text', // Use text type for better display
+      title: result.title || `Search Results for: ${lastQuery}`,
+      content: result.content || result.description || 'Search result',
+      metadata: {
+        query: result.query || lastQuery,
+        originalType: result.type || 'search_response',
+        url: result.url
+      }
+    }));
+  }, [searchResults, lastQuery]);
+  
+  console.log('🔍 HUNT_MODULE: Converting search results to output history:', {
+    searchResultsType: typeof searchResults,
+    searchResultsIsArray: Array.isArray(searchResults),
+    searchResultsCount: Array.isArray(searchResults) ? searchResults.length : 0,
+    outputHistoryCount: outputHistory.length,
+    latestResult: outputHistory[0]?.title
   });
   
-  // Business logic: Handle triggered input from chat
-  useEffect(() => {
-    if (triggeredInput && !huntState.isSearching) {
-      console.log('🔍 HUNT_MODULE: Processing triggered input:', triggeredInput);
-      
-      // Extract search query from triggered input
-      const query = extractQueryFromInput(triggeredInput);
-      if (query) {
-        const params: HuntWidgetParams = {
-          query,
-          category: 'all'
-        };
-        
-        handleSearch(params);
-      }
-    }
-  }, [triggeredInput, huntState.isSearching]);
-  
-  // Business logic: Extract search query from user input
-  const extractQueryFromInput = (input: string): string | null => {
-    const lowerInput = input.toLowerCase();
-    
-    // Common trigger patterns for product search
-    const patterns = [
-      /search (?:for )?(.+)/i,
-      /find (?:me )?(.+)/i,
-      /look (?:for|up) (.+)/i,
-      /hunt (?:for )?(.+)/i,
-      /show me (.+)/i,
-      /compare (.+)/i,
-      /buy (.+)/i,
-      /purchase (.+)/i
-    ];
-    
-    for (const pattern of patterns) {
-      const match = input.match(pattern);
-      if (match && match[1]) {
-        return match[1].trim();
-      }
-    }
-    
-    // If no pattern matches, check for product-related keywords
-    const productKeywords = ['laptop', 'phone', 'headphones', 'camera', 'book', 'clothes', 'shoes'];
-    if (productKeywords.some(keyword => lowerInput.includes(keyword))) {
-      return input;
-    }
-    
-    return null;
-  };
-  
-  // Business logic: Handle product search via WidgetHandler
-  const handleSearch = useCallback(async (params: HuntWidgetParams) => {
-    console.log('🔍 HUNT_MODULE: search called with:', params);
-    
-    if (!params.query) {
-      console.error('❌ HUNT_MODULE: No search query provided');
-      return;
-    }
-    
-    // Use WidgetHandler to route request to store → chatService → API
-    console.log('🔄 HUNT_MODULE: Routing request via WidgetHandler');
-    logger.info(LogCategory.ARTIFACT_CREATION, 'Hunt module routing request via WidgetHandler', { params });
-    
-    try {
-      await widgetHandler.processRequest({
-        type: 'hunt',
-        params,
-        sessionId: 'hunt_widget',
-        userId: 'widget_user'
-      });
-      
-      console.log('✅ HUNT_MODULE: Request successfully routed to store');
-    } catch (error) {
-      console.error('❌ HUNT_MODULE: WidgetHandler request failed:', error);
-      logger.error(LogCategory.ARTIFACT_CREATION, 'Hunt WidgetHandler request failed', { error, params });
-    }
-    
-  }, []);
-  
-  // Monitor hunt state changes to notify parent component
-  useEffect(() => {
-    if (huntState.searchResults.length > 0 && !huntState.isSearching) {
-      // Notify parent component when search is completed
-      const result: HuntWidgetResult = {
-        products: huntState.searchResults,
-        totalResults: huntState.searchResults.length,
-        searchQuery: huntState.lastQuery
-      };
-      onSearchCompleted?.(result);
-      logger.info(LogCategory.ARTIFACT_CREATION, 'Hunt search completed, parent notified');
-    }
-  }, [huntState.searchResults, huntState.isSearching, huntState.lastQuery, onSearchCompleted]);
-  
-  // Business logic: Clear search results
-  const handleClearResults = useCallback(() => {
-    console.log('🔍 HUNT_MODULE: Clearing search results');
-    huntActions.clearHuntData();
-    logger.info(LogCategory.ARTIFACT_CREATION, 'Hunt search results cleared');
-  }, [huntActions]);
-  
-  // Pass all data and business logic callbacks to pure UI component
   return (
-    <>
-      {children({
-        isSearching: huntState.isSearching,
-        searchResults: huntState.searchResults,
-        lastQuery: huntState.lastQuery,
-        onSearch: handleSearch,
-        onClearResults: handleClearResults
-      })}
-    </>
+    <BaseWidgetModule
+      config={huntWidgetConfig}
+      triggeredInput={triggeredInput}
+      onCompleted={onSearchCompleted}
+    >
+      {(moduleProps) => {
+        // Pass store state to HuntWidget via props with template support
+        if (React.isValidElement(children)) {
+          return React.cloneElement(children, {
+            ...children.props,
+            // Store state
+            searchResults,
+            isSearching,
+            lastQuery,
+            // Add onSearch function with template parameter preparation (like Dream)
+            onSearch: async (params: HuntWidgetParams) => {
+              // Prepare template parameters based on the selected mode
+              const templateParams = prepareHuntTemplateParams(params);
+              
+              // Add template information to params before sending to store
+              const enrichedParams = {
+                ...params,
+                templateParams // Add template configuration
+              };
+              
+              console.log('🔍 HUNT_MODULE: Sending enriched params to store:', enrichedParams);
+              await moduleProps.startProcessing(enrichedParams);
+            },
+            // BaseWidget state with converted data
+            outputHistory: outputHistory, // Use converted data instead of moduleProps.outputHistory
+            currentOutput: outputHistory[0] || null, // Show latest result as current
+            isStreaming: moduleProps.isStreaming,
+            streamingContent: moduleProps.streamingContent,
+            onSelectOutput: moduleProps.onSelectOutput,
+            onClearHistory: moduleProps.onClearHistory
+          });
+        }
+        return children;
+      }}
+    </BaseWidgetModule>
   );
 };

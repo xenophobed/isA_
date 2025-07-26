@@ -21,6 +21,118 @@ import { BaseWidgetModule, createWidgetConfig } from './BaseWidgetModule';
 import { DreamWidgetParams, DreamWidgetResult } from '../../types/widgetTypes';
 import { EditAction, ManagementAction } from '../../components/ui/widgets/BaseWidget';
 
+// Dream mode to MCP template mapping (based on the 9 MCP prompts)
+const DREAM_TEMPLATE_MAPPING = {
+  'text_to_image': {
+    template_id: 'text_to_image_prompt',
+    defaultArgs: { style_preset: 'photorealistic', quality: 'high' }
+  },
+  'image_to_image': {
+    template_id: 'image_to_image_prompt', 
+    defaultArgs: { style_preset: 'enhanced', strength: 'medium' }
+  },
+  'style_transfer': {
+    template_id: 'style_transfer_prompt',
+    defaultArgs: { style_preset: 'impressionist', strength: 'medium' }
+  },
+  'face_swap': {
+    template_id: 'face_swap_prompt',
+    defaultArgs: { hair_source: 'preserve', quality: 'professional' }
+  },
+  'professional_headshot': {
+    template_id: 'professional_headshot_prompt',
+    defaultArgs: { industry: 'corporate', quality: 'executive' }
+  },
+  'emoji_generation': {
+    template_id: 'emoji_generation_prompt',
+    defaultArgs: { expression: 'happy', style_preset: 'kawaii', color_scheme: 'vibrant' }
+  },
+  'photo_inpainting': {
+    template_id: 'photo_inpainting_prompt',
+    defaultArgs: { fill_method: 'content_aware', strength: 'seamless' }
+  },
+  'photo_outpainting': {
+    template_id: 'photo_outpainting_prompt', 
+    defaultArgs: { direction: 'all_sides', strength: 'natural' }
+  },
+  'sticker_generation': {
+    template_id: 'sticker_generation_prompt',
+    defaultArgs: { style_preset: 'kawaii', theme: 'cute_animal' }
+  }
+};
+
+// Prepare template parameters based on dream mode and user params
+const prepareDreamTemplateParams = (params: DreamWidgetParams) => {
+  const mode = params.style || 'text_to_image'; // Use 'style' field as mode
+  const mapping = DREAM_TEMPLATE_MAPPING[mode] || DREAM_TEMPLATE_MAPPING['text_to_image'];
+  
+  // Build prompt_args based on the mode - ONLY include relevant parameters for each template
+  // IMPORTANT: prompt must be first in the object!
+  const prompt_args = {
+    prompt: params.prompt || 'Generate an image',
+    ...mapping.defaultArgs
+  };
+  
+  // Add mode-specific parameters ONLY for the current template
+  switch (mode) {
+    case 'text_to_image':
+      if (params.style_preset) prompt_args.style_preset = params.style_preset;
+      if (params.quality) prompt_args.quality = params.quality;
+      break;
+      
+    case 'image_to_image':
+      if (params.style_preset) prompt_args.style_preset = params.style_preset;
+      if (params.strength) prompt_args.strength = params.strength;
+      break;
+      
+    case 'style_transfer':
+      if (params.style_preset) prompt_args.style_preset = params.style_preset;
+      if (params.strength) prompt_args.strength = params.strength;
+      break;
+      
+    case 'face_swap':
+      if (params.hair_source) prompt_args.hair_source = params.hair_source;
+      if (params.quality) prompt_args.quality = params.quality;
+      break;
+      
+    case 'professional_headshot':
+      if (params.industry) prompt_args.industry = params.industry;
+      if (params.quality) prompt_args.quality = params.quality;
+      break;
+      
+    case 'emoji_generation':
+      if (params.expression) prompt_args.expression = params.expression;
+      if (params.style_preset) prompt_args.style_preset = params.style_preset;
+      if (params.color_scheme) prompt_args.color_scheme = params.color_scheme;
+      break;
+      
+    case 'photo_inpainting':
+      if (params.fill_method) prompt_args.fill_method = params.fill_method;
+      if (params.strength) prompt_args.strength = params.strength;
+      break;
+      
+    case 'photo_outpainting':
+      if (params.direction) prompt_args.direction = params.direction;
+      if (params.strength) prompt_args.strength = params.strength;
+      break;
+      
+    case 'sticker_generation':
+      if (params.style_preset) prompt_args.style_preset = params.style_preset;
+      if (params.theme) prompt_args.theme = params.theme;
+      break;
+  }
+  
+  console.log('🎨 DREAM_MODULE: Prepared template params for mode', mode, ':', {
+    template_id: mapping.template_id,
+    prompt_args
+  });
+  
+  return {
+    template_id: mapping.template_id,
+    prompt_args
+  };
+};
+
 // Dream-specific edit actions
 const dreamEditActions: EditAction[] = [
   {
@@ -143,13 +255,19 @@ const dreamConfig = createWidgetConfig<DreamWidgetParams, DreamWidgetResult>({
 // Module props interface
 interface DreamWidgetModuleProps {
   triggeredInput?: string;
-  onImageGenerated?: (imageUrl: string, prompt: string) => void;
   children: (moduleProps: {
     isGenerating: boolean;
     generatedImage: string | null;
     lastParams: DreamWidgetParams | null;
     onGenerateImage: (params: DreamWidgetParams) => Promise<void>;
     onClearImage: () => void;
+    // Add BaseWidget props for UI display
+    outputHistory: any[];
+    currentOutput: any | null;
+    isStreaming: boolean;
+    streamingContent: string;
+    onSelectOutput: (item: any) => void;
+    onClearHistory: () => void;
   }) => ReactNode;
 }
 
@@ -164,24 +282,16 @@ interface DreamWidgetModuleProps {
  */
 export const DreamWidgetModule: React.FC<DreamWidgetModuleProps> = ({
   triggeredInput,
-  onImageGenerated,
   children
 }) => {
   console.log('🎨 DREAM_MODULE: Initializing with BaseWidgetModule architecture', {
-    hasTriggeredInput: !!triggeredInput,
-    hasCallback: !!onImageGenerated
+    hasTriggeredInput: !!triggeredInput
   });
 
   return (
     <BaseWidgetModule 
       config={dreamConfig}
       triggeredInput={triggeredInput}
-      onResultGenerated={(result) => {
-        // Transform result to expected format and call parent callback
-        if (result?.imageUrl && result?.prompt) {
-          onImageGenerated?.(result.imageUrl, result.prompt);
-        }
-      }}
     >
       {(moduleProps) => {
         // Transform BaseWidgetModule props to match original DreamWidgetModule interface
@@ -190,11 +300,28 @@ export const DreamWidgetModule: React.FC<DreamWidgetModuleProps> = ({
           generatedImage: moduleProps.currentOutput?.content || null,
           lastParams: moduleProps.currentOutput?.params || null,
           onGenerateImage: async (params: DreamWidgetParams) => {
-            await moduleProps.startProcessing(params);
+            // Prepare template parameters based on the selected mode
+            const templateParams = prepareDreamTemplateParams(params);
+            
+            // Add template information to params before sending to store
+            const enrichedParams = {
+              ...params,
+              templateParams // Add template configuration
+            };
+            
+            console.log('🎨 DREAM_MODULE: Sending enriched params to store:', enrichedParams);
+            await moduleProps.startProcessing(enrichedParams);
           },
           onClearImage: () => {
             moduleProps.onClearHistory();
-          }
+          },
+          // Pass through BaseWidget props for UI display
+          outputHistory: moduleProps.outputHistory,
+          currentOutput: moduleProps.currentOutput,
+          isStreaming: moduleProps.isStreaming,
+          streamingContent: moduleProps.streamingContent,
+          onSelectOutput: moduleProps.onSelectOutput,
+          onClearHistory: moduleProps.onClearHistory
         };
         
         return children(legacyProps);

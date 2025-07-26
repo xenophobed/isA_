@@ -15,6 +15,8 @@
  * 3. Management Area (Bottom): Quick action menu and toolbar
  */
 import React, { useState, ReactNode } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // Output history item interface
 interface OutputHistoryItem {
@@ -99,6 +101,8 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
 
   // Render output content
   const renderOutputContent = (content: any, type: string) => {
+    console.log('🖼️ BASEWIDGET: Rendering content:', { type, content, hasContent: !!content });
+    
     switch (type) {
       case 'image':
         return (
@@ -106,7 +110,156 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
             src={content} 
             alt="Output" 
             className="max-w-full h-auto rounded border border-white/10"
+            onLoad={() => console.log('🖼️ BASEWIDGET: Image loaded successfully:', content)}
+            onError={(e) => console.error('🖼️ BASEWIDGET: Image load error:', e, content)}
           />
+        );
+      case 'search_results':
+        // Perplexity-style search results display
+        return (
+          <div className="space-y-3">
+            {Array.isArray(content) ? content.map((result, index) => (
+              <div key={index} className="bg-white/5 rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors">
+                {/* Result Title */}
+                {result.title && (
+                  <h3 className="text-sm font-medium text-white mb-2 line-clamp-2">
+                    {result.title}
+                  </h3>
+                )}
+                
+                {/* Result URL */}
+                {result.url && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs text-blue-400">🔗</span>
+                    <a 
+                      href={result.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-400 hover:text-blue-300 truncate"
+                    >
+                      {result.url}
+                    </a>
+                  </div>
+                )}
+                
+                {/* Result Description/Content with Markdown */}
+                {result.description && (
+                  <div className="prose prose-invert prose-sm max-w-none">
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        h1: ({children}) => <h1 className="text-xs font-bold text-white mb-1">{children}</h1>,
+                        h2: ({children}) => <h2 className="text-xs font-semibold text-white mb-1">{children}</h2>,
+                        h3: ({children}) => <h3 className="text-xs font-medium text-white mb-1">{children}</h3>,
+                        p: ({children}) => <p className="text-xs text-white/70 leading-relaxed mb-1 line-clamp-3">{children}</p>,
+                        ul: ({children}) => <ul className="list-disc list-inside text-white/70 text-xs space-y-0.5 mb-1 ml-1">{children}</ul>,
+                        ol: ({children}) => <ol className="list-decimal list-inside text-white/70 text-xs space-y-0.5 mb-1 ml-1">{children}</ol>,
+                        li: ({children}) => <li className="text-white/70 text-xs">{children}</li>,
+                        a: ({href, children}) => (
+                          <a 
+                            href={href} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-blue-400 hover:text-blue-300 underline text-xs"
+                          >
+                            {children}
+                          </a>
+                        ),
+                        code: ({children}) => (
+                          <code className="bg-gray-700 text-green-300 px-1 py-0.5 rounded text-xs">
+                            {children}
+                          </code>
+                        ),
+                        pre: ({children}) => (
+                          <pre className="bg-gray-800 p-1 rounded text-xs overflow-x-auto mb-1">
+                            {children}
+                          </pre>
+                        ),
+                        blockquote: ({children}) => (
+                          <blockquote className="border-l-2 border-blue-500 pl-1 text-white/60 italic text-xs mb-1">
+                            {children}
+                          </blockquote>
+                        ),
+                        strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                        em: ({children}) => <em className="italic text-white/90">{children}</em>
+                      }}
+                    >
+                      {result.description}
+                    </ReactMarkdown>
+                  </div>
+                )}
+                
+                {/* Full content with markdown if available */}
+                {result.content && result.content !== result.description && (
+                  <div className="prose prose-invert prose-sm max-w-none mt-2">
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        h1: ({children}) => <h1 className="text-xs font-bold text-white mb-1">{children}</h1>,
+                        h2: ({children}) => <h2 className="text-xs font-semibold text-white mb-1">{children}</h2>,
+                        h3: ({children}) => <h3 className="text-xs font-medium text-white mb-1">{children}</h3>,
+                        p: ({children}) => <p className="text-xs text-white/70 leading-relaxed mb-1 line-clamp-3">{children}</p>,
+                        ul: ({children}) => <ul className="list-disc list-inside text-white/70 text-xs space-y-0.5 mb-1 ml-1">{children}</ul>,
+                        ol: ({children}) => <ol className="list-decimal list-inside text-white/70 text-xs space-y-0.5 mb-1 ml-1">{children}</ol>,
+                        li: ({children}) => <li className="text-white/70 text-xs">{children}</li>,
+                        a: ({href, children}) => (
+                          <a 
+                            href={href} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-blue-400 hover:text-blue-300 underline text-xs"
+                          >
+                            {children}
+                          </a>
+                        ),
+                        code: ({children}) => (
+                          <code className="bg-gray-700 text-green-300 px-1 py-0.5 rounded text-xs">
+                            {children}
+                          </code>
+                        ),
+                        pre: ({children}) => (
+                          <pre className="bg-gray-800 p-1 rounded text-xs overflow-x-auto mb-1">
+                            {children}
+                          </pre>
+                        ),
+                        blockquote: ({children}) => (
+                          <blockquote className="border-l-2 border-blue-500 pl-1 text-white/60 italic text-xs mb-1">
+                            {children}
+                          </blockquote>
+                        ),
+                        strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                        em: ({children}) => <em className="italic text-white/90">{children}</em>
+                      }}
+                    >
+                      {result.content.length > 200 ? result.content.substring(0, 200) + '...' : result.content}
+                    </ReactMarkdown>
+                  </div>
+                )}
+                
+                {/* Additional metadata */}
+                {(result.source || result.date) && (
+                  <div className="flex items-center gap-3 text-xs text-white/50">
+                    {result.source && (
+                      <span className="flex items-center gap-1">
+                        <span>📰</span>
+                        {result.source}
+                      </span>
+                    )}
+                    {result.date && (
+                      <span className="flex items-center gap-1">
+                        <span>📅</span>
+                        {result.date}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )) : (
+              <div className="text-sm text-white/80">
+                {typeof content === 'string' ? content : JSON.stringify(content)}
+              </div>
+            )}
+          </div>
         );
       case 'data':
         return (
@@ -122,10 +275,81 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
             <div className="text-xs text-red-300">{content}</div>
           </div>
         );
+      case 'text':
       default:
         return (
-          <div className="text-sm text-white/80">
-            {typeof content === 'string' ? content : JSON.stringify(content)}
+          <div className="prose prose-invert prose-sm max-w-none overflow-auto max-h-96">
+            <ReactMarkdown 
+              remarkPlugins={[remarkGfm]}
+              components={{
+                h1: ({children}) => <h1 className="text-lg font-bold text-white mb-3">{children}</h1>,
+                h2: ({children}) => <h2 className="text-base font-semibold text-white mb-2">{children}</h2>,
+                h3: ({children}) => <h3 className="text-sm font-medium text-white mb-2">{children}</h3>,
+                p: ({children}) => <p className="text-sm text-white/80 leading-relaxed mb-2">{children}</p>,
+                ul: ({children}) => <ul className="list-disc list-inside text-white/80 text-sm space-y-1 mb-2 ml-2">{children}</ul>,
+                ol: ({children}) => <ol className="list-decimal list-inside text-white/80 text-sm space-y-1 mb-2 ml-2">{children}</ol>,
+                li: ({children}) => <li className="text-white/80 text-sm">{children}</li>,
+                a: ({href, children}) => (
+                  <a 
+                    href={href} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-blue-400 hover:text-blue-300 underline text-sm"
+                  >
+                    {children}
+                  </a>
+                ),
+                code: ({children}) => (
+                  <code className="bg-gray-700 text-green-300 px-1 py-0.5 rounded text-sm">
+                    {children}
+                  </code>
+                ),
+                pre: ({children}) => (
+                  <pre className="bg-gray-800 p-3 rounded text-sm overflow-x-auto mb-2">
+                    {children}
+                  </pre>
+                ),
+                blockquote: ({children}) => (
+                  <blockquote className="border-l-2 border-blue-500 pl-3 text-white/70 italic text-sm mb-2">
+                    {children}
+                  </blockquote>
+                ),
+                strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                em: ({children}) => <em className="italic text-white/90">{children}</em>,
+                table: ({children}) => (
+                  <table className="min-w-full text-sm border-collapse border border-white/20 mb-2">
+                    {children}
+                  </table>
+                ),
+                thead: ({children}) => (
+                  <thead className="bg-white/10">
+                    {children}
+                  </thead>
+                ),
+                tbody: ({children}) => (
+                  <tbody>
+                    {children}
+                  </tbody>
+                ),
+                tr: ({children}) => (
+                  <tr className="border-b border-white/10">
+                    {children}
+                  </tr>
+                ),
+                th: ({children}) => (
+                  <th className="border border-white/20 px-2 py-1 text-left font-medium text-white">
+                    {children}
+                  </th>
+                ),
+                td: ({children}) => (
+                  <td className="border border-white/20 px-2 py-1 text-white/80">
+                    {children}
+                  </td>
+                )
+              }}
+            >
+              {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
+            </ReactMarkdown>
           </div>
         );
     }
@@ -134,7 +358,7 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
   // Get currently displayed output item
   const displayOutput = currentOutput || (selectedOutputId ? 
     outputHistory.find(item => item.id === selectedOutputId) : 
-    outputHistory[0]
+    outputHistory?.[0]
   );
 
   return (
@@ -156,7 +380,7 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
       {/* Output Area (Top) */}
       <div className="flex-1 min-h-0 flex relative">
         {/* Output History (Left Side) */}
-        <div className={`${showHistory ? 'w-1/4' : 'w-12'} border-r border-white/10 transition-all duration-200`}>
+        <div className={`${showHistory ? 'w-48' : 'w-12'} border-r border-white/10 transition-all duration-200`}>
           <div className="h-full flex flex-col">
             {/* History Toggle Button */}
             <button
@@ -240,6 +464,7 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="text-sm">
                       {displayOutput.type === 'image' ? '🖼️' : 
+                       displayOutput.type === 'search_results' ? '🔍' : 
                        displayOutput.type === 'data' ? '📊' : 
                        displayOutput.type === 'error' ? '❌' : '📝'}
                     </span>
@@ -248,17 +473,25 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
                     </span>
                   </div>
                   <span className="text-xs text-white/40">
-                    {displayOutput.timestamp.toLocaleTimeString()}
+                    {typeof displayOutput.timestamp === 'string' 
+                      ? new Date(displayOutput.timestamp).toLocaleTimeString()
+                      : displayOutput.timestamp.toLocaleTimeString()}
                   </span>
                 </div>
               </div>
 
               {/* Content Display */}
               <div className="flex-1 p-3 overflow-auto">
-                {renderOutputContent(displayOutput.content, displayOutput.type)}
+                {displayOutput ? (
+                  renderOutputContent(displayOutput.content, displayOutput.type)
+                ) : (
+                  <div className="text-center text-white/40 py-8">
+                    No output to display
+                  </div>
+                )}
               </div>
 
-              {/* Streaming Status Display */}
+              {/* Streaming Status Display with Markdown */}
               {isStreaming && streamingContent && (
                 <div className="border-t border-white/10 p-2 bg-blue-500/10">
                   <div className="flex items-center gap-2 mb-1">
@@ -266,8 +499,33 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
                     <span className="text-xs text-blue-300">Real-time Output</span>
                   </div>
                   <div className="bg-black/20 rounded p-2 max-h-20 overflow-y-auto">
-                    <div className="text-xs text-gray-300 whitespace-pre-wrap">
-                      {streamingContent}
+                    <div className="prose prose-invert prose-sm max-w-none">
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          h1: ({children}) => <h1 className="text-sm font-bold text-white mb-1">{children}</h1>,
+                          h2: ({children}) => <h2 className="text-xs font-semibold text-white mb-1">{children}</h2>,
+                          h3: ({children}) => <h3 className="text-xs font-medium text-white mb-1">{children}</h3>,
+                          p: ({children}) => <p className="text-xs text-gray-300 leading-relaxed mb-1">{children}</p>,
+                          ul: ({children}) => <ul className="list-disc list-inside text-gray-300 text-xs space-y-0.5 mb-1">{children}</ul>,
+                          ol: ({children}) => <ol className="list-decimal list-inside text-gray-300 text-xs space-y-0.5 mb-1">{children}</ol>,
+                          li: ({children}) => <li className="text-gray-300 text-xs">{children}</li>,
+                          code: ({children}) => (
+                            <code className="bg-gray-700 text-green-300 px-1 py-0.5 rounded text-xs">
+                              {children}
+                            </code>
+                          ),
+                          pre: ({children}) => (
+                            <pre className="bg-gray-800 p-1 rounded text-xs overflow-x-auto mb-1">
+                              {children}
+                            </pre>
+                          ),
+                          strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                          em: ({children}) => <em className="italic text-white/90">{children}</em>
+                        }}
+                      >
+                        {streamingContent}
+                      </ReactMarkdown>
                       <span className="inline-block w-1 h-3 bg-blue-400 ml-1 animate-pulse"></span>
                     </div>
                   </div>
@@ -290,12 +548,12 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
                   key={action.id}
                   onClick={() => displayOutput && action.onClick(displayOutput.content)}
                   disabled={action.disabled || !displayOutput}
-                  className="w-full p-2 rounded hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full p-1.5 rounded hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   title={action.label}
                 >
                   <div className="text-center">
                     <div className="text-sm">{action.icon}</div>
-                    <div className="text-xs text-white/60 mt-1">
+                    <div className="text-xs text-white/60 mt-0.5 leading-tight">
                       {action.label}
                     </div>
                   </div>

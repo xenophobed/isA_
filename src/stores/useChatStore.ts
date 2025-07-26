@@ -57,6 +57,7 @@ export interface ChatMessage {
   isStreaming?: boolean; // 标记是否为流式消息
   streamingStatus?: string; // 流式状态描述
   processed?: boolean; // 标记用户消息是否已发送到API
+  files?: File[]; // 用户上传的文件
 }
 
 interface ChatState {
@@ -101,10 +102,20 @@ export const useChatStore = create<ChatStore>()(
     
     // 消息操作
     addMessage: (message) => {
-      set((state) => ({
-        messages: [...state.messages, message]
-      }));
-      logger.info(LogCategory.CHAT_FLOW, 'Message added to chat store', { 
+      set((state) => {
+        // Check if message with same ID already exists
+        const existingIndex = state.messages.findIndex(m => m.id === message.id);
+        if (existingIndex >= 0) {
+          // Update existing message
+          const newMessages = [...state.messages];
+          newMessages[existingIndex] = message;
+          return { messages: newMessages };
+        } else {
+          // Add new message
+          return { messages: [...state.messages, message] };
+        }
+      });
+      logger.info(LogCategory.CHAT_FLOW, 'Message added/updated in chat store', { 
         messageId: message.id, 
         role: message.role, 
         contentLength: message.content.length 
@@ -358,29 +369,88 @@ const getAppStore = async () => {
   return useAppStore;
 };
 
+// Simple keyword-based widget detection
+const detectWidgetByKeywords = (userInput: string, hasFiles: boolean = false): string | null => {
+  // If files are uploaded, always suggest knowledge widget
+  if (hasFiles) {
+    return 'knowledge';
+  }
+
+  const input = userInput.toLowerCase();
+  
+  // Widget detection rules - order matters (most specific first)
+  const rules = [
+    { 
+      widget: 'dream', 
+      keywords: ['image', 'picture', 'photo', 'draw', 'generate', 'create', 'design', 'art', 'visual', 'illustration'] 
+    },
+    { 
+      widget: 'hunt', 
+      keywords: ['search', 'find', 'buy', 'shop', 'product', 'price', 'compare', 'look for', 'hunt'] 
+    },
+    { 
+      widget: 'data-scientist', 
+      keywords: ['analyze', 'analysis', 'data', 'chart', 'graph', 'statistics', 'plot', 'trend', 'metric'] 
+    },
+    { 
+      widget: 'omni', 
+      keywords: ['write', 'content', 'article', 'blog', 'copy', 'draft', 'compose', 'text', 'story', 'essay'] 
+    },
+    { 
+      widget: 'knowledge', 
+      keywords: ['document', 'pdf', 'file', 'analyze document', 'summarize', 'extract'] 
+    },
+    { 
+      widget: 'assistant', 
+      keywords: ['help', 'assist', 'question', 'ask', 'explain', 'how to'] 
+    }
+  ];
+  
+  // Check each rule
+  for (const rule of rules) {
+    const hasKeyword = rule.keywords.some(keyword => input.includes(keyword));
+    
+    if (hasKeyword) {
+      console.log('🎯 KEYWORD_TRIGGER: Detected widget:', rule.widget, 'for input:', userInput);
+      return rule.widget;
+    }
+  }
+  
+  // No widget triggered
+  return null;
+};
+
 // Available apps configuration
 const AVAILABLE_APPS = [
-  { id: 'dream', name: 'DreamForge AI', triggers: ['create image', 'generate image', 'make picture', 'draw'] },
-  { id: 'hunt', name: 'HuntAI', triggers: ['search product', 'find item', 'compare prices', 'shop'] },
-  { id: 'omni', name: 'Omni Content', triggers: ['generate content', 'create text', 'write', 'compose'] },
-  { id: 'assistant', name: 'AI Assistant', triggers: ['help', 'assist', 'question', 'ask'] },
-  { id: 'data-scientist', name: 'DataWise Analytics', triggers: ['analyze data', 'create chart', 'statistics'] },
-  { id: 'knowledge', name: 'Knowledge Hub', triggers: ['analyze document', 'summarize', 'extract'] }
+  { id: 'dream', name: 'DreamForge AI' },
+  { id: 'hunt', name: 'HuntAI' },
+  { id: 'omni', name: 'Omni Content' },
+  { id: 'assistant', name: 'AI Assistant' },
+  { id: 'data-scientist', name: 'DataWise Analytics' },
+  { id: 'knowledge', name: 'Knowledge Hub' }
 ];
 
 // Subscribe to message changes for widget triggers and API calls
 useChatStore.subscribe(
   (state) => state.messages,
   (messages, previousMessages) => {
-    // Find newly added user messages that haven't been processed
-    const newUserMessages = messages.filter((message, index) => {
-      // Check if this is a new message (not in previous state)
-      const isNewMessage = !previousMessages || index >= previousMessages.length;
-      // Check if it's a user message that hasn't been processed
-      const isUnprocessedUserMessage = message.role === 'user' && !message.processed;
-      
-      return isNewMessage && isUnprocessedUserMessage;
-    });
+    // More robust detection of new user messages
+    const newUserMessages = [];
+    
+    if (!previousMessages) {
+      // First load - check for unprocessed user messages
+      newUserMessages.push(...messages.filter(msg => 
+        msg.role === 'user' && !msg.processed
+      ));
+    } else {
+      // Find truly new messages by comparing arrays length and IDs
+      const previousIds = new Set(previousMessages.map(msg => msg.id));
+      newUserMessages.push(...messages.filter(msg => 
+        msg.role === 'user' && 
+        !msg.processed && 
+        !previousIds.has(msg.id)
+      ));
+    }
     
     // Process each new user message
     newUserMessages.forEach(async (userMessage) => {
@@ -390,32 +460,67 @@ useChatStore.subscribe(
         contentLength: userMessage.content.length
       });
       
+      // Prevent duplicate processing by checking again
+      const currentState = useChatStore.getState();
+      const currentMessage = currentState.messages.find(msg => msg.id === userMessage.id);
+      if (!currentMessage || currentMessage.processed) {
+        console.log('🚫 REACTIVE_TRIGGER: Message already processed, skipping:', userMessage.id);
+        return;
+      }
+      
+      // Additional safety: prevent processing if there's already a recent message being processed
+      // Only skip if there's a very recent message to avoid blocking legitimate new messages
+      const recentProcessingMessage = currentState.messages.find(m => 
+        m.role === 'user' && 
+        m.processed && 
+        (Date.now() - new Date(m.timestamp).getTime()) < 2000 // Within last 2 seconds
+      );
+      if (recentProcessingMessage && (currentState.chatLoading || currentState.isTyping)) {
+        console.log('🚫 REACTIVE_TRIGGER: Recent message still processing, skipping:', userMessage.id);
+        return;
+      }
+      
       try {
         // Mark message as processed immediately to prevent duplicate calls
-        const state = useChatStore.getState();
-        const updatedMessages = state.messages.map(msg => 
+        const updatedMessages = currentState.messages.map(msg => 
           msg.id === userMessage.id ? { ...msg, processed: true } : msg
         );
         useChatStore.setState({ messages: updatedMessages });
         
-        // Check for widget triggers
-        const lowerMessage = userMessage.content.toLowerCase();
+        // Check for file uploads first
+        const hasFiles = userMessage.files && userMessage.files.length > 0;
+        
+        // Fast keyword-based widget intent detection
         let triggeredApp = null;
         
-        for (const app of AVAILABLE_APPS) {
-          const matchingTrigger = app.triggers.find(trigger => lowerMessage.includes(trigger));
-          if (matchingTrigger) {
-            triggeredApp = app;
-            logger.info(LogCategory.APP_TRIGGER, 'Widget trigger detected', { 
-              appId: app.id, 
-              trigger: matchingTrigger 
-            });
-            console.log('🎯 REACTIVE_TRIGGER: Widget trigger detected!', { 
-              app: app.name, 
-              trigger: matchingTrigger 
-            });
-            break;
+        try {
+          console.log('🎯 REACTIVE_TRIGGER: Using keyword detection for:', userMessage.content);
+          
+          const detectedWidgetId = detectWidgetByKeywords(userMessage.content, hasFiles);
+          
+          if (detectedWidgetId) {
+            triggeredApp = AVAILABLE_APPS.find(app => app.id === detectedWidgetId);
+            
+            if (triggeredApp) {
+              logger.info(LogCategory.APP_TRIGGER, 'Keyword widget trigger detected', { 
+                appId: triggeredApp.id, 
+                hasFiles,
+                userInput: userMessage.content 
+              });
+              console.log('🎯 REACTIVE_TRIGGER: Keyword detected widget trigger!', { 
+                app: triggeredApp.name, 
+                detectedId: detectedWidgetId,
+                hasFiles 
+              });
+            }
+          } else {
+            console.log('💬 REACTIVE_TRIGGER: No widget intent detected by keywords');
           }
+        } catch (error) {
+          console.error('❌ REACTIVE_TRIGGER: Keyword detection failed:', error);
+          logger.error(LogCategory.APP_TRIGGER, 'Keyword detection failed', { error });
+          // Fall back to no widget trigger
+          triggeredApp = null;
         }
         
         if (triggeredApp) {
@@ -427,23 +532,23 @@ useChatStore.subscribe(
           if (currentApp === triggeredApp.id && showRightSidebar) {
             console.log('✅ REACTIVE_TRIGGER: App already open, sending to both widget and chat');
             // TODO: Send to widget AND continue with chat API
-            await state.sendMessage(userMessage.content, userMessage.metadata || {});
+            await currentState.sendMessage(userMessage.content, userMessage.metadata || {});
           } else {
             // Open widget and let widget handle the request
             console.log('📱 REACTIVE_TRIGGER: Opening widget, blocking chat API');
-            setTimeout(() => {
-              setCurrentApp(triggeredApp.id as any); // Cast to AppId type
-              setShowRightSidebar(true);
-              setTriggeredAppInput(userMessage.content);
-              console.log('✨ REACTIVE_TRIGGER: Widget opened successfully:', triggeredApp.id);
-            }, 100); // Reduced delay for better UX
+            
+            // Use immediate state update instead of setTimeout to prevent race conditions
+            setCurrentApp(triggeredApp.id as any); // Cast to AppId type
+            setShowRightSidebar(true);
+            setTriggeredAppInput(userMessage.content);
+            console.log('✨ REACTIVE_TRIGGER: Widget opened successfully:', triggeredApp.id);
             
             // Don't send to chat API - widget will handle
           }
         } else {
           // No widget triggered, send to chat API normally
           console.log('💬 REACTIVE_TRIGGER: No widget trigger, sending to chat API');
-          await state.sendMessage(userMessage.content, userMessage.metadata || {});
+          await currentState.sendMessage(userMessage.content, userMessage.metadata || {});
         }
         
         console.log('✅ REACTIVE_TRIGGER: Message processing completed');

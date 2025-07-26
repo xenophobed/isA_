@@ -77,7 +77,7 @@ const getEnvVar = (key: string, defaultValue?: string): string => {
     console.warn(`⚠️  Environment variable ${key} is not set`);
     return '';
   }
-  return value;
+  return value.trim();
 };
 
 const getBoolEnvVar = (key: string, defaultValue: boolean = false): boolean => {
@@ -109,11 +109,11 @@ export const config: AppConfiguration = {
 
   // Auth0配置 (使用现有的环境变量)
   auth0: {
-    domain: getEnvVar('REACT_APP_AUTH0_DOMAIN', 'dev-47zcqarlxizdkads.us.auth0.com'),
-    clientId: getEnvVar('REACT_APP_AUTH0_CLIENT_ID', 'Vsm0s23JTKzDrq9bq0foKyYieOCyeoQJ'),
-    audience: getEnvVar('REACT_APP_AUTH0_AUDIENCE', 'http://localhost:8100'),
-    redirectUri: getEnvVar('REACT_APP_AUTH0_REDIRECT_URI', `${getEnvVar('REACT_APP_BASE_URL', typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')}/callback`),
-    scope: getEnvVar('REACT_APP_AUTH0_SCOPE', 'openid profile email')
+    domain: getEnvVar('REACT_APP_AUTH0_DOMAIN', 'dev-47zcqarlxizdkads.us.auth0.com').trim(),
+    clientId: getEnvVar('REACT_APP_AUTH0_CLIENT_ID', 'Vsm0s23JTKzDrq9bq0foKyYieOCyeoQJ').trim(),
+    audience: getEnvVar('REACT_APP_AUTH0_AUDIENCE', 'https://dev-47zcqarlxizdkads.us.auth0.com/api/v2/').trim(),
+    redirectUri: getEnvVar('REACT_APP_AUTH0_REDIRECT_URI', `${getEnvVar('REACT_APP_BASE_URL', typeof window !== 'undefined' ? window.location.origin : 'https://app.iapro.ai')}/api/auth/callback`).trim(),
+    scope: getEnvVar('REACT_APP_AUTH0_SCOPE', 'openid profile email read:users update:users create:users offline_access').trim()
   },
 
   // 外部API配置 (使用现有的环境变量结构)

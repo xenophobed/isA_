@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Auth0Provider as Auth0ProviderBase, useAuth0 } from '@auth0/auth0-react';
 import { LoginScreen } from '../components/ui/LoginScreen';
+import { config } from '../config';
 
 interface Auth0ProviderProps {
   children: React.ReactNode;
@@ -23,9 +24,10 @@ export const Auth0Provider: React.FC<Auth0ProviderProps> = ({ children }) => {
     );
   }
 
-  const domain = process.env.REACT_APP_AUTH0_DOMAIN;
-  const clientId = process.env.REACT_APP_AUTH0_CLIENT_ID;
-  const audience = process.env.REACT_APP_AUTH0_AUDIENCE;
+  const domain = config.auth0.domain;
+  const clientId = config.auth0.clientId;
+  const audience = config.auth0.audience;
+  const scope = config.auth0.scope;
   // 使用当前域名作为 redirectUri，支持多域名
   const redirectUri = window.location.origin;
 
@@ -52,7 +54,7 @@ export const Auth0Provider: React.FC<Auth0ProviderProps> = ({ children }) => {
       authorizationParams={{
         redirect_uri: redirectUri,
         audience: audience,
-        scope: 'openid profile email read:users update:users create:users'
+        scope: scope
       }}
       useRefreshTokens={true}
       cacheLocation="localstorage"

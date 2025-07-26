@@ -40,6 +40,8 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { logger, LogCategory } from '../utils/logger';
+import { sessionService } from '../api/sessionService';
+import { Session, SessionMetadata } from '../types/sessionTypes';
 
 export interface ChatSession {
   id: string;
@@ -69,6 +71,11 @@ interface SessionState {
   
   // 加载状态
   isLoadingSession: boolean;
+  
+  // API 同步状态
+  isSyncingToAPI: boolean;
+  lastSyncError: string | null;
+  syncStatus: 'idle' | 'syncing' | 'success' | 'error';
 }
 
 interface SessionActions {
@@ -81,10 +88,19 @@ interface SessionActions {
   
   // 会话状态
   setLoadingSession: (loading: boolean) => void;
+  setSyncStatus: (status: 'idle' | 'syncing' | 'success' | 'error', error?: string) => void;
   
   // 会话数据操作
   loadSessionsFromStorage: () => void;
   saveSessionsToStorage: () => void;
+  
+  // API 集成操作
+  loadSessionsFromAPI: (userId: string) => Promise<void>;
+  syncSessionToAPI: (session: ChatSession, userId: string) => Promise<void>;
+  
+  // 消息操作
+  addMessageToSession: (sessionId: string, message: any) => void;
+  clearSessionMessages: (sessionId: string) => void;
 }
 
 export type SessionStore = SessionState & SessionActions;
@@ -95,6 +111,11 @@ export const useSessionStore = create<SessionStore>()(
     sessions: [],
     currentSessionId: 'default',
     isLoadingSession: false,
+    
+    // API 同步状态
+    isSyncingToAPI: false,
+    lastSyncError: null,
+    syncStatus: 'idle',
     
     // 会话CRUD操作
     createSession: (session) => {
@@ -142,6 +163,14 @@ export const useSessionStore = create<SessionStore>()(
     // 会话状态
     setLoadingSession: (loading) => {
       set({ isLoadingSession: loading });
+    },
+    
+    setSyncStatus: (status, error) => {
+      set({ 
+        syncStatus: status,
+        isSyncingToAPI: status === 'syncing',
+        lastSyncError: error || null
+      });
     },
     
     // 会话数据操作
@@ -222,6 +251,157 @@ export const useSessionStore = create<SessionStore>()(
           logger.error(LogCategory.CHAT_FLOW, 'Failed to save sessions to localStorage', { error });
         }
       }
+    },
+    
+    // API 集成操作
+    loadSessionsFromAPI: async (userId: string) => {
+      try {
+        get().setSyncStatus('syncing');
+        
+        const response = await sessionService.getUserSessions(userId, { limit: 50 });
+        
+        if (response.success && response.data?.sessions) {
+          // 转换 API 数据到本地格式
+          const apiSessions = response.data.sessions;
+          const localSessions: ChatSession[] = apiSessions.map(apiSession => ({
+            id: apiSession.id,
+            title: apiSession.title,
+            lastMessage: apiSession.summary || 'No messages yet',
+            timestamp: apiSession.last_activity,
+            messageCount: apiSession.message_count,
+            artifacts: [],
+            messages: [],
+            metadata: {
+              apps_used: apiSession.metadata?.apps_used || [],
+              total_messages: apiSession.message_count,
+              last_activity: apiSession.last_activity,
+              api_session_id: apiSession.id,
+              user_id: apiSession.user_id,
+              sync_status: 'synced'
+            }
+          }));
+          
+          set({ sessions: localSessions });
+          get().setSyncStatus('success');
+          
+          logger.info(LogCategory.CHAT_FLOW, 'Sessions loaded from API', {
+            count: localSessions.length
+          });
+        } else {
+          throw new Error(response.error || 'Failed to load sessions');
+        }
+      } catch (error) {
+        get().setSyncStatus('error', error instanceof Error ? error.message : String(error));
+        logger.error(LogCategory.CHAT_FLOW, 'Failed to load sessions from API', { error });
+        
+        // 回退到 localStorage
+        get().loadSessionsFromStorage();
+      }
+    },
+    
+    syncSessionToAPI: async (session: ChatSession, userId: string) => {
+      try {
+        if (session.metadata?.api_session_id) {
+          logger.debug(LogCategory.CHAT_FLOW, 'Session already synced to API', {
+            sessionId: session.id
+          });
+          return;
+        }
+        
+        const metadata: SessionMetadata = {
+          apps_used: session.metadata?.apps_used || [],
+          total_messages: session.messageCount,
+          last_activity: session.timestamp
+        };
+        
+        const response = await sessionService.createSession(userId, session.title, metadata);
+        
+        if (response.success && response.data?.session) {
+          const apiSession = response.data.session;
+          
+          // 更新本地会话的 API 信息
+          const updatedSession: ChatSession = {
+            ...session,
+            metadata: {
+              ...session.metadata,
+              api_session_id: apiSession.id,
+              user_id: apiSession.user_id,
+              sync_status: 'synced'
+            }
+          };
+          
+          set((state) => ({
+            sessions: state.sessions.map(s => 
+              s.id === session.id ? updatedSession : s
+            )
+          }));
+          
+          logger.info(LogCategory.CHAT_FLOW, 'Session synced to API', {
+            sessionId: session.id,
+            apiId: apiSession.id
+          });
+        }
+      } catch (error) {
+        logger.warn(LogCategory.CHAT_FLOW, 'Failed to sync session to API', {
+          sessionId: session.id,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    },
+    
+    // 消息操作
+    addMessageToSession: (sessionId: string, message: any) => {
+      set((state) => ({
+        sessions: state.sessions.map(session => {
+          if (session.id === sessionId) {
+            const updatedMessages = [...session.messages, message];
+            return {
+              ...session,
+              messages: updatedMessages,
+              messageCount: updatedMessages.length,
+              lastMessage: message.content.length > 100 
+                ? message.content.substring(0, 100) + '...' 
+                : message.content,
+              timestamp: new Date().toISOString(),
+              metadata: {
+                ...session.metadata,
+                total_messages: updatedMessages.length,
+                last_activity: new Date().toISOString()
+              }
+            };
+          }
+          return session;
+        })
+      }));
+      
+      logger.debug(LogCategory.CHAT_FLOW, 'Message added to session', {
+        sessionId,
+        messageId: message.id
+      });
+    },
+    
+    clearSessionMessages: (sessionId: string) => {
+      set((state) => ({
+        sessions: state.sessions.map(session => {
+          if (session.id === sessionId) {
+            return {
+              ...session,
+              messages: [],
+              messageCount: 0,
+              lastMessage: 'Session cleared',
+              timestamp: new Date().toISOString(),
+              metadata: {
+                ...session.metadata,
+                total_messages: 0,
+                last_activity: new Date().toISOString()
+              }
+            };
+          }
+          return session;
+        })
+      }));
+      
+      logger.debug(LogCategory.CHAT_FLOW, 'Session messages cleared', { sessionId });
     }
   }))
 );
@@ -230,6 +410,11 @@ export const useSessionStore = create<SessionStore>()(
 export const useSessions = () => useSessionStore(state => state.sessions);
 export const useCurrentSessionId = () => useSessionStore(state => state.currentSessionId);
 export const useIsLoadingSession = () => useSessionStore(state => state.isLoadingSession);
+
+// 同步状态选择器
+export const useSyncStatus = () => useSessionStore(state => state.syncStatus);
+export const useIsSyncingToAPI = () => useSessionStore(state => state.isSyncingToAPI);
+export const useLastSyncError = () => useSessionStore(state => state.lastSyncError);
 
 // 派生状态选择器
 export const useCurrentSession = () => {
@@ -245,12 +430,26 @@ export const useSessionCount = () => {
 
 // Session操作
 export const useSessionActions = () => useSessionStore(state => ({
+  // 基础操作
   createSession: state.createSession,
   selectSession: state.selectSession,
   deleteSession: state.deleteSession,
   renameSession: state.renameSession,
   updateCurrentSession: state.updateCurrentSession,
+  
+  // 状态操作
   setLoadingSession: state.setLoadingSession,
+  setSyncStatus: state.setSyncStatus,
+  
+  // 存储操作
   loadSessionsFromStorage: state.loadSessionsFromStorage,
-  saveSessionsToStorage: state.saveSessionsToStorage
+  saveSessionsToStorage: state.saveSessionsToStorage,
+  
+  // API 操作
+  loadSessionsFromAPI: state.loadSessionsFromAPI,
+  syncSessionToAPI: state.syncSessionToAPI,
+  
+  // 消息操作
+  addMessageToSession: state.addMessageToSession,
+  clearSessionMessages: state.clearSessionMessages
 }));

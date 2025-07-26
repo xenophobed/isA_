@@ -1,38 +1,31 @@
 /**
  * ============================================================================
- * 聊天输入处理器 (ChatInputHandler.tsx)
+ * 聊天输入处理器 (ChatInputHandler.tsx) - 简化版
  * ============================================================================
  * 
  * 【核心功能】
- * - 处理用户输入并决定消息路由
- * - 检测应用触发词并自动打开相应应用
- * - 管理用户消息的添加和API调用控制
+ * - 处理用户输入和文件上传
+ * - 创建用户消息并添加到聊天存储
+ * - 委托所有路由决策给useChatStore的响应式系统
  * 
- * 【关键逻辑】
- * onBeforeSend函数的处理流程：
- * 1. 第44行：addMessage(userMessage) - 添加用户消息到聊天
- * 2. 检查是否包含应用触发词
- * 3. 如果触发应用 → 打开应用，返回null阻止聊天API调用
- * 4. 如果不触发 → 返回message，让聊天继续API调用
+ * 【架构更新】
+ * ✅ 移除了硬编码的触发词逻辑
+ * ✅ 使用AI驱动的意图检测 (在useChatStore中)
+ * ✅ 统一的响应式消息路由系统
+ * ✅ 支持文件上传自动触发Knowledge widget
  * 
- * 【消息创建】
- * 第37-44行：创建用户消息并添加到store
- * 这是用户消息的唯一创建源头
+ * 【处理流程】
+ * 1. onBeforeSend: 创建用户消息 → 添加到store → 返回null
+ * 2. onFileSelect: 创建带文件的消息 → 添加到store
+ * 3. useChatStore响应式系统：检测意图 → 路由到widget或chat API
  * 
- * 【重要】这里不会创建AI回复消息，只处理用户输入
+ * 【重要】所有消息路由现在由useChatStore的AI系统处理
  */
 import React, { useCallback } from 'react';
-import { useAppStore } from '../../stores/useAppStore';
 import { useChatActions } from '../../stores/useChatStore';
-import { AppId } from '../../types/appTypes';
 import { logger, LogCategory } from '../../utils/logger';
 
 interface ChatInputHandlerProps {
-  availableApps: Array<{
-    id: string;
-    name: string;
-    triggers: string[];
-  }>;
   children: (handlers: {
     onBeforeSend: (message: string) => string | null;
     onFileSelect: (files: FileList) => void;
@@ -40,100 +33,60 @@ interface ChatInputHandlerProps {
 }
 
 export const ChatInputHandler: React.FC<ChatInputHandlerProps> = ({
-  availableApps,
   children
 }) => {
-  const {
-    currentApp,
-    showRightSidebar,
-    setCurrentApp,
-    setShowRightSidebar,
-    setTriggeredAppInput
-  } = useAppStore();
   const { addMessage } = useChatActions();
 
   const onBeforeSend = useCallback((message: string): string | null => {
     const traceId = logger.startTrace('USER_INPUT_PROCESSING');
-    logger.trackUserInput(message, { currentApp, showRightSidebar });
-    console.log('🚀 State check: Current state:', { currentApp, showRightSidebar });
+    logger.trackUserInput(message, {});
+    console.log('🚀 ChatInputHandler: Processing user input:', message);
     
-    // Always add user message to chat first
+    // Create and add user message to chat store
+    // The reactive system in useChatStore will handle widget triggering and API calls
     const userMessage = {
       id: `user-${Date.now()}`,
       role: 'user' as const,
       content: message,
       timestamp: new Date().toISOString(),
-      metadata: {}
+      metadata: {},
+      processed: false // Mark as unprocessed for reactive system
     };
     addMessage(userMessage);
     
-    // Check if message contains app trigger words
-    const lowerMessage = message.toLowerCase();
-    
-    for (const app of availableApps) {
-      const matchingTrigger = app.triggers.find(trigger => lowerMessage.includes(trigger));
-      if (matchingTrigger) {
-        logger.trackAppTrigger(app.id, matchingTrigger, message);
-        console.log('🎯 App trigger detected!', { 
-          app: app.name, 
-          trigger: matchingTrigger, 
-          currentApp, 
-          showRightSidebar 
-        });
-        
-        // If the app is already open, let chat send normally
-        if (currentApp === app.id && showRightSidebar) {
-          logger.info(LogCategory.USER_INPUT, 'App already open, chat sends to API', { appId: app.id });
-          console.log('✅ App already open, chat will send to API');
-          logger.endTrace();
-          return message;
-        }
-        
-        // If app is not open, open it and let APP handle the API request
-        logger.info(LogCategory.APP_TRIGGER, 'Opening app, app will handle API request', { 
-          appId: app.id, 
-          trigger: matchingTrigger 
-        });
-        console.log('📱 Opening app, blocking chat API request - app will handle');
-        setTimeout(() => {
-          setCurrentApp(app.id as AppId);
-          setShowRightSidebar(true);
-          setTriggeredAppInput(message);
-          logger.info(LogCategory.APP_TRIGGER, 'App opened successfully', { appId: app.id });
-          console.log('✨ App opened and will handle API request:', app.id);
-        }, 1000);
-        
-        // BLOCK chat API call since app will handle it
-        logger.endTrace();
-        return null;
-      }
-    }
-    
-    // No app triggered, current state is chat, let chat send to API
-    logger.info(LogCategory.USER_INPUT, 'No app trigger detected, chat sends to API', { 
+    logger.info(LogCategory.USER_INPUT, 'User message added, reactive system will handle routing', { 
       messageLength: message.length 
     });
     logger.endTrace();
-    return message;
-  }, [currentApp, showRightSidebar, availableApps, addMessage, setCurrentApp, setShowRightSidebar, setTriggeredAppInput]);
+    
+    // Always return null - the reactive system in useChatStore handles all routing
+    return null;
+  }, [addMessage]);
 
   const onFileSelect = useCallback((files: FileList) => {
     logger.info(LogCategory.USER_INPUT, 'Files selected', { 
       fileCount: files.length,
       fileNames: Array.from(files).map(f => f.name)
     });
-    console.log('📎 Files selected:', files);
+    console.log('📎 ChatInputHandler: Files selected:', Array.from(files).map(f => f.name));
+    
     if (files.length > 0) {
+      // Create a message with files - the reactive system will handle knowledge widget triggering
       const fileMessage = `Analyze ${files.length} document${files.length > 1 ? 's' : ''}: ${Array.from(files).map(f => f.name).join(', ')}`;
-      setTimeout(() => {
-        setCurrentApp('knowledge' as AppId);
-        setShowRightSidebar(true);
-        setTriggeredAppInput(fileMessage);
-        logger.info(LogCategory.APP_TRIGGER, 'Opened knowledge app for files', { fileCount: files.length });
-        console.log('🧠 Opened knowledge app for files');
-      }, 500);
+      const userMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user' as const,
+        content: fileMessage,
+        timestamp: new Date().toISOString(),
+        metadata: {},
+        processed: false,
+        files: Array.from(files) // Add files to trigger knowledge widget
+      };
+      
+      addMessage(userMessage);
+      logger.info(LogCategory.USER_INPUT, 'File message added, reactive system will trigger knowledge widget', { fileCount: files.length });
     }
-  }, [setCurrentApp, setShowRightSidebar, setTriggeredAppInput]);
+  }, [addMessage]);
 
   return <>{children({ onBeforeSend, onFileSelect })}</>;
 };

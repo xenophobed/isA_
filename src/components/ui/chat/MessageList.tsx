@@ -21,6 +21,7 @@
  */
 import React, { memo } from 'react';
 import { ChatMessage } from '../../../types/chatTypes';
+import { ArtifactComponent } from './ArtifactComponent';
 
 export interface MessageListProps {
   showTimestamps?: boolean;
@@ -79,10 +80,68 @@ export const MessageList = memo<MessageListProps>(({
     const isStreaming = message.isStreaming;
     const hasContent = message.content && message.content.trim().length > 0;
     const hasStatus = message.streamingStatus && message.streamingStatus.trim().length > 0;
+    const isArtifact = message.metadata?.type === 'artifact';
     
-    // 流式消息始终显示，包括空内容的状态消息
+    // Handle artifact messages specially
+    if (isArtifact) {
+      const artifactData = message.metadata?.artifactData;
+      const appIcon = message.metadata?.appIcon || '🤖';
+      const appName = message.metadata?.appName || 'AI';
+      
+      return (
+        <div 
+          key={message.id} 
+          className="mb-6"
+          onClick={() => onMessageClick?.(message)}
+          style={{ width: '100%', display: 'flex', justifyContent: 'flex-start' }}
+        >
+          <div style={{ width: '100%', maxWidth: '100%' }}>
+            {showAvatars && (
+              <div className="flex items-center mb-3" style={{ justifyContent: 'flex-start' }}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
+                  isStreaming 
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                    : 'bg-gray-700 text-white'
+                }`}>
+                  {appIcon}
+                </div>
+                <span className="ml-2 text-sm font-medium text-gray-300">{appName}</span>
+                {isStreaming && (
+                  <span className="ml-2 text-xs text-blue-400 italic">{message.streamingStatus || 'Processing...'}</span>
+                )}
+              </div>
+            )}
+            
+            {/* Use ArtifactComponent for artifact content */}
+            <div className="ml-10" style={{ width: 'calc(100% - 2.5rem)' }}>
+              <ArtifactComponent
+                artifact={{
+                  id: message.id,
+                  appId: message.metadata?.appId || 'unknown',
+                  appName: appName,
+                  appIcon: appIcon,
+                  title: message.metadata?.title || 'Generated Content',
+                  userInput: message.metadata?.userInput || '',
+                  createdAt: message.timestamp,
+                  isOpen: false,
+                  generatedContent: artifactData || {
+                    type: 'text',
+                    content: isStreaming ? 'Loading...' : (hasContent ? message.content : 'No content available'),
+                    metadata: {}
+                  }
+                }}
+                onReopen={() => {
+                  // Handle artifact reopening - could emit an event or callback
+                  console.log('Artifact reopened:', message.id);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
 
-    // Default rendering
+    // Default message rendering for non-artifact messages
     return (
       <div 
         key={message.id} 
@@ -101,7 +160,13 @@ export const MessageList = memo<MessageListProps>(({
               }`}>
                 {message.role === 'user' ? 'U' : isStreaming ? '🤖' : 'AI'}
               </div>
-              {/* 状态显示已移至右侧边栏，不在聊天气泡中显示 */}
+              {/* Show streaming status next to AI avatar */}
+              {message.role === 'assistant' && isStreaming && hasStatus && (
+                <div className="ml-3 flex items-center gap-2 text-blue-400 text-sm italic">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                  <span>{message.streamingStatus}</span>
+                </div>
+              )}
             </div>
           )}
           
@@ -119,10 +184,10 @@ export const MessageList = memo<MessageListProps>(({
                   <span className="inline-block w-2 h-4 bg-blue-400 ml-1 animate-pulse"></span>
                 )}
               </div>
-            ) : isStreaming && hasStatus ? (
-              <div className="text-blue-400 text-sm italic flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                <span>{message.streamingStatus}</span>
+            ) : isStreaming ? (
+              <div className="text-gray-400 text-sm italic flex items-center gap-2">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                <span>...</span>
               </div>
             ) : null}
             

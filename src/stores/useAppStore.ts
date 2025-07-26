@@ -16,6 +16,7 @@
  *   - 全局加载和错误状态
  *   - 应用级UI状态（模态框、仪表板等）
  *   - 小部件触发输入管理
+ *   - Widget使用状态跟踪和排序
  *   - 新聊天会话控制
  * 
  * ❌ 不负责：
@@ -24,6 +25,7 @@
  *   - 工件管理（由useArtifactStore处理）
  *   - 小部件特定状态（由useWidgetStores处理）
  *   - 流式消息处理（由useChatStore处理）
+ *   - Widget具体业务逻辑（由各Widget Module处理）
  * 
  * 【架构定位】
  * 这是应用的"交通控制中心"，负责协调各个专门的store，
@@ -35,6 +37,13 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { AppId } from '../types/appTypes';
 import { logger, LogCategory } from '../utils/logger';
 
+// Widget使用状态跟踪
+export interface WidgetUsageState {
+  lastUsed: string | null; // ISO timestamp
+  hasArtifacts: boolean;   // 是否生成过artifacts
+  usageCount: number;      // 使用次数
+}
+
 export interface AppState {
   // 主应用导航
   currentApp: AppId | null;
@@ -42,6 +51,9 @@ export interface AppState {
   
   // 小部件交互
   triggeredAppInput: string;
+  
+  // Widget使用状态跟踪
+  widgetUsage: Record<string, WidgetUsageState>;
   
   // 全局UI状态
   showLoggingDashboard: boolean;
@@ -61,6 +73,12 @@ export interface AppActions {
   
   // 小部件交互
   setTriggeredAppInput: (input: string) => void;
+  
+  // Widget使用状态跟踪
+  recordWidgetUsage: (widgetId: string) => void;
+  markWidgetWithArtifacts: (widgetId: string) => void;
+  getWidgetUsage: (widgetId: string) => WidgetUsageState;
+  getSortedWidgets: () => Array<{ id: string; usage: WidgetUsageState }>;
   
   // 聊天控制
   startNewChat: () => void;
@@ -82,6 +100,7 @@ export const useAppStore = create<AppStore>()(
     currentApp: null,
     showRightSidebar: false,
     triggeredAppInput: '',
+    widgetUsage: {},
     showLoggingDashboard: false,
     chatKey: 0,
     isLoading: false,
@@ -91,6 +110,9 @@ export const useAppStore = create<AppStore>()(
     setCurrentApp: (app) => {
       const oldApp = get().currentApp;
       logger.trackStateChange('currentApp', oldApp, app, 'useAppStore');
+      
+      // 不在这里记录使用，只在用户真正使用功能时才记录
+      
       set({ currentApp: app });
     },
     
@@ -185,6 +207,94 @@ export const useAppStore = create<AppStore>()(
     
     clearError: () => {
       set({ error: null });
+    },
+    
+    // Widget使用状态跟踪
+    recordWidgetUsage: (widgetId) => {
+      const currentUsage = get().widgetUsage[widgetId] || {
+        lastUsed: null,
+        hasArtifacts: false,
+        usageCount: 0
+      };
+      
+      const newUsage = {
+        ...currentUsage,
+        lastUsed: new Date().toISOString(),
+        usageCount: currentUsage.usageCount + 1
+      };
+      
+      set(state => ({
+        widgetUsage: {
+          ...state.widgetUsage,
+          [widgetId]: newUsage
+        }
+      }));
+      
+      logger.debug(LogCategory.SIDEBAR_INTERACTION, 'Widget usage recorded', { 
+        widgetId, 
+        usageCount: newUsage.usageCount 
+      });
+    },
+    
+    markWidgetWithArtifacts: (widgetId) => {
+      const currentUsage = get().widgetUsage[widgetId] || {
+        lastUsed: new Date().toISOString(),
+        hasArtifacts: false,
+        usageCount: 0
+      };
+      
+      const newUsage = {
+        ...currentUsage,
+        hasArtifacts: true
+      };
+      
+      set(state => ({
+        widgetUsage: {
+          ...state.widgetUsage,
+          [widgetId]: newUsage
+        }
+      }));
+      
+      logger.debug(LogCategory.ARTIFACT_CREATION, 'Widget marked with artifacts', { widgetId });
+    },
+    
+    getWidgetUsage: (widgetId) => {
+      return get().widgetUsage[widgetId] || {
+        lastUsed: null,
+        hasArtifacts: false,
+        usageCount: 0
+      };
+    },
+    
+    getSortedWidgets: () => {
+      const usage = get().widgetUsage;
+      
+      // 获取所有已知的widget ID
+      const allWidgetIds = ['dream', 'hunt', 'omni', 'data-scientist', 'knowledge'];
+      
+      return allWidgetIds
+        .map(id => ({
+          id,
+          usage: usage[id] || {
+            lastUsed: null,
+            hasArtifacts: false,
+            usageCount: 0
+          }
+        }))
+        .sort((a, b) => {
+          // 首先按是否有artifacts排序
+          if (a.usage.hasArtifacts !== b.usage.hasArtifacts) {
+            return b.usage.hasArtifacts ? 1 : -1;
+          }
+          // 然后按最后使用时间排序
+          if (a.usage.lastUsed && b.usage.lastUsed) {
+            return new Date(b.usage.lastUsed).getTime() - new Date(a.usage.lastUsed).getTime();
+          }
+          if (a.usage.lastUsed) return -1;
+          if (b.usage.lastUsed) return 1;
+          // 最后按使用次数排序
+          return b.usage.usageCount - a.usage.usageCount;
+        });
     }
   }))
 );
@@ -197,6 +307,11 @@ export const useAppLoading = () => useAppStore(state => state.isLoading);
 export const useAppError = () => useAppStore(state => state.error);
 export const useShowLoggingDashboard = () => useAppStore(state => state.showLoggingDashboard);
 export const useChatKey = () => useAppStore(state => state.chatKey);
+export const useGetWidgetUsage = (widgetId: string) => useAppStore(state => state.getWidgetUsage(widgetId));
+
+// Widget使用状态选择器
+export const useWidgetUsage = () => useAppStore(state => state.widgetUsage);
+export const useSortedWidgets = () => useAppStore(state => state.getSortedWidgets());
 
 // 主应用操作
 export const useAppActions = () => useAppStore(state => ({
@@ -205,9 +320,21 @@ export const useAppActions = () => useAppStore(state => ({
   closeApp: state.closeApp,
   reopenApp: state.reopenApp,
   setTriggeredAppInput: state.setTriggeredAppInput,
+  recordWidgetUsage: state.recordWidgetUsage,
+  markWidgetWithArtifacts: state.markWidgetWithArtifacts,
+  getWidgetUsage: state.getWidgetUsage,
+  getSortedWidgets: state.getSortedWidgets,
   startNewChat: state.startNewChat,
   setShowLoggingDashboard: state.setShowLoggingDashboard,
   setLoading: state.setLoading,
   setError: state.setError,
   clearError: state.clearError
+}));
+
+// Widget状态跟踪操作 
+export const useWidgetActions = () => useAppStore(state => ({
+  recordWidgetUsage: state.recordWidgetUsage,
+  markWidgetWithArtifacts: state.markWidgetWithArtifacts,
+  getWidgetUsage: state.getWidgetUsage,
+  getSortedWidgets: state.getSortedWidgets
 }));

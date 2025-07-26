@@ -630,14 +630,6 @@ Begin your scientific analysis now.`
     }
   };
   
-  // Remove file from references (exact copy from omni_sidebar.tsx)
-  const removeReferenceFile = (index: number) => {
-    setArgs(prev => ({
-      ...prev,
-      referenceFiles: prev.referenceFiles.filter((_, i) => i !== index)
-    }));
-  };
-  
   // Add URL to reference list (exact copy from omni_sidebar.tsx)
   const addReferenceUrl = () => {
     const url = prompt('Enter URL:');
@@ -647,14 +639,6 @@ Begin your scientific analysis now.`
         referenceUrls: [...prev.referenceUrls, url.trim()]
       }));
     }
-  };
-  
-  // Remove URL from reference list (exact copy from omni_sidebar.tsx)
-  const removeReferenceUrl = (index: number) => {
-    setArgs(prev => ({
-      ...prev,
-      referenceUrls: prev.referenceUrls.filter((_, i) => i !== index)
-    }));
   };
   
   // Generate topic-specific prompt template (exact copy from omni_sidebar.tsx)
@@ -708,95 +692,83 @@ Begin your scientific analysis now.`
   };
 
   return (
-    <div className="space-y-4 h-full flex flex-col">
-      {/* Main Content - No Scroll Needed */}
-      <div className="flex-1 space-y-4 min-h-0">
-        {/* What to Create - Top Priority */}
-        <div>
-          <label className="text-sm font-medium text-white/80 mb-2 block">💭 What do you want to create?</label>
-          <textarea
-            value={args.subject}
-            onChange={(e) => updateArgs('subject', e.target.value)}
-            placeholder="E.g., 'Guide to sustainable living' or 'B2B pricing analysis'"
-            className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none"
-            rows={2}
-          />
+    <div className="space-y-4 p-3">
+      {/* Compact Mode Header - like DreamWidget and HuntWidget */}
+      <div className="flex items-center gap-3 p-2 bg-green-500/10 rounded border border-green-500/20">
+        <span className="text-lg">{topicCategories.find(t => t.id === args.topic)?.icon || '⚡'}</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-white truncate">
+            {topicCategories.find(t => t.id === args.topic)?.title || 'Custom'}
+          </div>
+          <div className="flex gap-3 text-xs text-white/50">
+            <span>{args.depth === 'deep' ? 'Deep Analysis' : 'Quick Overview'}</span>
+            <span>Content Generation</span>
+          </div>
         </div>
+      </div>
 
-        {/* Topic Selection - Dropdown */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium text-white/80 mb-2 block">🎯 Topic</label>
-            <select
-              value={args.topic}
-              onChange={(e) => updateArgs('topic', e.target.value)}
-              className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm"
+      {/* What to Create - Input Area */}
+      <div className="space-y-3">
+        <textarea
+          value={args.subject}
+          onChange={(e) => updateArgs('subject', e.target.value)}
+          placeholder="Describe what you want to create..."
+          className="w-full p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
+          rows={2}
+        />
+      </div>
+
+      {/* Topic Selection - 3x3 grid with scrolling for remaining topics */}
+      <div>
+        <div className="text-xs text-white/60 mb-2">🎯 Select Topic</div>
+        <div className="grid grid-cols-3 gap-1 max-h-24 overflow-y-auto">
+          {topicCategories.map((topic) => (
+            <button
+              key={topic.id}
+              onClick={() => updateArgs('topic', topic.id)}
+              className={`p-1.5 rounded border transition-all text-center ${
+                args.topic === topic.id
+                  ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+                  : 'bg-white/5 border-white/10 hover:bg-white/10 text-white cursor-pointer'
+              }`}
+              title={`${topic.title} - ${topicConfigs[topic.id]?.description || 'General purpose content'}`}
             >
-              {topicCategories.map((topic) => (
-                <option key={topic.id} value={topic.id} className="bg-gray-800">
-                  {topic.icon} {topic.title}
-                </option>
-              ))}
-            </select>
-            {topicConfigs[args.topic] && (
-              <div className="text-xs text-white/60 mt-1">
-                📋 {topicConfigs[args.topic].description}
-              </div>
-            )}
-          </div>
-          
-          {/* Depth Selection */}
-          <div>
-            <label className="text-sm font-medium text-white/80 mb-2 block">📊 Depth</label>
-            <select
-              value={args.depth}
-              onChange={(e) => updateArgs('depth', e.target.value as 'shallow' | 'deep')}
-              className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm"
-            >
-              <option value="shallow" className="bg-gray-800">🔍 Shallow - Quick overview</option>
-              <option value="deep" className="bg-gray-800">🧠 Deep - Comprehensive</option>
-            </select>
-          </div>
+              <div className="text-xs mb-0.5">{topic.icon}</div>
+              <div className="text-xs font-medium truncate leading-tight">{topic.title.split(' ')[0]}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Advanced Options */}
+      <div className="space-y-2">
+        <div className="text-xs text-white/60">⚙️ Advanced Options</div>
+        
+        {/* Depth Selection */}
+        <div>
+          <label className="block text-xs text-white/60 mb-1">Analysis Depth</label>
+          <select
+            value={args.depth}
+            onChange={(e) => updateArgs('depth', e.target.value as 'shallow' | 'deep')}
+            className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs"
+          >
+            <option value="shallow">Shallow - Quick overview</option>
+            <option value="deep">Deep - Comprehensive</option>
+          </select>
         </div>
         
-        {/* Template Selection */}
-        {topicConfigs[args.topic] && (
-          <div>
-            <label className="text-sm font-medium text-white/80 mb-2 block">📋 Template</label>
-            <select
-              value={args.template}
-              onChange={(e) => updateArgs('template', e.target.value)}
-              className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm"
-            >
-              {topicConfigs[args.topic].templates.map((template) => (
-                <option key={template.id} value={template.id} className="bg-gray-800">
-                  {template.name}
-                </option>
-              ))}
-            </select>
-            {getCurrentTemplate() && (
-              <div className="text-xs text-blue-300 mt-1">
-                📝 {getCurrentTemplate()?.description}
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* References Section - Compact */}
+        {/* References */}
         <div>
-          <label className="text-sm font-medium text-white/80 mb-2 block">📚 References</label>
-          
-          {/* Reference Input Row */}
-          <div className="grid grid-cols-2 gap-2 mb-2">
+          <label className="block text-xs text-white/60 mb-1">References</label>
+          <div className="grid grid-cols-2 gap-1 mb-1">
             <button
               onClick={addReferenceUrl}
-              className="p-2 bg-white/5 border border-white/10 rounded-lg text-white/80 hover:bg-white/10 transition-all text-xs"
+              className="p-1.5 bg-white/5 border border-white/10 rounded text-white/80 hover:bg-white/10 transition-all text-xs"
             >
-              🔗 Add URL
+              🔗 URL
             </button>
-            
-            <label className="p-2 bg-white/5 border border-white/10 rounded-lg text-white/80 hover:bg-white/10 transition-all text-xs cursor-pointer text-center">
-              📁 Upload Files
+            <label className="p-1.5 bg-white/5 border border-white/10 rounded text-white/80 hover:bg-white/10 transition-all text-xs cursor-pointer text-center">
+              📁 Files
               <input
                 type="file"
                 multiple
@@ -806,106 +778,36 @@ Begin your scientific analysis now.`
               />
             </label>
           </div>
-          
-          {/* Reference Display - Compact */}
-          {(args.referenceUrls.length > 0 || args.referenceFiles.length > 0 || args.referenceText) && (
-            <div className="bg-white/5 rounded-lg p-2 max-h-20 overflow-y-auto">
-              {/* URLs */}
-              {args.referenceUrls.map((url, index) => (
-                <div key={`url-${index}`} className="flex items-center gap-2 text-xs mb-1">
-                  <span className="text-blue-300">🔗</span>
-                  <span className="flex-1 text-white/80 truncate">{url}</span>
-                  <button
-                    onClick={() => removeReferenceUrl(index)}
-                    className="text-red-400 hover:text-red-300"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              
-              {/* Files */}
-              {args.referenceFiles.map((file, index) => (
-                <div key={`file-${index}`} className="flex items-center gap-2 text-xs mb-1">
-                  <span className="text-green-300">📁</span>
-                  <span className="flex-1 text-white/80 truncate">{file.name}</span>
-                  <button
-                    onClick={() => removeReferenceFile(index)}
-                    className="text-red-400 hover:text-red-300"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              
-              {/* Text Preview */}
-              {args.referenceText && (
-                <div className="flex items-center gap-2 text-xs mb-1">
-                  <span className="text-yellow-300">📝</span>
-                  <span className="flex-1 text-white/80 truncate">
-                    {args.referenceText.substring(0, 50)}{args.referenceText.length > 50 ? '...' : ''}
-                  </span>
-                  <button
-                    onClick={() => updateArgs('referenceText', '')}
-                    className="text-red-400 hover:text-red-300"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {/* Reference Text Input */}
           <textarea
             value={args.referenceText}
             onChange={(e) => updateArgs('referenceText', e.target.value)}
-            placeholder="Additional context or instructions..."
-            className="w-full mt-2 p-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-xs"
+            placeholder="Additional context..."
+            className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-xs"
             rows={2}
           />
         </div>
-        
-        {/* Generate Button */}
-        <button
-          onClick={handleGenerate}
-          disabled={isGenerating || !args.subject.trim()}
-          className={`w-full p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg text-white font-medium flex items-center justify-center gap-2 transition-all ${
-            isGenerating ? 'animate-pulse' : 'hover:from-blue-600 hover:to-purple-600'
-          } disabled:opacity-50 disabled:cursor-not-allowed`}
-        >
-          {isGenerating ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              Generating...
-            </>
-          ) : (
-            <>
-              <span>🚀</span>
-              Generate {getCurrentTemplate()?.name || 'Content'}
-            </>
-          )}
-        </button>
-        
-        {/* Generation Status */}
-        {isGenerating && (
-          <div className="p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg mt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
-              <span className="text-sm text-blue-300 font-medium">
-                Agentic AI at work...
-              </span>
-            </div>
-            
-            <div className="text-xs text-white/60 space-y-1">
-              <div>• Researching topic with web search</div>
-              <div>• Analyzing sources and trends</div>
-              <div>• Generating sophisticated content</div>
-              <div>• Results will appear in chat with citations</div>
-            </div>
-          </div>
-        )}
       </div>
+      
+      {/* Generate Button */}
+      <button
+        onClick={handleGenerate}
+        disabled={isGenerating || !args.subject.trim()}
+        className={`w-full p-3 bg-gradient-to-r from-green-500 to-blue-500 rounded text-white font-medium transition-all hover:from-green-600 hover:to-blue-600 flex items-center justify-center gap-2 text-sm ${
+          isGenerating ? 'animate-pulse' : ''
+        } disabled:opacity-50 disabled:cursor-not-allowed`}
+      >
+        {isGenerating ? (
+          <>
+            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            Generating...
+          </>
+        ) : (
+          <>
+            <span>{topicCategories.find(t => t.id === args.topic)?.icon || '⚡'}</span>
+            Generate {topicConfigs[args.topic]?.name || 'Content'}
+          </>
+        )}
+      </button>
     </div>
   );
 };
@@ -967,61 +869,60 @@ export const OmniWidget: React.FC<OmniWidgetProps> = ({
     }
   ];
 
-  // Custom management actions for content generation
+  // Custom management actions for content generation - only 4 needed actions
   const managementActions: ManagementAction[] = [
     {
-      id: 'blog_post',
-      label: 'Blog',
+      id: 'doc',
+      label: 'Doc',
       icon: '📝',
       onClick: () => onGenerateContent({ 
-        prompt: 'Generate a blog post',
+        prompt: 'Generate document content',
         contentType: 'text',
         tone: 'professional',
         length: 'medium'
       }),
-      disabled: isGenerating
+      disabled: false
     },
     {
-      id: 'marketing',
-      label: 'Marketing',
+      id: 'presentation',
+      label: 'Presentation',
       icon: '📊',
       onClick: () => onGenerateContent({ 
-        prompt: 'Create marketing content',
+        prompt: 'Create presentation content',
         contentType: 'text',
-        tone: 'creative',
+        tone: 'professional',
+        length: 'medium'
+      }),
+      disabled: false
+    },
+    {
+      id: 'infographic',
+      label: 'Infographic',
+      icon: '📈',
+      onClick: () => onGenerateContent({ 
+        prompt: 'Create infographic content',
+        contentType: 'text',
+        tone: 'professional',
         length: 'short'
       }),
-      disabled: isGenerating
+      disabled: false
     },
     {
-      id: 'research',
-      label: 'Research',
-      icon: '🔬',
+      id: 'other',
+      label: 'Other',
+      icon: '📄',
       onClick: () => onGenerateContent({ 
-        prompt: 'Conduct research analysis',
-        contentType: 'research',
-        tone: 'academic',
-        length: 'long'
+        prompt: 'Generate custom content',
+        contentType: 'text',
+        tone: 'professional',
+        length: 'medium'
       }),
-      disabled: isGenerating
-    },
-    {
-      id: 'clear',
-      label: 'Clear',
-      icon: '🗑️',
-      onClick: () => {
-        onClearContent();
-        onClearHistory?.();
-      },
-      variant: 'danger' as const,
-      disabled: isGenerating
+      disabled: false
     }
   ];
 
   return (
     <BaseWidget
-      title="Omni Generator"
-      icon="⚡"
       isProcessing={isGenerating}
       outputHistory={outputHistory}
       currentOutput={currentOutput}

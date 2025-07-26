@@ -1,82 +1,131 @@
 /**
  * ============================================================================
- * Omni Widget Module (OmniWidgetModule.tsx) - Omni小部件的业务逻辑模块
+ * Omni Widget Module (OmniWidgetModule.tsx) - Refactored with BaseWidgetModule
  * ============================================================================
  * 
- * 【核心职责】
- * - 处理Omni小部件的所有业务逻辑
- * - 管理多用途内容生成的流程
- * - 封装内容生成参数处理和结果管理
- * - 向纯UI组件提供数据和事件回调
+ * Core Responsibilities:
+ * - Uses BaseWidgetModule for standardized widget management
+ * - Provides Omni-specific configuration and customizations
+ * - Manages multi-purpose content generation business logic
+ * - Integrates seamlessly with BaseWidget UI components
  * 
- * 【关注点分离】
- * ✅ 负责：
- *   - Omni小部件业务逻辑的统一管理
- *   - AI内容生成和状态管理的集成
- *   - 内容生成请求的协调
- *   - 用户输入的处理和验证
- *   - 生成结果的处理和格式化
- * 
- * ❌ 不负责：
- *   - UI布局和样式处理（由OmniWidget UI组件处理）
- *   - 组件的直接渲染（由UI components处理）
- *   - 底层数据存储（由stores处理）
- *   - 网络通信（由api处理）
- * 
- * 【数据流向】
- * WidgetManager → OmniWidgetModule → OmniWidget UI
- * hooks → OmniWidgetModule → 事件回调 → stores → api/services
+ * Benefits of BaseWidgetModule integration:
+ * - Automatic output history management for generated content
+ * - Built-in edit and management actions
+ * - Streaming status display
+ * - Standard error handling and logging
+ * - Consistent UI patterns across all widgets
  */
-import React, { useCallback, useEffect } from 'react';
-import { useWidget, useWidgetActions } from '../../hooks/useWidget';
+import React, { ReactNode } from 'react';
+import { BaseWidgetModule, createWidgetConfig } from './BaseWidgetModule';
 import { OmniWidgetParams, OmniWidgetResult } from '../../types/widgetTypes';
-import { logger, LogCategory } from '../../utils/logger';
-import { widgetHandler } from '../../components/core/WidgetHandler';
+import { EditAction, ManagementAction } from '../../components/ui/widgets/BaseWidget';
+import { useOmniState } from '../../stores/useWidgetStores';
 
 interface OmniWidgetModuleProps {
   triggeredInput?: string;
   onContentGenerated?: (result: OmniWidgetResult) => void;
-  children: (moduleProps: {
-    isGenerating: boolean;
-    generatedContent: string | null;
-    lastParams: OmniWidgetParams | null;
-    onGenerateContent: (params: OmniWidgetParams) => Promise<void>;
-    onClearContent: () => void;
-  }) => React.ReactNode;
+  children: ReactNode;
 }
 
 /**
- * Omni Widget Module - Business logic module for Omni widget
+ * Omni Widget Module - Template mapping and configuration for multi-purpose content generation
  * 
- * This module:
- * - Uses hooks to get omni widget state and AI client
- * - Handles all content generation business logic
- * - Manages user input processing and validation
- * - Passes pure data and callbacks to Omni UI component
- * - Keeps Omni UI component pure
+ * Content Types:
+ * - text: General text content creation
+ * - code: Code generation and programming
+ * - markdown: Documentation and structured content
+ * - email: Email and communication writing
+ * - social: Social media posts and content
+ * - business: Business strategy and analysis
+ * - academic: Research and academic writing
  */
-export const OmniWidgetModule: React.FC<OmniWidgetModuleProps> = ({
-  triggeredInput,
-  onContentGenerated,
-  children
-}) => {
-  // Get omni widget state using hooks
-  const { omniState } = useWidget();
-  const { omni: omniActions } = useWidgetActions();
+
+// Omni content type to MCP template mapping
+const OMNI_TEMPLATE_MAPPING = {
+  'general': {
+    template_id: 'general_content_prompt',
+    focus: 'comprehensive_content'
+  },
+  'text': {
+    template_id: 'general_content_prompt',
+    focus: 'text_generation'
+  },
+  'code': {
+    template_id: 'general_content_prompt',
+    focus: 'code_generation'
+  },
+  'markdown': {
+    template_id: 'general_content_prompt',
+    focus: 'documentation_writing'
+  },
+  'email': {
+    template_id: 'general_content_prompt',
+    focus: 'communication_writing'
+  },
+  'social': {
+    template_id: 'content_marketing_prompt',
+    focus: 'social_media_content'
+  },
+  'business': {
+    template_id: 'business_strategy_prompt',
+    focus: 'business_content'
+  },
+  'academic': {
+    template_id: 'research_paper_prompt',
+    focus: 'academic_writing'
+  },
+  'marketing': {
+    template_id: 'content_marketing_prompt',
+    focus: 'marketing_content'
+  },
+  'financial': {
+    template_id: 'financial_analysis_prompt',
+    focus: 'financial_content'
+  }
+};
+
+// Omni-specific template parameter preparation
+const prepareOmniTemplateParams = (params: OmniWidgetParams) => {
+  const { prompt, contentType = 'text', tone = 'professional', length = 'medium' } = params;
   
-  console.log('⚡ OMNI_MODULE: Providing data to Omni UI:', {
-    isGenerating: omniState.isGenerating,
-    hasContent: !!omniState.generatedContent,
-    hasParams: !!omniState.lastParams,
-    triggeredInput: triggeredInput?.substring(0, 50)
+  const mapping = OMNI_TEMPLATE_MAPPING[contentType] || OMNI_TEMPLATE_MAPPING['general'];
+  
+  // Build prompt_args for content generation
+  const prompt_args = {
+    subject: prompt || 'Content generation request',
+    content_type: contentType,
+    tone: tone,
+    length: length,
+    depth: 'deep',
+    reference_text: `Generate ${contentType} content with ${tone} tone and ${length} length`
+  };
+  
+  console.log('⚡ OMNI_MODULE: Prepared template params for content type', contentType, ':', {
+    template_id: mapping.template_id,
+    prompt_args
   });
   
-  // Business logic: Analyze input and determine content generation parameters
-  const analyzeInputAndCreateParams = (input: string): OmniWidgetParams | null => {
+  return {
+    template_id: mapping.template_id,
+    prompt_args
+  };
+};
+
+// Omni widget configuration
+const omniWidgetConfig = createWidgetConfig({
+  type: 'omni',
+  title: 'Omni Content Generator',
+  icon: '⚡',
+  sessionIdPrefix: 'omni_widget',
+  maxHistoryItems: 30,
+  
+  // Extract parameters from triggered input
+  extractParamsFromInput: (input: string) => {
     const lowerInput = input.toLowerCase();
     
     // Determine content type based on keywords
-    let contentType: 'text' | 'code' | 'markdown' | 'email' | 'social' = 'text';
+    let contentType: 'text' | 'code' | 'markdown' | 'email' | 'social' | 'business' | 'academic' = 'text';
     let tone: 'professional' | 'casual' | 'creative' | 'technical' = 'professional';
     let length: 'short' | 'medium' | 'long' = 'medium';
     
@@ -93,6 +142,12 @@ export const OmniWidgetModule: React.FC<OmniWidgetModuleProps> = ({
       length = 'short';
     } else if (lowerInput.includes('markdown') || lowerInput.includes('documentation') || lowerInput.includes('readme')) {
       contentType = 'markdown';
+      tone = 'technical';
+    } else if (lowerInput.includes('business') || lowerInput.includes('strategy') || lowerInput.includes('analysis')) {
+      contentType = 'business';
+      tone = 'professional';
+    } else if (lowerInput.includes('academic') || lowerInput.includes('research') || lowerInput.includes('paper')) {
+      contentType = 'academic';
       tone = 'technical';
     }
     
@@ -113,86 +168,155 @@ export const OmniWidgetModule: React.FC<OmniWidgetModuleProps> = ({
     }
     
     return {
-      prompt: input,
+      prompt: input.trim(),
       contentType,
       tone,
       length
     };
-  };
-  
-  // Business logic: Handle content generation via useWidget actions
-  const handleGenerateContent = useCallback(async (params: OmniWidgetParams) => {
-    console.log('⚡ OMNI_MODULE: generateContent called with:', params);
-    
-    if (!params.prompt) {
-      console.error('❌ OMNI_MODULE: No prompt provided');
-      return;
-    }
-    
-    try {
-      logger.info(LogCategory.ARTIFACT_CREATION, 'Starting content generation via omniActions', { params });
-      
-      // Use omni actions from useWidget hook
-      await omniActions.triggerOmniGeneration(params);
-      
-      logger.info(LogCategory.ARTIFACT_CREATION, 'Content generation request sent via omniActions');
-      console.log('✅ OMNI_MODULE: Content generation request processed');
-      
-    } catch (error) {
-      console.error('❌ OMNI_MODULE: Content generation failed:', error);
-      logger.error(LogCategory.ARTIFACT_CREATION, 'Content generation failed', { error, params });
-    }
-  }, [omniActions]);
-  
-  // Business logic: Handle triggered input from chat
-  useEffect(() => {
-    if (triggeredInput && !omniState.isGenerating) {
-      console.log('⚡ OMNI_MODULE: Processing triggered input:', triggeredInput);
-      
-      // Analyze input to determine content type and generate parameters
-      const params = analyzeInputAndCreateParams(triggeredInput);
-      if (params) {
-        handleGenerateContent(params);
+  },
+  editActions: [
+    {
+      id: 'copy_content',
+      label: 'Copy',
+      icon: '📋',
+      onClick: (content) => {
+        navigator.clipboard.writeText(content);
+        console.log('📋 Content copied to clipboard');
+      }
+    },
+    {
+      id: 'export_markdown', 
+      label: 'Export MD',
+      icon: '📝',
+      onClick: (content) => {
+        console.log('📝 Exporting as Markdown:', content);
+      }
+    },
+    {
+      id: 'refine_content',
+      label: 'Refine',
+      icon: '✨', 
+      onClick: (content) => {
+        console.log('✨ Refining content:', content);
       }
     }
-  }, [triggeredInput, omniState.isGenerating, handleGenerateContent]);
-  
-  // Monitor omni state changes to notify parent component
-  useEffect(() => {
-    if (omniState.generatedContent && omniState.lastParams && !omniState.isGenerating) {
-      // Create result and notify parent component when content is generated
-      const result: OmniWidgetResult = {
-        content: omniState.generatedContent,
-        contentType: omniState.lastParams.contentType || 'text',
-        metadata: {
-          wordCount: omniState.generatedContent.split(' ').length,
-          tone: omniState.lastParams.tone || 'professional',
-          generatedAt: new Date().toISOString()
-        }
-      };
-      
-      onContentGenerated?.(result);
-      logger.info(LogCategory.ARTIFACT_CREATION, 'Omni content generation completed, parent notified');
+  ],
+  managementActions: [
+    {
+      id: 'content_types',
+      label: 'Content Types',
+      icon: '📑',
+      onClick: () => console.log('📑 Content type selector'),
+      variant: 'primary' as const,
+      disabled: false
+    },
+    {
+      id: 'templates',
+      label: 'Templates',
+      icon: '📋',
+      onClick: () => console.log('📋 Content templates library'),
+      disabled: false
+    },
+    {
+      id: 'tone_style',
+      label: 'Tone & Style', 
+      icon: '🎨',
+      onClick: () => console.log('🎨 Tone and style settings'),
+      disabled: false
+    },
+    {
+      id: 'ai_models',
+      label: 'AI Models',
+      icon: '🧠',
+      onClick: () => console.log('🧠 AI model selection - coming soon'),
+      disabled: true
     }
-  }, [omniState.generatedContent, omniState.lastParams, omniState.isGenerating, onContentGenerated]);
+  ]
+});
+
+/**
+ * Omni Widget Module - Uses BaseWidgetModule with Omni-specific configuration
+ */
+export const OmniWidgetModule: React.FC<OmniWidgetModuleProps> = ({
+  triggeredInput,
+  onContentGenerated,
+  children
+}) => {
+  // Read state from store
+  const { generatedContent, isGenerating, lastParams } = useOmniState();
   
-  // Business logic: Clear generated content
-  const handleClearContent = useCallback(() => {
-    console.log('⚡ OMNI_MODULE: Clearing content');
-    omniActions.clearOmniData();
-    logger.info(LogCategory.ARTIFACT_CREATION, 'Omni content cleared');
-  }, [omniActions]);
+  // Convert generatedContent to outputHistory format for BaseWidget display
+  const outputHistory = React.useMemo(() => {
+    if (!generatedContent) {
+      return [];
+    }
+    
+    return [{
+      id: `omni_result_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      type: 'generated_content',
+      title: lastParams?.prompt ? `Generated: ${lastParams.prompt.substring(0, 50)}...` : 'Generated Content',
+      content: generatedContent,
+      metadata: {
+        contentType: lastParams?.contentType || 'text',
+        tone: lastParams?.tone || 'professional',
+        length: lastParams?.length || 'medium',
+        wordCount: generatedContent.split(' ').length
+      }
+    }];
+  }, [generatedContent, lastParams]);
   
-  // Pass all data and business logic callbacks to pure UI component
+  console.log('⚡ OMNI_MODULE: Converting generated content to output history:', {
+    hasContent: !!generatedContent,
+    outputHistoryCount: outputHistory.length,
+    latestResult: outputHistory[0]?.title
+  });
+  
   return (
-    <>
-      {children({
-        isGenerating: omniState.isGenerating,
-        generatedContent: omniState.generatedContent,
-        lastParams: omniState.lastParams,
-        onGenerateContent: handleGenerateContent,
-        onClearContent: handleClearContent
-      })}
-    </>
+    <BaseWidgetModule
+      config={omniWidgetConfig}
+      triggeredInput={triggeredInput}
+      onCompleted={onContentGenerated}
+    >
+      {(moduleProps) => {
+        // Pass store state to OmniWidget via props with template support
+        if (React.isValidElement(children)) {
+          return React.cloneElement(children, {
+            ...children.props,
+            // Store state
+            generatedContent,
+            isGenerating,
+            lastParams,
+            // Add onGenerateContent function with template parameter preparation
+            onGenerateContent: async (params: OmniWidgetParams) => {
+              // Prepare template parameters based on the content type
+              const templateParams = prepareOmniTemplateParams(params);
+              
+              // Add template information to params before sending to store
+              const enrichedParams = {
+                ...params,
+                templateParams // Add template configuration
+              };
+              
+              console.log('⚡ OMNI_MODULE: Sending enriched params to store:', enrichedParams);
+              await moduleProps.startProcessing(enrichedParams);
+            },
+            // Add clear content function
+            onClearContent: () => {
+              console.log('⚡ OMNI_MODULE: Clearing content');
+              moduleProps.onClearHistory();
+            },
+            // BaseWidget state with converted data
+            outputHistory: outputHistory,
+            currentOutput: outputHistory[0] || null,
+            isStreaming: moduleProps.isStreaming,
+            streamingContent: moduleProps.streamingContent,
+            onSelectOutput: moduleProps.onSelectOutput,
+            onClearHistory: moduleProps.onClearHistory
+          });
+        }
+        return children;
+      }}
+    </BaseWidgetModule>
   );
 };

@@ -34,6 +34,8 @@ import { ChatMessage } from '../types/chatTypes';
 import { useChat } from '../hooks/useChat';
 import { useChatActions } from '../stores/useChatStore';
 import { useAuth } from '../hooks/useAuth';
+import { useArtifactLogic } from './ArtifactModule';
+import { ArtifactComponent } from '../components/ui/chat/ArtifactComponent';
 
 interface ChatModuleProps extends Omit<ChatLayoutProps, 'messages' | 'isLoading' | 'isTyping' | 'onSendMessage' | 'onSendMultimodal'> {
   // All ChatLayout props except the data and callback props that we'll provide from business logic
@@ -59,12 +61,17 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   // Get user info for metadata enrichment
   const { auth0User } = useAuth();
   
+  // Get artifact logic for handling artifacts in messages
+  const artifactLogic = useArtifactLogic();
+  
   console.log('📦 CHAT_MODULE: Providing data to ChatLayout:', {
     messagesCount: chatInterface.messages.length,
     isLoading: chatInterface.isLoading,
     isTyping: chatInterface.isTyping,
     hasStreamingMessage: chatInterface.hasStreamingMessage,
-    chatActionsAvailable: !!chatActions
+    chatActionsAvailable: !!chatActions,
+    artifactsCount: artifactLogic.artifacts.length,
+    latestArtifact: artifactLogic.latestWidgetArtifact?.appName
   });
   
   // Business logic: Handle message sending
@@ -123,7 +130,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     // Note: File handling and API call will be handled by the reactive subscriber
     console.log('✅ CHAT_MODULE: Multimodal user message added, reactive trigger will handle processing');
   }, [chatActions, auth0User]);
-  
+
   // Pass all data and business logic callbacks as props to pure UI component
   return (
     <ChatLayout

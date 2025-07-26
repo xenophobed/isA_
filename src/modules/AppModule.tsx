@@ -40,18 +40,43 @@ import { RightSidebarLayout } from '../components/ui/chat/RightSidebarLayout';
 import { useChat } from '../hooks/useChat';
 import { useArtifactLogic } from './ArtifactModule';
 import { useAppStore } from '../stores/useAppStore';
+import { useChatActions } from '../stores/useChatStore';
 import { widgetHandler } from '../components/core/WidgetHandler';
 import { logger, LogCategory } from '../utils/logger';
 import { AppId } from '../types/appTypes';
 
-// Available apps configuration
+// Available apps configuration - More relaxed keyword triggers
 const AVAILABLE_APPS = [
-  { id: 'dream', name: 'DreamForge AI', triggers: ['create image', 'generate image', 'make picture', 'draw'] },
-  { id: 'hunt', name: 'HuntAI', triggers: ['search product', 'find item', 'compare prices', 'shop'] },
-  { id: 'omni', name: 'Omni Content', triggers: ['generate content', 'create text', 'write', 'compose'] },
-  { id: 'assistant', name: 'AI Assistant', triggers: ['help', 'assist', 'question', 'ask'] },
-  { id: 'data-scientist', name: 'DataWise Analytics', triggers: ['analyze data', 'create chart', 'statistics'] },
-  { id: 'knowledge', name: 'Knowledge Hub', triggers: ['analyze document', 'summarize', 'extract'] }
+  { 
+    id: 'dream', 
+    name: 'DreamForge AI', 
+    triggers: ['image', 'picture', 'photo', 'draw', 'generate', 'create', 'design', 'art', 'visual', 'illustration'] 
+  },
+  { 
+    id: 'hunt', 
+    name: 'HuntAI', 
+    triggers: ['search', 'find', 'buy', 'shop', 'product', 'price', 'compare', 'look for', 'hunt'] 
+  },
+  { 
+    id: 'omni', 
+    name: 'Omni Content', 
+    triggers: ['write', 'content', 'article', 'blog', 'copy', 'draft', 'compose', 'text', 'story', 'essay'] 
+  },
+  { 
+    id: 'data-scientist', 
+    name: 'DataWise Analytics', 
+    triggers: ['analyze', 'analysis', 'data', 'chart', 'graph', 'statistics', 'plot', 'trend', 'metric'] 
+  },
+  { 
+    id: 'knowledge', 
+    name: 'Knowledge Hub', 
+    triggers: ['document', 'pdf', 'file', 'analyze document', 'summarize', 'extract'] 
+  },
+  { 
+    id: 'assistant', 
+    name: 'AI Assistant', 
+    triggers: ['help', 'assist', 'question', 'ask', 'explain', 'how to'] 
+  }
 ];
 
 interface AppModuleProps extends Omit<AppLayoutProps, 'children'> {
@@ -71,6 +96,7 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
   // Business logic hooks
   const chatInterface = useChat();
   const artifactLogic = useArtifactLogic();
+  const chatActions = useChatActions();
   
   // App state management
   const {
@@ -94,25 +120,32 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
 
   // Note: Widget trigger logic is now handled in useChatStore reactive subscriber
 
-  // Business logic: Handle file selection
+  // Business logic: Handle file selection - delegates to reactive system
   const handleFileSelect = useCallback((files: FileList) => {
     logger.info(LogCategory.USER_INPUT, 'Files selected', { 
       fileCount: files.length,
       fileNames: Array.from(files).map(f => f.name)
     });
-    console.log('📎 APP_MODULE: Files selected:', files);
+    console.log('📎 APP_MODULE: Files selected:', Array.from(files).map(f => f.name));
     
     if (files.length > 0) {
+      // Create a message with files - the reactive system in useChatStore will handle widget triggering
       const fileMessage = `Analyze ${files.length} document${files.length > 1 ? 's' : ''}: ${Array.from(files).map(f => f.name).join(', ')}`;
-      setTimeout(() => {
-        setCurrentApp('knowledge' as AppId);
-        setShowRightSidebar(true);
-        setTriggeredAppInput(fileMessage);
-        logger.info(LogCategory.APP_TRIGGER, 'Opened knowledge app for files', { fileCount: files.length });
-        console.log('🧠 APP_MODULE: Opened knowledge app for files');
-      }, 500);
+      const userMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user' as const,
+        content: fileMessage,
+        timestamp: new Date().toISOString(),
+        metadata: {},
+        processed: false,
+        files: Array.from(files) // Add files to trigger knowledge widget via AI detection
+      };
+      
+      chatActions.addMessage(userMessage);
+      logger.info(LogCategory.USER_INPUT, 'File message added, reactive system will trigger knowledge widget', { fileCount: files.length });
+      console.log('✅ APP_MODULE: File message added, reactive system will handle knowledge widget');
     }
-  }, [setCurrentApp, setShowRightSidebar, setTriggeredAppInput]);
+  }, [chatActions]);
 
   // Business logic: Widget management callbacks
   const handleDreamGeneration = useCallback(async (params: any) => {
@@ -142,6 +175,13 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
     setTriggeredAppInput('');
     logger.info(LogCategory.APP_TRIGGER, 'App closed', { previousApp: currentApp });
   }, [setShowRightSidebar, setCurrentApp, setTriggeredAppInput, currentApp]);
+
+  const handleBackToList = useCallback(() => {
+    setCurrentApp(null);
+    setTriggeredAppInput('');
+    // Keep showRightSidebar true to show widget list
+    logger.info(LogCategory.APP_TRIGGER, 'Back to widget list', { previousApp: currentApp });
+  }, [setCurrentApp, setTriggeredAppInput, currentApp]);
 
   const handleAppSelect = useCallback((appId: string) => {
     setCurrentApp(appId as AppId);
@@ -221,6 +261,7 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
                 showRightSidebar={showRightSidebar}
                 triggeredAppInput={triggeredAppInput}
                 onCloseApp={handleCloseApp}
+                onBackToList={handleBackToList}
                 onAppSelect={handleAppSelect}
               />
             }

@@ -165,6 +165,7 @@ interface DreamWidgetProps {
   onClearHistory?: () => void;
 }
 
+
 /**
  * Dream Widget Input Area - Content that goes inside BaseWidget
  */
@@ -176,10 +177,20 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
   onGenerateImage,
   onClearImage
 }) => {
-  // Modern state management (copied from dream_sidebar.tsx)
+  // Modern state management with enhanced parameters
   const [prompt, setPrompt] = useState('');
   const [selectedMode, setSelectedMode] = useState<ImageMode>(imageModes[0]);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [stylePreset, setStylePreset] = useState('photorealistic');
+  const [quality, setQuality] = useState('high');
+  const [strength, setStrength] = useState('medium');
+  const [hairSource, setHairSource] = useState('preserve');
+  const [industry, setIndustry] = useState('corporate');
+  const [expression, setExpression] = useState('happy');
+  const [colorScheme, setColorScheme] = useState('vibrant');
+  const [theme, setTheme] = useState('cute_animal');
+  const [fillMethod, setFillMethod] = useState('content_aware');
+  const [direction, setDirection] = useState('all_sides');
 
   // Real-time mode recommendations (exact copy from dream_sidebar.tsx)
   React.useEffect(() => {
@@ -209,7 +220,17 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
         prompt: prompt,
         style: selectedMode.id,
         size: '1024x1024',
-        quality: 'high'
+        // Add all MCP-specific parameters
+        style_preset: stylePreset,
+        quality: quality,
+        strength: strength,
+        hair_source: hairSource,
+        industry: industry,
+        expression: expression,
+        color_scheme: colorScheme,
+        theme: theme,
+        fill_method: fillMethod,
+        direction: direction
       };
       
       await onGenerateImage(params);
@@ -274,7 +295,7 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
           rows={2}
         />
 
-        {/* Compact Upload */}
+        {/* Compact Upload - Only show when image is uploaded */}
         <input
           type="file"
           accept="image/*"
@@ -282,60 +303,270 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
           className="hidden"
           id="image-upload"
         />
-        <label
-          htmlFor="image-upload"
-          className={`flex items-center gap-2 w-full p-2 border border-dashed rounded cursor-pointer transition-all text-sm ${
-            selectedMode.requiresImage 
-              ? 'border-orange-500/50 bg-orange-500/5 hover:border-orange-500' 
-              : 'border-white/20 hover:border-white/40'
-          }`}
-        >
-          {uploadedImage ? (
-            <>
-              <img src={uploadedImage} alt="Uploaded" className="w-6 h-6 object-cover rounded" />
-              <span className="text-white/70 text-xs">Image uploaded</span>
-            </>
-          ) : (
-            <>
-              <span>📷</span>
-              <span className={selectedMode.requiresImage ? 'text-orange-300' : 'text-white/60'}>
-                {selectedMode.requiresImage ? 'Required' : 'Optional'}
-              </span>
-            </>
-          )}
-        </label>
+        {uploadedImage && (
+          <div className="flex items-center gap-2 p-2 bg-white/5 border border-white/10 rounded">
+            <img src={uploadedImage} alt="Uploaded" className="w-6 h-6 object-cover rounded" />
+            <span className="text-white/70 text-xs">Image uploaded</span>
+            <button 
+              onClick={() => setUploadedImage(null)}
+              className="ml-auto text-white/40 hover:text-white/70 text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Compact Mode Selector */}
       <div>
-        <div className="text-xs text-white/60 mb-2">🎯 Modes</div>
-        <div className="grid grid-cols-3 gap-1 max-h-48 overflow-y-auto">
+        <div className="text-xs text-white/60 mb-2">🎯 Select Mode</div>
+        <div className="grid grid-cols-3 gap-1">
           {imageModes.map((mode) => (
             <button
               key={mode.id}
               onClick={() => {
+                if (mode.requiresImage && !uploadedImage) {
+                  // Trigger file upload for modes that need images
+                  document.getElementById('image-upload')?.click();
+                }
                 setSelectedMode(mode);
                 console.log('🎨 Mode selected:', mode.name);
               }}
-              disabled={mode.requiresImage && !uploadedImage}
-              className={`p-2 rounded border transition-all text-center ${
+              className={`p-1.5 rounded border transition-all text-center ${
                 selectedMode.id === mode.id
                   ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
-                  : mode.requiresImage && !uploadedImage
-                    ? 'bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed opacity-50'
-                    : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
+                  : 'bg-white/5 border-white/10 hover:bg-white/10 text-white cursor-pointer'
               }`}
-              title={`${mode.name} - ${mode.description} (${mode.cost}, ${mode.estimatedTime})`}
+              title={`${mode.name} - ${mode.description}`}
             >
-              <div className="text-sm mb-1">{mode.icon}</div>
-              <div className="text-xs font-medium truncate">{mode.name}</div>
-              <div className="text-xs text-white/40">{mode.cost}</div>
+              <div className="text-xs mb-0.5">{mode.icon}</div>
+              <div className="text-xs font-medium truncate leading-tight">{mode.name}</div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Compact Process Button */}
+      {/* Advanced Options based on MCP prompts */}
+      {selectedMode && (
+        <div className="space-y-2">
+          <div className="text-xs text-white/60">⚙️ Options</div>
+          
+          {/* text_to_image_prompt: style_preset, quality */}
+          {selectedMode.id === 'text_to_image' && (
+            <>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Style</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={stylePreset} onChange={(e) => setStylePreset(e.target.value)}>
+                  <option value="photorealistic">Photorealistic</option>
+                  <option value="artistic">Artistic</option>
+                  <option value="cinematic">Cinematic</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Quality</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={quality} onChange={(e) => setQuality(e.target.value)}>
+                  <option value="standard">Standard</option>
+                  <option value="high">High</option>
+                  <option value="ultra">Ultra</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {/* image_to_image_prompt: style_preset, strength */}
+          {selectedMode.id === 'image_to_image' && (
+            <>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Style</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={stylePreset} onChange={(e) => setStylePreset(e.target.value)}>
+                  <option value="enhanced">Enhanced</option>
+                  <option value="artistic">Artistic</option>
+                  <option value="dramatic">Dramatic</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Strength</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={strength} onChange={(e) => setStrength(e.target.value)}>
+                  <option value="light">Light</option>
+                  <option value="medium">Medium</option>
+                  <option value="strong">Strong</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {/* style_transfer_prompt: style_preset, strength */}
+          {selectedMode.id === 'style_transfer' && (
+            <>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Art Style</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={stylePreset} onChange={(e) => setStylePreset(e.target.value)}>
+                  <option value="impressionist">Impressionist</option>
+                  <option value="renaissance">Renaissance</option>
+                  <option value="abstract">Abstract</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Intensity</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={strength} onChange={(e) => setStrength(e.target.value)}>
+                  <option value="subtle">Subtle</option>
+                  <option value="medium">Medium</option>
+                  <option value="strong">Strong</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {/* face_swap_prompt: hair_source, quality */}
+          {selectedMode.id === 'face_swap' && (
+            <>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Hair</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={hairSource} onChange={(e) => setHairSource(e.target.value)}>
+                  <option value="preserve">Preserve</option>
+                  <option value="adapt">Adapt</option>
+                  <option value="blend">Blend</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Quality</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={quality} onChange={(e) => setQuality(e.target.value)}>
+                  <option value="standard">Standard</option>
+                  <option value="high">High</option>
+                  <option value="professional">Professional</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {/* professional_headshot_prompt: industry, quality */}
+          {selectedMode.id === 'professional_headshot' && (
+            <>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Industry</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={industry} onChange={(e) => setIndustry(e.target.value)}>
+                  <option value="corporate">Corporate</option>
+                  <option value="creative">Creative</option>
+                  <option value="tech">Tech</option>
+                  <option value="healthcare">Healthcare</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Level</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={quality} onChange={(e) => setQuality(e.target.value)}>
+                  <option value="standard">Standard</option>
+                  <option value="premium">Premium</option>
+                  <option value="executive">Executive</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {/* emoji_generation_prompt: expression, style_preset, color_scheme */}
+          {selectedMode.id === 'emoji_generation' && (
+            <>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Expression</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={expression} onChange={(e) => setExpression(e.target.value)}>
+                  <option value="happy">Happy</option>
+                  <option value="sad">Sad</option>
+                  <option value="excited">Excited</option>
+                  <option value="surprised">Surprised</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Style</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={stylePreset} onChange={(e) => setStylePreset(e.target.value)}>
+                  <option value="kawaii">Kawaii</option>
+                  <option value="modern">Modern</option>
+                  <option value="classic">Classic</option>
+                  <option value="minimal">Minimal</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Colors</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={colorScheme} onChange={(e) => setColorScheme(e.target.value)}>
+                  <option value="vibrant">Vibrant</option>
+                  <option value="pastel">Pastel</option>
+                  <option value="monochrome">Monochrome</option>
+                  <option value="rainbow">Rainbow</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {/* photo_inpainting_prompt: fill_method, strength */}
+          {selectedMode.id === 'photo_inpainting' && (
+            <>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Method</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={fillMethod} onChange={(e) => setFillMethod(e.target.value)}>
+                  <option value="content_aware">Content Aware</option>
+                  <option value="texture_synthesis">Texture Synthesis</option>
+                  <option value="smart_fill">Smart Fill</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Quality</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={strength} onChange={(e) => setStrength(e.target.value)}>
+                  <option value="seamless">Seamless</option>
+                  <option value="natural">Natural</option>
+                  <option value="enhanced">Enhanced</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {/* photo_outpainting_prompt: direction, strength */}
+          {selectedMode.id === 'photo_outpainting' && (
+            <>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Direction</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={direction} onChange={(e) => setDirection(e.target.value)}>
+                  <option value="all_sides">All Sides</option>
+                  <option value="horizontal">Horizontal</option>
+                  <option value="vertical">Vertical</option>
+                  <option value="specific">Specific</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Quality</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={strength} onChange={(e) => setStrength(e.target.value)}>
+                  <option value="natural">Natural</option>
+                  <option value="enhanced">Enhanced</option>
+                  <option value="dramatic">Dramatic</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {/* sticker_generation_prompt: style_preset, theme */}
+          {selectedMode.id === 'sticker_generation' && (
+            <>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Style</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={stylePreset} onChange={(e) => setStylePreset(e.target.value)}>
+                  <option value="kawaii">Kawaii</option>
+                  <option value="chibi">Chibi</option>
+                  <option value="modern">Modern</option>
+                  <option value="vintage">Vintage</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Theme</label>
+                <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={theme} onChange={(e) => setTheme(e.target.value)}>
+                  <option value="cute_animal">Cute Animal</option>
+                  <option value="food">Food</option>
+                  <option value="nature">Nature</option>
+                  <option value="emoji">Emoji</option>
+                </select>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Enhanced Process Button */}
       <button
         onClick={handleImageProcessing}
         disabled={isGenerating || !prompt.trim() || (selectedMode.requiresImage && !uploadedImage)}
@@ -351,44 +582,10 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
         ) : (
           <>
             <span>{selectedMode.icon}</span>
-            Start
+            Generate with {selectedMode.name}
           </>
         )}
       </button>
-
-      {/* Compact Quick Ideas */}
-      <div>
-        <div className="text-xs text-white/60 mb-2">💡 Quick Ideas</div>
-        <div className="grid grid-cols-1 gap-1">
-          <button 
-            onClick={() => {
-              setPrompt("A majestic mountain landscape at golden hour");
-              setSelectedMode(imageModes[0]);
-            }}
-            className="p-1 bg-white/5 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition-all text-left"
-          >
-            🏔️ Mountain landscape
-          </button>
-          <button 
-            onClick={() => {
-              setPrompt("Transform this into a cyberpunk style");
-              setSelectedMode(imageModes[2]);
-            }}
-            className="p-1 bg-white/5 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition-all text-left"
-          >
-            🌃 Cyberpunk style
-          </button>
-          <button 
-            onClick={() => {
-              setPrompt("Make this look professional for LinkedIn");
-              setSelectedMode(imageModes[5]);
-            }}
-            className="p-1 bg-white/5 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition-all text-left"
-          >
-            👔 Professional headshot
-          </button>
-        </div>
-      </div>
     </div>
   );
 };
@@ -411,14 +608,14 @@ export const DreamWidget: React.FC<DreamWidgetProps> = ({
   onClearHistory
 }) => {
   
-  // Custom edit actions for generated images
+  // Simplified edit actions for generated images - only essential ones
   const editActions: EditAction[] = [
     {
       id: 'download',
-      label: 'Download',
+      label: 'Save',
       icon: '💾',
       onClick: (content) => {
-        if (typeof content === 'string' && content.startsWith('data:') || content.startsWith('http')) {
+        if (typeof content === 'string' && (content.startsWith('data:') || content.startsWith('http'))) {
           const link = document.createElement('a');
           link.href = content;
           link.download = `dream-${Date.now()}.jpg`;
@@ -435,75 +632,47 @@ export const DreamWidget: React.FC<DreamWidgetProps> = ({
           window.open(content, '_blank');
         }
       }
-    },
-    {
-      id: 'copy',
-      label: 'Copy URL',
-      icon: '📋',
-      onClick: (content) => {
-        if (typeof content === 'string') {
-          navigator.clipboard.writeText(content);
-        }
-      }
     }
   ];
 
-  // Custom management actions for image generation
+  // Media type management actions
   const managementActions: ManagementAction[] = [
     {
-      id: 'text_to_image',
-      label: 'Create',
-      icon: '✨',
-      onClick: () => onGenerateImage({ 
-        prompt: "A beautiful landscape", 
-        style: 'text_to_image', 
-        size: '1024x1024', 
-        quality: 'high' 
-      }),
-      disabled: isGenerating
+      id: 'image',
+      label: 'Image',
+      icon: '🖼️',
+      onClick: () => {
+        console.log('🖼️ Image mode selected (already active)');
+      },
+      variant: 'primary' as const,
+      disabled: false // Current active mode
     },
     {
-      id: 'transform',
-      label: 'Transform',
-      icon: '🔄',
+      id: 'video',
+      label: 'Video',
+      icon: '🎬',
       onClick: () => {
-        if (generatedImage) {
-          onGenerateImage({ 
-            prompt: "Transform this image", 
-            style: 'image_to_image', 
-            size: '1024x1024', 
-            quality: 'high' 
-          });
-        }
+        console.log('🎬 Video mode - not implemented yet');
       },
-      disabled: isGenerating || !generatedImage
+      disabled: true // Not yet implemented
     },
     {
-      id: 'style',
-      label: 'Style',
-      icon: '🎨',
+      id: 'audio',
+      label: 'Audio',
+      icon: '🎵',
       onClick: () => {
-        if (generatedImage) {
-          onGenerateImage({ 
-            prompt: "Change the style of this image", 
-            style: 'style_transfer', 
-            size: '1024x1024', 
-            quality: 'high' 
-          });
-        }
+        console.log('🎵 Audio mode - not implemented yet');
       },
-      disabled: isGenerating || !generatedImage
+      disabled: true // Not yet implemented
     },
     {
-      id: 'clear',
-      label: 'Clear',
-      icon: '🗑️',
+      id: 'others',
+      label: 'Others',
+      icon: '📄',
       onClick: () => {
-        onClearImage();
-        onClearHistory?.();
+        console.log('📄 Others mode - not implemented yet');
       },
-      variant: 'danger' as const,
-      disabled: isGenerating
+      disabled: true // Not yet implemented
     }
   ];
 

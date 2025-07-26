@@ -1,120 +1,102 @@
 /**
  * ============================================================================
- * Data Scientist Widget Module (DataScientistWidgetModule.tsx) - 数据科学小部件的业务逻辑模块
+ * Data Scientist Widget Module (DataScientistWidgetModule.tsx) - Refactored with BaseWidgetModule
  * ============================================================================
  * 
- * 【核心职责】
- * - 处理DataScientist小部件的所有业务逻辑
- * - 管理数据分析和可视化的流程
- * - 封装数据处理参数和结果管理
- * - 向纯UI组件提供数据和事件回调
+ * Core Responsibilities:
+ * - Uses BaseWidgetModule for standardized widget management
+ * - Provides DataScientist-specific configuration and customizations
+ * - Manages CSV data analysis business logic
+ * - Integrates seamlessly with BaseWidget UI components
  * 
- * 【关注点分离】
- * ✅ 负责：
- *   - DataScientist小部件业务逻辑的统一管理
- *   - 数据分析和状态管理的集成
- *   - 数据处理请求的协调
- *   - 用户输入的处理和验证
- *   - 分析结果的处理和格式化
- * 
- * ❌ 不负责：
- *   - UI布局和样式处理（由DataScientistWidget UI组件处理）
- *   - 组件的直接渲染（由UI components处理）
- *   - 底层数据存储（由stores处理）
- *   - 网络通信（由api处理）
- * 
- * 【数据流向】
- * WidgetManager → DataScientistWidgetModule → DataScientistWidget UI
- * hooks → DataScientistWidgetModule → 事件回调 → stores → api/services
+ * Benefits of BaseWidgetModule integration:
+ * - Automatic output history management for analysis results
+ * - Built-in edit and management actions
+ * - Streaming status display
+ * - Standard error handling and logging
+ * - Consistent UI patterns across all widgets
  */
-import React, { useCallback, useEffect } from 'react';
-import { useWidget, useWidgetActions } from '../../hooks/useWidget';
+import React, { ReactNode } from 'react';
+import { BaseWidgetModule, createWidgetConfig } from './BaseWidgetModule';
 import { DataScientistWidgetParams, DataScientistWidgetResult } from '../../types/widgetTypes';
-import { logger, LogCategory } from '../../utils/logger';
-import { widgetHandler } from '../../components/core/WidgetHandler';
-
+import { EditAction, ManagementAction } from '../../components/ui/widgets/BaseWidget';
+import { useDataScientistState } from '../../stores/useWidgetStores';
 
 interface DataScientistWidgetModuleProps {
   triggeredInput?: string;
   onAnalysisCompleted?: (result: DataScientistWidgetResult) => void;
-  children: (moduleProps: {
-    isAnalyzing: boolean;
-    analysisResult: DataScientistWidgetResult | null;
-    lastParams: DataScientistWidgetParams | null;
-    onAnalyzeData: (params: DataScientistWidgetParams) => Promise<void>;
-    onClearAnalysis: () => void;
-  }) => React.ReactNode;
+  children: ReactNode;
 }
 
 /**
- * Data Scientist Widget Module - Business logic module for Data Scientist widget
+ * Data Scientist Widget Module - Template mapping and configuration for CSV data analysis
  * 
- * This module:
- * - Uses hooks to get data scientist widget state and AI client
- * - Handles all data analysis business logic
- * - Manages user input processing and validation
- * - Passes pure data and callbacks to DataScientist UI component
- * - Keeps DataScientist UI component pure
+ * Analysis Types:
+ * - descriptive: Basic statistical analysis and summaries
+ * - predictive: Machine learning and forecasting 
+ * - prescriptive: Optimization and recommendations
+ * - exploratory: Data exploration and visualization
  */
-export const DataScientistWidgetModule: React.FC<DataScientistWidgetModuleProps> = ({
-  triggeredInput,
-  onAnalysisCompleted,
-  children
-}) => {
-  // Get data scientist widget state using hooks
-  const { dataScientistState } = useWidget();
-  const { dataScientist: dataScientistActions } = useWidgetActions();
+
+// DataScientist analysis type to MCP template mapping
+const DATA_SCIENTIST_TEMPLATE_MAPPING = {
+  'csv_analysis': {
+    template_id: 'csv_analyze_prompt',
+    focus: 'data_analysis'
+  },
+  'descriptive': {
+    template_id: 'csv_analyze_prompt',
+    focus: 'statistical_summary'
+  },
+  'predictive': {
+    template_id: 'csv_analyze_prompt',
+    focus: 'predictive_modeling'
+  },
+  'prescriptive': {
+    template_id: 'csv_analyze_prompt',
+    focus: 'optimization_recommendations'
+  },
+  'exploratory': {
+    template_id: 'csv_analyze_prompt',
+    focus: 'exploratory_analysis'
+  }
+};
+
+// DataScientist-specific template parameter preparation
+const prepareDataScientistTemplateParams = (params: DataScientistWidgetParams) => {
+  const { query, analysisType = 'exploratory', visualizationType = 'chart', data } = params;
   
-  console.log('📊 DATA_SCIENTIST_MODULE: Providing data to DataScientist UI:', {
-    isAnalyzing: dataScientistState.isAnalyzing,
-    hasResult: !!dataScientistState.analysisResult,
-    hasParams: !!dataScientistState.lastParams,
-    triggeredInput: triggeredInput?.substring(0, 50)
+  const mapping = DATA_SCIENTIST_TEMPLATE_MAPPING[analysisType] || DATA_SCIENTIST_TEMPLATE_MAPPING['exploratory'];
+  
+  // Build prompt_args for CSV analysis
+  const prompt_args = {
+    query: query || 'Analyze the provided data',
+    analysis_type: analysisType,
+    visualization_type: visualizationType,
+    data_context: data ? 'CSV data provided' : 'Request for data analysis'
+  };
+  
+  console.log('📊 DATA_SCIENTIST_MODULE: Prepared template params for analysis type', analysisType, ':', {
+    template_id: mapping.template_id,
+    prompt_args
   });
   
-  // Business logic: Handle data analysis via WidgetHandler
-  const handleAnalyzeData = useCallback(async (params: DataScientistWidgetParams) => {
-    console.log('📊 DATA_SCIENTIST_MODULE: analyzeData called with:', params);
-    
-    if (!params.query && !params.data) {
-      console.error('❌ DATA_SCIENTIST_MODULE: No query or data provided');
-      return;
-    }
-    
-    // Use WidgetHandler to route request to store → chatService → API
-    console.log('🔄 DATA_SCIENTIST_MODULE: Routing request via WidgetHandler');
-    logger.info(LogCategory.ARTIFACT_CREATION, 'DataScientist module routing request via WidgetHandler', { params });
-    
-    try {
-      await widgetHandler.processRequest({
-        type: 'data_scientist',
-        params,
-        sessionId: 'data_scientist_widget',
-        userId: 'widget_user'
-      });
-      
-      console.log('✅ DATA_SCIENTIST_MODULE: Request successfully routed to store');
-    } catch (error) {
-      console.error('❌ DATA_SCIENTIST_MODULE: WidgetHandler request failed:', error);
-      logger.error(LogCategory.ARTIFACT_CREATION, 'DataScientist WidgetHandler request failed', { error, params });
-    }
-  }, []);
+  return {
+    template_id: mapping.template_id,
+    prompt_args
+  };
+};
+
+// DataScientist widget configuration
+const dataScientistWidgetConfig = createWidgetConfig({
+  type: 'data_scientist',
+  title: 'DataScientist Analysis',
+  icon: '📊',
+  sessionIdPrefix: 'data_scientist_widget',
+  maxHistoryItems: 15,
   
-  // Business logic: Handle triggered input from chat
-  useEffect(() => {
-    if (triggeredInput && !dataScientistState.isAnalyzing) {
-      console.log('📊 DATA_SCIENTIST_MODULE: Processing triggered input:', triggeredInput);
-      
-      // Extract analysis request from triggered input
-      const params = extractAnalysisFromInput(triggeredInput);
-      if (params) {
-        handleAnalyzeData(params);
-      }
-    }
-  }, [triggeredInput, dataScientistState.isAnalyzing, handleAnalyzeData]);
-  
-  // Business logic: Extract analysis parameters from user input
-  const extractAnalysisFromInput = (input: string): DataScientistWidgetParams | null => {
+  // Extract parameters from triggered input
+  extractParamsFromInput: (input: string) => {
     const lowerInput = input.toLowerCase();
     
     // Determine analysis type based on keywords
@@ -140,39 +122,152 @@ export const DataScientistWidgetModule: React.FC<DataScientistWidgetModuleProps>
     }
     
     return {
-      query: input,
+      query: input.trim(),
       analysisType,
       visualizationType
     };
-  };
-  
-  // Monitor data scientist state changes to notify parent component
-  useEffect(() => {
-    if (dataScientistState.analysisResult && dataScientistState.lastParams && !dataScientistState.isAnalyzing) {
-      // Notify parent component when analysis is completed
-      onAnalysisCompleted?.(dataScientistState.analysisResult);
-      logger.info(LogCategory.ARTIFACT_CREATION, 'DataScientist analysis completed, parent notified');
+  },
+  editActions: [
+    {
+      id: 'export_csv',
+      label: 'Export CSV',
+      icon: '📋',
+      onClick: (content) => {
+        console.log('📋 Exporting analysis as CSV:', content);
+      }
+    },
+    {
+      id: 'view_chart', 
+      label: 'Chart',
+      icon: '📈',
+      onClick: (content) => {
+        console.log('📈 Opening chart view:', content);
+      }
+    },
+    {
+      id: 'download_report',
+      label: 'Report',
+      icon: '📄', 
+      onClick: (content) => {
+        console.log('📄 Downloading analysis report:', content);
+      }
     }
-  }, [dataScientistState.analysisResult, dataScientistState.lastParams, dataScientistState.isAnalyzing, onAnalysisCompleted]);
+  ],
+  managementActions: [
+    {
+      id: 'upload_csv',
+      label: 'Upload CSV',
+      icon: '📂',
+      onClick: () => console.log('📂 CSV upload dialog'),
+      variant: 'primary' as const,
+      disabled: false
+    },
+    {
+      id: 'data_sources',
+      label: 'Data Sources',
+      icon: '🗄️',
+      onClick: () => console.log('🗄️ Data sources manager'),
+      disabled: false
+    },
+    {
+      id: 'ml_models',
+      label: 'ML Models', 
+      icon: '🤖',
+      onClick: () => console.log('🤖 ML models - coming soon'),
+      disabled: true
+    },
+    {
+      id: 'notebooks',
+      label: 'Notebooks',
+      icon: '📓',
+      onClick: () => console.log('📓 Jupyter notebooks - coming soon'),
+      disabled: true
+    }
+  ]
+});
+
+/**
+ * Data Scientist Widget Module - Uses BaseWidgetModule with DataScientist-specific configuration
+ */
+export const DataScientistWidgetModule: React.FC<DataScientistWidgetModuleProps> = ({
+  triggeredInput,
+  onAnalysisCompleted,
+  children
+}) => {
+  // Read state from store
+  const { analysisResult, isAnalyzing, lastParams } = useDataScientistState();
   
+  // Convert analysisResult to outputHistory format for BaseWidget display
+  const outputHistory = React.useMemo(() => {
+    if (!analysisResult) {
+      return [];
+    }
+    
+    return [{
+      id: `data_scientist_result_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      type: 'data_analysis',
+      title: lastParams?.query ? `Analysis: ${lastParams.query}` : 'Data Analysis Results',
+      content: typeof analysisResult === 'object' ? JSON.stringify(analysisResult, null, 2) : analysisResult,
+      metadata: {
+        analysisType: lastParams?.analysisType || 'exploratory',
+        visualizationType: lastParams?.visualizationType || 'chart',
+        hasInsights: analysisResult?.analysis?.insights?.length > 0
+      }
+    }];
+  }, [analysisResult, lastParams]);
   
-  // Business logic: Clear analysis results
-  const handleClearAnalysis = useCallback(() => {
-    console.log('📊 DATA_SCIENTIST_MODULE: Clearing analysis');
-    dataScientistActions.clearDataScientistData();
-    logger.info(LogCategory.ARTIFACT_CREATION, 'DataScientist analysis cleared');
-  }, [dataScientistActions]);
+  console.log('📊 DATA_SCIENTIST_MODULE: Converting analysis result to output history:', {
+    hasResult: !!analysisResult,
+    outputHistoryCount: outputHistory.length,
+    latestResult: outputHistory[0]?.title
+  });
   
-  // Pass all data and business logic callbacks to pure UI component
   return (
-    <>
-      {children({
-        isAnalyzing: dataScientistState.isAnalyzing,
-        analysisResult: dataScientistState.analysisResult,
-        lastParams: dataScientistState.lastParams,
-        onAnalyzeData: handleAnalyzeData,
-        onClearAnalysis: handleClearAnalysis
-      })}
-    </>
+    <BaseWidgetModule
+      config={dataScientistWidgetConfig}
+      triggeredInput={triggeredInput}
+      onCompleted={onAnalysisCompleted}
+    >
+      {(moduleProps) => {
+        // Pass store state to DataScientistWidget via props with template support
+        if (React.isValidElement(children)) {
+          return React.cloneElement(children, {
+            ...children.props,
+            // Store state
+            analysisResult,
+            isAnalyzing,
+            lastParams,
+            // Add onAnalyzeData function with template parameter preparation
+            onAnalyzeData: async (params: DataScientistWidgetParams) => {
+              // Prepare template parameters based on the analysis type
+              const templateParams = prepareDataScientistTemplateParams(params);
+              
+              // Add template information to params before sending to store
+              const enrichedParams = {
+                ...params,
+                templateParams // Add template configuration
+              };
+              
+              console.log('📊 DATA_SCIENTIST_MODULE: Sending enriched params to store:', enrichedParams);
+              await moduleProps.startProcessing(enrichedParams);
+            },
+            // Add clear analysis function
+            onClearAnalysis: () => {
+              console.log('📊 DATA_SCIENTIST_MODULE: Clearing analysis');
+              moduleProps.onClearHistory();
+            },
+            // BaseWidget state with converted data
+            outputHistory: outputHistory,
+            currentOutput: outputHistory[0] || null,
+            isStreaming: moduleProps.isStreaming,
+            streamingContent: moduleProps.streamingContent,
+            onSelectOutput: moduleProps.onSelectOutput,
+            onClearHistory: moduleProps.onClearHistory
+          });
+        }
+        return children;
+      }}
+    </BaseWidgetModule>
   );
 };

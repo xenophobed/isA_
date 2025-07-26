@@ -49,6 +49,8 @@ export interface SSEParserCallbacks {
   onStreamStatus?: (status: string) => void;
   onStreamComplete?: () => void;
   onError?: (error: Error) => void;
+  onArtifactCreated?: (artifact: { id?: string; type: string; content: string }) => void;
+  onMessageExtracted?: (extractedContent: string) => void; // 新增：用于传递提取的纯净内容
 }
 
 // ================================================================================
@@ -97,6 +99,18 @@ export class SSEParser {
         case 'custom_event':
           this.handleCustomEvent(eventData, callbacks);
           break;
+        case 'custom_stream':
+          this.handleCustomStreamEvent(eventData, callbacks);
+          break;
+        case 'message_stream':
+          this.handleMessageStreamEvent(eventData, callbacks);
+          break;
+        case 'graph_update':
+          this.handleGraphUpdateEvent(eventData, callbacks);
+          break;
+        case 'memory_update':
+          this.handleMemoryUpdateEvent(eventData, callbacks);
+          break;
         case 'node_update':
           this.handleNodeUpdate(eventData, callbacks);
           break;
@@ -105,6 +119,9 @@ export class SSEParser {
           break;
         case 'end':
           this.handleEndEvent(eventData, callbacks);
+          break;
+        case 'error':
+          this.handleErrorEvent(eventData, callbacks);
           break;
         case 'credits':
           console.log('💰 SSE_PARSER: Credits event:', eventData.content);
@@ -127,7 +144,8 @@ export class SSEParser {
       onStreamContent: callbacks.onMessageContent,
       onStreamStatus: callbacks.onMessageStatus,
       onStreamComplete: callbacks.onMessageComplete,
-      onError: callbacks.onError
+      onError: callbacks.onError,
+      onArtifactCreated: callbacks.onArtifactCreated
     };
 
     this.parseSSEEvent(data, adaptedCallbacks);
@@ -195,14 +213,165 @@ export class SSEParser {
     
     if (eventData.content) {
       console.log('📄 SSE_PARSER: Final content available:', eventData.content.substring(0, 100) + '...');
-      // 通常streaming tokens已经处理过内容，这里跳过
-      console.log('ℹ️ SSE_PARSER: Skipping content event - already processed via streaming tokens');
+      
+      // Extract image URLs from final content as well (for cases where streaming didn't catch it)
+      const imageRegex = /!\[.*?\]\((https?:\/\/[^\)]+)\)/g;
+      const imageMatches = eventData.content.match(imageRegex);
+      
+      if (imageMatches && callbacks.onArtifactCreated) {
+        console.log('🖼️ SSE_PARSER: Found images in final content event:', imageMatches.length);
+        imageMatches.forEach((match: string, index: number) => {
+          const urlMatch = match.match(/\((https?:\/\/[^\)]+)\)/);
+          if (urlMatch && urlMatch[1]) {
+            const imageUrl = urlMatch[1];
+            console.log(`🖼️ SSE_PARSER: Extracting image from content event: ${imageUrl}`);
+            callbacks.onArtifactCreated?.({
+              id: `content_image_${Date.now()}_${index}`,
+              type: 'image',
+              content: imageUrl
+            });
+          }
+        });
+      } else {
+        console.log('ℹ️ SSE_PARSER: No images found in content event');
+      }
     }
   }
 
   private static handleEndEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
     console.log('🏁 SSE_PARSER: Stream ended');
     callbacks.onStreamComplete?.();
+  }
+
+  // ================================================================================
+  // 新API事件处理方法
+  // ================================================================================
+
+  private static handleCustomStreamEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
+    const content = (eventData as any).content;
+    if (!content) return;
+
+    // 处理LLM token流
+    if (content.custom_llm_chunk) {
+      console.log(`🚀 SSE_PARSER: Custom LLM chunk: "${content.custom_llm_chunk}"`);
+      callbacks.onStreamContent?.(content.custom_llm_chunk);
+      return;
+    }
+
+    // 处理工具执行进度
+    if (content.data && content.type === 'progress') {
+      console.log(`🔧 SSE_PARSER: Tool progress: ${content.data}`);
+      callbacks.onStreamStatus?.(content.data);
+      return;
+    }
+
+    console.log('🔄 SSE_PARSER: Unknown custom_stream content:', content);
+  }
+
+  private static handleMessageStreamEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
+    const content = (eventData as any).content;
+    if (!content) return;
+
+    // 处理LangChain消息信息（如工具调用）
+    if (content.raw_message) {
+      console.log(`📨 SSE_PARSER: Message stream: ${content.raw_message}`);
+      
+      // 提取content="..."部分的纯净内容
+      let extractedContent = content.raw_message;
+      const contentMatch = content.raw_message.match(/content="([^"]*(?:\\"[^"]*)*)"/);
+      if (contentMatch) {
+        extractedContent = contentMatch[1];
+        // Unescape quotes
+        extractedContent = extractedContent.replace(/\\"/g, '"').replace(/\\'/g, "'");
+        console.log(`📨 SSE_PARSER: Extracted pure content: ${extractedContent.substring(0, 100)}...`);
+        
+        // 通知chatService使用提取的纯净内容
+        if (extractedContent && extractedContent.trim() && !extractedContent.includes('tool_calls')) {
+          callbacks.onMessageExtracted?.(extractedContent);
+        }
+      }
+      
+      // 解析图片URL - 检查markdown格式的图片
+      const imageRegex = /!\[.*?\]\((https?:\/\/[^\)]+)\)/g;
+      const imageMatches = extractedContent.match(imageRegex);
+      
+      if (imageMatches && callbacks.onArtifactCreated) {
+        imageMatches.forEach((match: string, index: number) => {
+          const urlMatch = match.match(/\((https?:\/\/[^\)]+)\)/);
+          if (urlMatch && urlMatch[1]) {
+            const imageUrl = urlMatch[1];
+            console.log(`🖼️ SSE_PARSER: Found image artifact: ${imageUrl}`);
+            callbacks.onArtifactCreated?.({
+              id: `image_${Date.now()}_${index}`,
+              type: 'image',
+              content: imageUrl
+            });
+          }
+        });
+      }
+      
+      // 检查其他类型的artifacts (JSON、数据等)
+      try {
+        // 尝试解析结构化数据
+        if (extractedContent.includes('{') && extractedContent.includes('}')) {
+          const jsonMatch = extractedContent.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const jsonData = JSON.parse(jsonMatch[0]);
+            if (jsonData && callbacks.onArtifactCreated) {
+              console.log(`📊 SSE_PARSER: Found data artifact`);
+              callbacks.onArtifactCreated?.({
+                id: `data_${Date.now()}`,
+                type: 'data',
+                content: JSON.stringify(jsonData)
+              });
+            }
+          }
+        }
+      } catch (e) {
+        // 忽略JSON解析错误
+      }
+      
+      callbacks.onStreamStatus?.('🔧 Processing tools...');
+      return;
+    }
+
+    console.log('🔄 SSE_PARSER: Unknown message_stream content:', content);
+  }
+
+  private static handleGraphUpdateEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
+    const content = (eventData as any).content;
+    const data = (eventData as any).data;
+    
+    console.log(`📊 SSE_PARSER: Graph update: ${content}`);
+    
+    if (data?.reason_model?.next_action) {
+      const action = data.reason_model.next_action;
+      const status = action === 'call_tool' ? '🔧 Calling tools...' : 
+                    action === 'respond' ? '📝 Preparing response...' : 
+                    `🔄 Processing: ${action}`;
+      callbacks.onStreamStatus?.(status);
+    } else {
+      callbacks.onStreamStatus?.('🧠 AI processing...');
+    }
+  }
+
+  private static handleMemoryUpdateEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
+    const content = (eventData as any).content;
+    const data = (eventData as any).data;
+    
+    console.log(`💾 SSE_PARSER: Memory update: ${content}`);
+    
+    if (data?.memories_stored) {
+      callbacks.onStreamStatus?.(`💾 Stored ${data.memories_stored} memories`);
+    } else {
+      callbacks.onStreamStatus?.('💾 Updating memory...');
+    }
+  }
+
+  private static handleErrorEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
+    const content = (eventData as any).content;
+    console.error('❌ SSE_PARSER: Error event:', content);
+    callbacks.onError?.(new Error(`API Error: ${content}`));
   }
 }
 

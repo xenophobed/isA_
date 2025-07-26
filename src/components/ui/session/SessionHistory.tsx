@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useSessionHandler } from '../../core/SessionHandler';
+import { useSessions, useCurrentSessionId, useIsLoadingSession } from '../../../stores/useSessionStore';
+import { logger, LogCategory } from '../../../utils/logger';
 
 export interface SessionHistoryProps {
   onSessionSelect?: (session: any) => void;
@@ -7,46 +10,57 @@ export interface SessionHistoryProps {
 }
 
 /**
- * Simple SessionHistory component for main_app
- * Standalone version without SDK dependencies
+ * SessionHistory component - 纯UI组件，使用SessionHandler处理用户事件
+ * 
+ * 架构流程：
+ * SessionHistory UI → SessionHandler → SessionStore → SessionHook → SessionModule
  */
 export const SessionHistory: React.FC<SessionHistoryProps> = ({
   onSessionSelect,
   showCreateButton = true,
   className = ''
 }) => {
-  const [sessions] = useState([
-    {
-      id: '1',
-      title: 'Image Generation Chat',
-      lastMessage: 'Generated a beautiful landscape',
-      timestamp: new Date().toISOString(),
-      messageCount: 5
-    },
-    {
-      id: '2', 
-      title: 'Product Research',
-      lastMessage: 'Found wireless headphones under $100',
-      timestamp: new Date(Date.now() - 86400000).toISOString(),
-      messageCount: 12
-    },
-    {
-      id: '3',
-      title: 'Content Writing',
-      lastMessage: 'Created blog post about AI trends',
-      timestamp: new Date(Date.now() - 172800000).toISOString(),
-      messageCount: 8
-    }
-  ]);
+  // ================================================================================
+  // 状态和Handler集成
+  // ================================================================================
+  
+  // 从Store获取会话数据
+  const sessions = useSessions();
+  const currentSessionId = useCurrentSessionId();
+  const isLoading = useIsLoadingSession();
+  
+  // 获取SessionHandler
+  const sessionHandler = useSessionHandler();
+  
+  // ================================================================================
+  // 事件处理器
+  // ================================================================================
 
   const handleSessionClick = (session: any) => {
-    console.log('📋 Session selected:', session);
+    logger.debug(LogCategory.CHAT_FLOW, 'SessionHistory: Session clicked', {
+      sessionId: session.id,
+      title: session.title
+    });
+
+    // 通过SessionHandler处理选择事件
+    sessionHandler.handleSessionSelect({ sessionId: session.id });
+    
+    // 同时触发外部回调（保持向后兼容）
     onSessionSelect?.(session);
   };
 
   const handleNewSession = () => {
-    console.log('🆕 Creating new session');
-    // This would typically create a new session
+    logger.debug(LogCategory.CHAT_FLOW, 'SessionHistory: New session requested');
+    
+    // 通过SessionHandler处理创建事件
+    sessionHandler.handleSessionCreate({
+      title: `新会话 ${new Date().toLocaleTimeString()}`,
+      metadata: {
+        apps_used: [],
+        total_messages: 0,
+        last_activity: new Date().toISOString()
+      }
+    });
   };
 
   return (
@@ -69,12 +83,23 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
 
       {/* Sessions List */}
       <div className="space-y-2">
-        {sessions.map((session) => (
-          <button
-            key={session.id}
-            onClick={() => handleSessionClick(session)}
-            className="w-full text-left p-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-colors group"
-          >
+        {isLoading && (
+          <div className="text-center py-4">
+            <div className="text-gray-400 text-sm">Loading sessions...</div>
+          </div>
+        )}
+        {sessions.map((session) => {
+          const isCurrentSession = session.id === currentSessionId;
+          return (
+            <button
+              key={session.id}
+              onClick={() => handleSessionClick(session)}
+              className={`w-full text-left p-3 rounded-lg border transition-colors group ${
+                isCurrentSession 
+                  ? 'bg-blue-600/20 border-blue-500/50 hover:bg-blue-600/30' 
+                  : 'bg-white/5 hover:bg-white/10 border-white/10'
+              }`}
+            >
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
                 <div className="text-white font-medium text-sm truncate">
@@ -90,6 +115,11 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                   <span className="text-gray-500 text-xs">
                     {session.messageCount} messages
                   </span>
+                  {session.metadata?.apps_used && session.metadata.apps_used.length > 0 && (
+                    <span className="text-blue-400 text-xs">
+                      {session.metadata.apps_used.length} apps
+                    </span>
+                  )}
                 </div>
               </div>
               
@@ -100,11 +130,12 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
               </div>
             </div>
           </button>
-        ))}
+        );
+        })}
       </div>
 
       {/* Empty state */}
-      {sessions.length === 0 && (
+      {sessions.length === 0 && !isLoading && (
         <div className="text-center py-8">
           <div className="text-gray-400 text-sm">No chat history yet</div>
           <div className="text-gray-500 text-xs mt-1">Start a conversation to see it here</div>
