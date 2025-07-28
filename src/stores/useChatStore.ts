@@ -45,22 +45,13 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { logger, LogCategory } from '../utils/logger';
-import { chatService } from '../api/chatService';
-import { ChatMetadata } from '../types/chatTypes';
+// 使用全局实例获取函数而不是直接导入
+import { getChatServiceInstance } from '../hooks/useChatService';
+import { ChatMetadata, ChatMessage, StreamingStatus } from '../types/chatTypes';
+import { useUserStore } from './useUserStore';
+import { useSessionStore } from './useSessionStore';
 
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  metadata?: Record<string, any>;
-  isStreaming?: boolean; // 标记是否为流式消息
-  streamingStatus?: string; // 流式状态描述
-  processed?: boolean; // 标记用户消息是否已发送到API
-  files?: File[]; // 用户上传的文件
-}
-
-interface ChatState {
+interface ChatStoreState {
   // 聊天消息
   messages: ChatMessage[];
   
@@ -75,6 +66,7 @@ interface ChatActions {
   // 消息操作
   addMessage: (message: ChatMessage) => void;
   clearMessages: () => void;
+  loadMessagesFromSession: (sessionId?: string) => void;
   
   // 消息发送
   sendMessage: (content: string, metadata?: ChatMetadata) => Promise<void>;
@@ -88,10 +80,10 @@ interface ChatActions {
   startStreamingMessage: (id: string, status?: string) => void;
   appendToStreamingMessage: (content: string) => void;
   finishStreamingMessage: () => void;
-  updateStreamingStatus: (status: string) => void;
+  updateStreamingStatus: (status: StreamingStatus | string) => void;
 }
 
-export type ChatStore = ChatState & ChatActions;
+export type ChatStore = ChatStoreState & ChatActions;
 
 export const useChatStore = create<ChatStore>()(
   subscribeWithSelector((set, get) => ({
@@ -115,7 +107,19 @@ export const useChatStore = create<ChatStore>()(
           return { messages: [...state.messages, message] };
         }
       });
-      logger.info(LogCategory.CHAT_FLOW, 'Message added/updated in chat store', { 
+      
+      // 同时将消息添加到当前session（防止循环调用）
+      if (!message.metadata?._skipSessionSync) {
+        const sessionStore = useSessionStore.getState();
+        const currentSession = sessionStore.getCurrentSession();
+        if (currentSession) {
+          // 添加标记防止循环调用
+          const messageWithFlag = { ...message, metadata: { ...message.metadata, _skipSessionSync: true } };
+          sessionStore.addMessage(currentSession.id, messageWithFlag);
+        }
+      }
+      
+      logger.info(LogCategory.CHAT_FLOW, 'Message added/updated in chat store and session', { 
         messageId: message.id, 
         role: message.role, 
         contentLength: message.content.length 
@@ -124,38 +128,112 @@ export const useChatStore = create<ChatStore>()(
 
     clearMessages: () => {
       set({ messages: [] });
-      logger.info(LogCategory.CHAT_FLOW, 'Messages cleared from chat store');
+      
+      // 同时清空当前session的消息
+      const sessionStore = useSessionStore.getState();
+      const currentSession = sessionStore.getCurrentSession();
+      if (currentSession) {
+        sessionStore.clearMessages(currentSession.id);
+      }
+      
+      logger.info(LogCategory.CHAT_FLOW, 'Messages cleared from chat store and session', {
+        sessionId: currentSession?.id
+      });
+    },
+    
+    // 新增：从session加载消息到chat store
+    loadMessagesFromSession: (sessionId?: string) => {
+      const sessionStore = useSessionStore.getState();
+      const session = sessionId 
+        ? sessionStore.getSessionById(sessionId)
+        : sessionStore.getCurrentSession();
+      
+      if (session?.messages) {
+        // 直接设置消息，不触发addMessage的同步逻辑
+        const messagesWithFlag = session.messages.map(msg => ({
+          ...msg,
+          metadata: { ...msg.metadata, _skipSessionSync: true }
+        }));
+        set({ messages: messagesWithFlag });
+        logger.info(LogCategory.CHAT_FLOW, 'Messages loaded from session to chat store', {
+          sessionId: session.id,
+          messageCount: session.messages.length
+        });
+      } else {
+        set({ messages: [] });
+        logger.info(LogCategory.CHAT_FLOW, 'No messages to load from session', {
+          sessionId: session?.id || 'none'
+        });
+      }
     },
 
-    // 消息发送
-    sendMessage: async (content, metadata = {}) => {
+    // 消息发送 - 添加初始化检查和重试机制以及token支持
+    sendMessage: async (content, metadata = {}, token?: string) => {
       const { 
         setChatLoading, 
         setIsTyping, 
         startStreamingMessage, 
         appendToStreamingMessage, 
-        finishStreamingMessage, 
-        updateStreamingStatus 
+        updateStreamingStatus, 
+        finishStreamingMessage 
       } = get();
-      
+
       setChatLoading(true);
       setIsTyping(true);
-      
+
       try {
-        logger.info(LogCategory.CHAT_FLOW, 'Sending message via chatService', {
-          contentLength: content.length,
-          hasMetadata: Object.keys(metadata).length > 0
+        // 获取 ChatService 实例 - 添加重试机制
+        let chatService = getChatServiceInstance();
+        console.log('💬 useChatStore.sendMessage: ChatService check', { 
+          hasChatService: !!chatService,
+          serviceType: chatService?.constructor?.name,
+          timestamp: new Date().toISOString()
+        });
+        
+        // 如果 ChatService 不可用，等待一下再重试
+        if (!chatService) {
+          console.warn('💬 useChatStore.sendMessage: ChatService not ready, waiting 500ms...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+          chatService = getChatServiceInstance();
+          
+          if (!chatService) {
+            console.warn('💬 useChatStore.sendMessage: ChatService still not ready, waiting 1000ms...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            chatService = getChatServiceInstance();
+          }
+        }
+        
+        if (!chatService) {
+          const errorMsg = 'ChatService not initialized after retries - AIProvider may have failed to initialize';
+          console.error('💬 useChatStore.sendMessage: ChatService missing after retries', {
+            error: errorMsg,
+            timestamp: new Date().toISOString()
+          });
+          throw new Error(errorMsg);
+        }
+
+        console.log('💬 useChatStore.sendMessage: Using ChatService instance', {
+          serviceReady: true,
+          timestamp: new Date().toISOString()
         });
 
-        // 使用新的chatService
-        await chatService.sendMessage(content, {
-          onMessageStart: (messageId, status) => {
+        logger.info(LogCategory.CHAT_FLOW, 'Sending message via chatService', {
+          contentLength: content.length,
+          hasMetadata: Object.keys(metadata).length > 0,
+          hasToken: !!token
+        });
+        
+        // 使用 chatService 实例，现在需要token参数
+        const authToken = token || 'dev_key_test'; // 如果没有提供token，使用默认值作为fallback
+        
+        await chatService.sendMessage(content, metadata, authToken, {
+          onMessageStart: (messageId: string, status?: string) => {
             startStreamingMessage(messageId, status);
           },
-          onMessageContent: (contentChunk) => {
+          onMessageContent: (contentChunk: string) => {
             appendToStreamingMessage(contentChunk);
           },
-          onMessageStatus: (status) => {
+          onMessageStatus: (status: string) => {
             updateStreamingStatus(status);
           },
           onMessageComplete: () => {
@@ -164,12 +242,37 @@ export const useChatStore = create<ChatStore>()(
             setIsTyping(false);
             logger.info(LogCategory.CHAT_FLOW, 'Message sending completed successfully');
           },
-          onError: (error) => {
+          onMessageExtracted: (extractedContent: string) => {
+            // 当从message_stream事件提取到完整消息时，更新当前流式消息的内容
+            const state = get();
+            const streamingMessage = state.messages.find(m => m.isStreaming);
+            if (streamingMessage) {
+              // 更新流式消息的内容为完整的提取内容
+              set(state => ({
+                messages: state.messages.map(msg => 
+                  msg.id === streamingMessage.id 
+                    ? { ...msg, content: extractedContent }
+                    : msg
+                )
+              }));
+              logger.info(LogCategory.CHAT_FLOW, 'Updated streaming message with extracted content', {
+                messageId: streamingMessage.id,
+                contentLength: extractedContent.length
+              });
+            }
+          },
+          onBillingUpdate: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => {
+            // 更新用户credit余额
+            logger.info(LogCategory.CHAT_FLOW, 'Billing update received', billingData);
+            const userStore = useUserStore.getState();
+            userStore.updateCredits(billingData.creditsRemaining);
+          },
+          onError: (error: Error) => {
             logger.error(LogCategory.CHAT_FLOW, 'Message sending failed', { error: error.message });
             setChatLoading(false);
             setIsTyping(false);
           }
-        }, metadata);
+        });
       } catch (error) {
         logger.error(LogCategory.CHAT_FLOW, 'Failed to send message', { error });
         setChatLoading(false);
@@ -177,7 +280,7 @@ export const useChatStore = create<ChatStore>()(
       }
     },
 
-    sendMultimodalMessage: async (content, files, metadata = {}) => {
+    sendMultimodalMessage: async (content, files, metadata = {}, token?: string) => {
       const { 
         setChatLoading, 
         setIsTyping, 
@@ -194,19 +297,52 @@ export const useChatStore = create<ChatStore>()(
         logger.info(LogCategory.CHAT_FLOW, 'Sending multimodal message via chatService', {
           contentLength: content.length,
           fileCount: files.length,
-          fileTypes: files.map(f => f.type),
-          hasMetadata: Object.keys(metadata).length > 0
+          hasMetadata: Object.keys(metadata).length > 0,
+          hasToken: !!token
         });
-
-        // 使用新的chatService
-        await chatService.sendMultimodalMessage(content, files, {
-          onMessageStart: (messageId, status) => {
+        
+        // 使用 chatService 实例，现在需要token参数
+        const authToken = token || 'dev_key_test'; // 如果没有提供token，使用默认值作为fallback
+        
+        // 获取 ChatService 实例 - 添加重试机制
+        let chatService = getChatServiceInstance();
+        console.log('💬 useChatStore.sendMultimodalMessage: ChatService check', { 
+          hasChatService: !!chatService,
+          serviceType: chatService?.constructor?.name,
+          timestamp: new Date().toISOString()
+        });
+        
+        // 如果 ChatService 不可用，等待一下再重试
+        if (!chatService) {
+          console.warn('💬 useChatStore.sendMultimodalMessage: ChatService not ready, waiting 500ms...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+          chatService = getChatServiceInstance();
+          
+          if (!chatService) {
+            console.warn('💬 useChatStore.sendMultimodalMessage: ChatService still not ready, waiting 1000ms...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            chatService = getChatServiceInstance();
+          }
+        }
+        
+        if (!chatService) {
+          const errorMsg = 'ChatService not initialized after retries - AIProvider may have failed to initialize';
+          console.error('💬 useChatStore.sendMultimodalMessage: ChatService missing after retries', {
+            error: errorMsg,
+            timestamp: new Date().toISOString()
+          });
+          throw new Error(errorMsg);
+        }
+        
+        // 使用 chatService 实例
+        await chatService.sendMultimodalMessage(content, files, metadata, authToken, {
+          onMessageStart: (messageId: string, status?: string) => {
             startStreamingMessage(messageId, status);
           },
-          onMessageContent: (contentChunk) => {
+          onMessageContent: (contentChunk: string) => {
             appendToStreamingMessage(contentChunk);
           },
-          onMessageStatus: (status) => {
+          onMessageStatus: (status: string) => {
             updateStreamingStatus(status);
           },
           onMessageComplete: () => {
@@ -214,6 +350,31 @@ export const useChatStore = create<ChatStore>()(
             setChatLoading(false);
             setIsTyping(false);
             logger.info(LogCategory.CHAT_FLOW, 'Multimodal message sending completed successfully');
+          },
+          onMessageExtracted: (extractedContent: string) => {
+            // 当从message_stream事件提取到完整消息时，更新当前流式消息的内容
+            const state = get();
+            const streamingMessage = state.messages.find(m => m.isStreaming);
+            if (streamingMessage) {
+              // 更新流式消息的内容为完整的提取内容
+              set(state => ({
+                messages: state.messages.map(msg => 
+                  msg.id === streamingMessage.id 
+                    ? { ...msg, content: extractedContent }
+                    : msg
+                )
+              }));
+              logger.info(LogCategory.CHAT_FLOW, 'Updated streaming message with extracted content', {
+                messageId: streamingMessage.id,
+                contentLength: extractedContent.length
+              });
+            }
+          },
+          onBillingUpdate: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => {
+            // 更新用户credit余额
+            logger.info(LogCategory.CHAT_FLOW, 'Billing update received', billingData);
+            const userStore = useUserStore.getState();
+            userStore.updateCredits(billingData.creditsRemaining);
           },
           onError: (error) => {
             logger.error(LogCategory.CHAT_FLOW, 'Multimodal message sending failed', { error: error.message });
@@ -247,15 +408,25 @@ export const useChatStore = create<ChatStore>()(
           return state;
         }
         
+        console.log('🔥 CHAT_STORE: Creating streaming message', { id, status, currentMessageCount: state.messages.length });
+        
+        const streamingMessage: ChatMessage = {
+          id,
+          role: 'assistant' as const,
+          content: '',
+          timestamp: new Date().toISOString(),
+          isStreaming: true,
+          streamingStatus: status
+        };
+        
+        // 不要在开始时同步到session，只有完成时才同步
+        // 这样避免创建两条消息：一条空的，一条完整的
+        
+        const newMessages = [...state.messages, streamingMessage];
+        console.log('🔥 CHAT_STORE: New messages array length:', newMessages.length);
+        
         return {
-          messages: [...state.messages, {
-            id,
-            role: 'assistant',
-            content: '',
-            timestamp: new Date().toISOString(),
-            isStreaming: true,
-            streamingStatus: status
-          }]
+          messages: newMessages
         };
       });
       logger.debug(LogCategory.CHAT_FLOW, 'Streaming message started in chat store', { id, status });
@@ -310,12 +481,29 @@ export const useChatStore = create<ChatStore>()(
         const lastMessage = state.messages[state.messages.length - 1];
         if (!lastMessage || !lastMessage.isStreaming) return state;
         
-        const updatedMessages = [...state.messages];
-        updatedMessages[updatedMessages.length - 1] = {
+        const finishedMessage = {
           ...lastMessage,
           isStreaming: false,
           streamingStatus: undefined
         };
+        
+        const updatedMessages = [...state.messages];
+        updatedMessages[updatedMessages.length - 1] = finishedMessage;
+        
+        // 重要：将完成的AI消息同步到session
+        const sessionStore = useSessionStore.getState();
+        const currentSession = sessionStore.getCurrentSession();
+        if (currentSession) {
+          const messageWithFlag = { 
+            ...finishedMessage, 
+            metadata: { ...finishedMessage.metadata, _skipSessionSync: true } 
+          };
+          sessionStore.addMessage(currentSession.id, messageWithFlag);
+          logger.debug(LogCategory.CHAT_FLOW, 'Finished streaming message synced to session', {
+            messageId: finishedMessage.id,
+            sessionId: currentSession.id
+          });
+        }
         
         return { messages: updatedMessages };
       });
@@ -382,27 +570,23 @@ const detectWidgetByKeywords = (userInput: string, hasFiles: boolean = false): s
   const rules = [
     { 
       widget: 'dream', 
-      keywords: ['image', 'picture', 'photo', 'draw', 'generate', 'create', 'design', 'art', 'visual', 'illustration'] 
+      keywords: ['image', 'picture', 'photo', 'draw', 'art', 'visual'] 
     },
     { 
       widget: 'hunt', 
-      keywords: ['search', 'find', 'buy', 'shop', 'product', 'price', 'compare', 'look for', 'hunt'] 
+      keywords: ['search', 'find', 'buy', 'shop', 'product', 'price'] 
     },
     { 
       widget: 'data-scientist', 
-      keywords: ['analyze', 'analysis', 'data', 'chart', 'graph', 'statistics', 'plot', 'trend', 'metric'] 
+      keywords: ['analyze', 'data', 'chart', 'graph', 'statistics', 'plot'] 
     },
     { 
       widget: 'omni', 
-      keywords: ['write', 'content', 'article', 'blog', 'copy', 'draft', 'compose', 'text', 'story', 'essay'] 
+      keywords: ['write', 'content', 'article', 'blog', 'draft', 'story'] 
     },
     { 
       widget: 'knowledge', 
-      keywords: ['document', 'pdf', 'file', 'analyze document', 'summarize', 'extract'] 
-    },
-    { 
-      widget: 'assistant', 
-      keywords: ['help', 'assist', 'question', 'ask', 'explain', 'how to'] 
+      keywords: ['document', 'pdf', 'file', 'summarize', 'extract'] 
     }
   ];
   
@@ -430,135 +614,6 @@ const AVAILABLE_APPS = [
   { id: 'knowledge', name: 'Knowledge Hub' }
 ];
 
-// Subscribe to message changes for widget triggers and API calls
-useChatStore.subscribe(
-  (state) => state.messages,
-  (messages, previousMessages) => {
-    // More robust detection of new user messages
-    const newUserMessages = [];
-    
-    if (!previousMessages) {
-      // First load - check for unprocessed user messages
-      newUserMessages.push(...messages.filter(msg => 
-        msg.role === 'user' && !msg.processed
-      ));
-    } else {
-      // Find truly new messages by comparing arrays length and IDs
-      const previousIds = new Set(previousMessages.map(msg => msg.id));
-      newUserMessages.push(...messages.filter(msg => 
-        msg.role === 'user' && 
-        !msg.processed && 
-        !previousIds.has(msg.id)
-      ));
-    }
-    
-    // Process each new user message
-    newUserMessages.forEach(async (userMessage) => {
-      console.log('🚀 REACTIVE_TRIGGER: Processing user message:', userMessage.content);
-      logger.info(LogCategory.CHAT_FLOW, 'Reactive trigger: Processing user message', {
-        messageId: userMessage.id,
-        contentLength: userMessage.content.length
-      });
-      
-      // Prevent duplicate processing by checking again
-      const currentState = useChatStore.getState();
-      const currentMessage = currentState.messages.find(msg => msg.id === userMessage.id);
-      if (!currentMessage || currentMessage.processed) {
-        console.log('🚫 REACTIVE_TRIGGER: Message already processed, skipping:', userMessage.id);
-        return;
-      }
-      
-      // Additional safety: prevent processing if there's already a recent message being processed
-      // Only skip if there's a very recent message to avoid blocking legitimate new messages
-      const recentProcessingMessage = currentState.messages.find(m => 
-        m.role === 'user' && 
-        m.processed && 
-        (Date.now() - new Date(m.timestamp).getTime()) < 2000 // Within last 2 seconds
-      );
-      if (recentProcessingMessage && (currentState.chatLoading || currentState.isTyping)) {
-        console.log('🚫 REACTIVE_TRIGGER: Recent message still processing, skipping:', userMessage.id);
-        return;
-      }
-      
-      try {
-        // Mark message as processed immediately to prevent duplicate calls
-        const updatedMessages = currentState.messages.map(msg => 
-          msg.id === userMessage.id ? { ...msg, processed: true } : msg
-        );
-        useChatStore.setState({ messages: updatedMessages });
-        
-        // Check for file uploads first
-        const hasFiles = userMessage.files && userMessage.files.length > 0;
-        
-        // Fast keyword-based widget intent detection
-        let triggeredApp = null;
-        
-        try {
-          console.log('🎯 REACTIVE_TRIGGER: Using keyword detection for:', userMessage.content);
-          
-          const detectedWidgetId = detectWidgetByKeywords(userMessage.content, hasFiles);
-          
-          if (detectedWidgetId) {
-            triggeredApp = AVAILABLE_APPS.find(app => app.id === detectedWidgetId);
-            
-            if (triggeredApp) {
-              logger.info(LogCategory.APP_TRIGGER, 'Keyword widget trigger detected', { 
-                appId: triggeredApp.id, 
-                hasFiles,
-                userInput: userMessage.content 
-              });
-              console.log('🎯 REACTIVE_TRIGGER: Keyword detected widget trigger!', { 
-                app: triggeredApp.name, 
-                detectedId: detectedWidgetId,
-                hasFiles 
-              });
-            }
-          } else {
-            console.log('💬 REACTIVE_TRIGGER: No widget intent detected by keywords');
-          }
-        } catch (error) {
-          console.error('❌ REACTIVE_TRIGGER: Keyword detection failed:', error);
-          logger.error(LogCategory.APP_TRIGGER, 'Keyword detection failed', { error });
-          // Fall back to no widget trigger
-          triggeredApp = null;
-        }
-        
-        if (triggeredApp) {
-          // Open widget and block chat API call
-          const appStore = await getAppStore();
-          const { currentApp, showRightSidebar, setCurrentApp, setShowRightSidebar, setTriggeredAppInput } = appStore.getState();
-          
-          // If the app is already open, send to both widget and chat
-          if (currentApp === triggeredApp.id && showRightSidebar) {
-            console.log('✅ REACTIVE_TRIGGER: App already open, sending to both widget and chat');
-            // TODO: Send to widget AND continue with chat API
-            await currentState.sendMessage(userMessage.content, userMessage.metadata || {});
-          } else {
-            // Open widget and let widget handle the request
-            console.log('📱 REACTIVE_TRIGGER: Opening widget, blocking chat API');
-            
-            // Use immediate state update instead of setTimeout to prevent race conditions
-            setCurrentApp(triggeredApp.id as any); // Cast to AppId type
-            setShowRightSidebar(true);
-            setTriggeredAppInput(userMessage.content);
-            console.log('✨ REACTIVE_TRIGGER: Widget opened successfully:', triggeredApp.id);
-            
-            // Don't send to chat API - widget will handle
-          }
-        } else {
-          // No widget triggered, send to chat API normally
-          console.log('💬 REACTIVE_TRIGGER: No widget trigger, sending to chat API');
-          await currentState.sendMessage(userMessage.content, userMessage.metadata || {});
-        }
-        
-        console.log('✅ REACTIVE_TRIGGER: Message processing completed');
-      } catch (error) {
-        console.error('❌ REACTIVE_TRIGGER: Failed to process message:', error);
-        logger.error(LogCategory.CHAT_FLOW, 'Reactive trigger failed', { 
-          error: error instanceof Error ? error.message : String(error),
-          messageId: userMessage.id 
-        });
-      }
-    });
-  }
-);
+// 移除：Reactive subscriber 不再需要，因为现在消息流程改为：
+// ChatModule.handleSendMessage → useChatStore.addMessage → 直接调用 sendMessage
+// 不再需要监听 messages 数组的变化来触发 API 调用

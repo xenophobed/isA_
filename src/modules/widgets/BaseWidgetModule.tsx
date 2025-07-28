@@ -16,16 +16,29 @@
  * - Triggered input processing
  * - Error handling and logging
  */
-import React, { useCallback, useEffect, useState, ReactNode } from 'react';
+import React, { useCallback, useEffect, useState, useRef, ReactNode } from 'react';
 import { useWidget, useWidgetActions } from '../../hooks/useWidget';
 import { logger, LogCategory } from '../../utils/logger';
 import { widgetHandler } from '../../components/core/WidgetHandler';
+import { WidgetType } from '../../types/widgetTypes';
 import { 
   BaseWidget, 
   OutputHistoryItem, 
   EditAction, 
   ManagementAction 
 } from '../../components/ui/widgets/BaseWidget';
+import {
+  DreamWidgetParams,
+  DreamWidgetResult,
+  HuntWidgetParams,
+  HuntWidgetResult,
+  OmniWidgetParams,
+  OmniWidgetResult,
+  DataScientistWidgetParams,
+  DataScientistWidgetResult,
+  KnowledgeWidgetParams,
+  KnowledgeWidgetResult
+} from '../../types/widgetTypes';
 
 // Generic widget params interface
 interface BaseWidgetParams {
@@ -37,10 +50,20 @@ interface BaseWidgetResult {
   [key: string]: any;
 }
 
+// Result extraction configuration for different widget types
+interface ResultExtractorConfig {
+  outputType: 'text' | 'image' | 'data' | 'analysis' | 'search' | 'knowledge';
+  extractResult?: (widgetData: any) => {
+    finalResult: any;
+    outputContent: string;
+    title?: string;
+  } | null;
+}
+
 // Widget module configuration
 interface WidgetModuleConfig<TParams = BaseWidgetParams, TResult = BaseWidgetResult> {
   // Widget identification
-  type: string;
+  type: WidgetType;
   title: string;
   icon: string;
   
@@ -49,6 +72,9 @@ interface WidgetModuleConfig<TParams = BaseWidgetParams, TResult = BaseWidgetRes
   
   // Output management
   maxHistoryItems?: number;
+  
+  // Result processing configuration
+  resultExtractor?: ResultExtractorConfig;
   
   // Callbacks
   onProcessStart?: (params: TParams) => void;
@@ -97,12 +123,22 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   
+  // Use refs to access current state without triggering dependencies
+  const isProcessingRef = useRef(isProcessing);
+  const currentOutputRef = useRef(currentOutput);
+  
+  // Update refs when state changes
+  useEffect(() => { isProcessingRef.current = isProcessing; }, [isProcessing]);
+  useEffect(() => { currentOutputRef.current = currentOutput; }, [currentOutput]);
+  
   console.log(`🔧 ${config.type.toUpperCase()}_MODULE: Initializing with config:`, {
     type: config.type,
     title: config.title,
     maxHistory: config.maxHistoryItems,
     hasTriggeredInput: !!triggeredInput
   });
+  
+  console.log(`🚨DEBUG_WIDGET🚨 ${config.type.toUpperCase()}_MODULE: Mounted and running`);
   
   // Add item to output history
   const addToHistory = useCallback((item: Omit<OutputHistoryItem, 'id' | 'timestamp'>) => {
@@ -159,11 +195,15 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
     
     try {
       // Use WidgetHandler to route request with streaming callbacks
-      console.log(`🔄 ${config.type.toUpperCase()}_MODULE: Routing request via WidgetHandler`);
+      console.log('🔥MODULE_DATA_FLOW🔥 BaseWidgetModule 转发数据到 WidgetHandler:', {
+        type: config.type,
+        params,
+        sessionId: `${config.sessionIdPrefix}_${Date.now()}`
+      });
       logger.info(LogCategory.ARTIFACT_CREATION, `${config.type} module routing request via WidgetHandler`, { params });
       
       await widgetHandler.processRequest({
-        type: config.type as any, // Type assertion needed for WidgetType compatibility
+        type: config.type,
         params,
         sessionId: `${config.sessionIdPrefix}_${Date.now()}`,
         userId: 'widget_user'
@@ -209,57 +249,112 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
   const widgetState = widget.currentWidgetState;
   const widgetData = widget.currentWidgetData;
   
+  // Debug: Log widget data changes with more detail
+  console.log(`🔍 ${config.type.toUpperCase()}_MODULE: Widget data:`, {
+    widgetState,
+    widgetData,
+    hasGeneratedImage: !!widgetData?.generatedImage,
+    currentOutput: !!currentOutput,
+    generatedImageUrl: widgetData?.generatedImage?.substring(0, 80),
+    currentOutputContent: currentOutput?.content?.substring(0, 80),
+    isCurrentApp: config.type === widget.currentApp
+  });
+  
   useEffect(() => {
     // Monitor actual widget state changes instead of using placeholder timer
     if (config.type === widget.currentApp) {
-      const wasProcessing = isProcessing;
+      const wasProcessing = isProcessingRef.current;
       const isCurrentlyProcessing = widgetState !== 'idle';
+      const currentOutputValue = currentOutputRef.current;
       
-      // If processing just completed
-      if (wasProcessing && !isCurrentlyProcessing && currentOutput) {
-        console.log(`✅ ${config.type.toUpperCase()}_MODULE: Real processing completed, updating output`);
+      console.log(`🔍 ${config.type.toUpperCase()}_MODULE: State check:`, {
+        wasProcessing,
+        isCurrentlyProcessing,
+        widgetState,
+        hasWidgetData: !!widgetData,
+        generatedImage: widgetData?.generatedImage?.substring(0, 50),
+        currentOutputExists: !!currentOutputValue
+      });
+      
+      // If processing just completed OR if we have new data that needs to be displayed
+      const hasNewData = widgetData && (
+        (widgetData.generatedImage && (!currentOutputValue || currentOutputValue.content !== widgetData.generatedImage)) ||
+        (widgetData.generatedContent && (!currentOutputValue || currentOutputValue.content !== widgetData.generatedContent)) ||
+        (widgetData.searchResults && widgetData.searchResults.length > 0 && (!currentOutputValue || currentOutputValue.type !== 'data')) ||
+        (widgetData.analysisResult && (!currentOutputValue || currentOutputValue.type !== 'analysis'))
+      );
+      
+      if ((wasProcessing && !isCurrentlyProcessing) || hasNewData) {
+        console.log(`✅ ${config.type.toUpperCase()}_MODULE: Updating output - processing completed or new data:`, {
+          wasProcessing,
+          isCurrentlyProcessing, 
+          hasNewData,
+          hasGeneratedImage: !!widgetData?.generatedImage,
+          hasCurrentOutput: !!currentOutputValue,
+          currentOutputContent: currentOutputValue?.content?.substring(0, 50)
+        });
         
-        // Get actual result from widget data
+        // Get actual result from widget data using configurable extractor
         let finalResult = null;
-        let outputType = 'text';
+        let outputType = config.resultExtractor?.outputType || 'text';
         let outputContent = 'Processing completed successfully';
+        let outputTitle = `${config.type} processing completed`;
         
-        if (config.type === 'dream' && widgetData?.generatedImage) {
-          finalResult = { imageUrl: widgetData.generatedImage, prompt: widgetData.params?.prompt };
-          outputType = 'image';
-          outputContent = widgetData.generatedImage;
-          console.log(`🎨 ${config.type.toUpperCase()}_MODULE: Found generated image, updating output:`, { imageUrl: widgetData.generatedImage });
-        } else if (config.type === 'hunt' && widgetData?.searchResults && widgetData.searchResults.length > 0) {
-          finalResult = { searchResults: widgetData.searchResults, query: widgetData.lastQuery };
-          outputType = 'data';
-          outputContent = widgetData.searchResults[0]?.content || JSON.stringify(widgetData.searchResults);
-          console.log(`🔍 ${config.type.toUpperCase()}_MODULE: Found search results, updating output:`, { 
-            resultCount: widgetData.searchResults.length,
-            firstResult: widgetData.searchResults[0]?.title 
-          });
-        } else if (config.type === 'omni' && widgetData?.generatedContent) {
-          finalResult = { content: widgetData.generatedContent, params: widgetData.params };
-          outputType = 'text';
-          outputContent = widgetData.generatedContent;
+        if (config.resultExtractor?.extractResult) {
+          const extractedResult = config.resultExtractor.extractResult(widgetData);
+          if (extractedResult) {
+            finalResult = extractedResult.finalResult;
+            outputContent = extractedResult.outputContent;
+            outputTitle = extractedResult.title || outputTitle;
+            console.log(`✅ ${config.type.toUpperCase()}_MODULE: Extracted result using custom extractor:`, { 
+              hasResult: !!finalResult,
+              contentLength: outputContent?.length 
+            });
+          }
+        } else {
+          // Fallback: use generic extraction based on widget data structure
+          if (widgetData?.generatedImage) {
+            finalResult = { imageUrl: widgetData.generatedImage, prompt: widgetData.params?.prompt };
+            outputType = 'image';
+            outputContent = widgetData.generatedImage;
+          } else if (widgetData?.searchResults?.length > 0) {
+            finalResult = { searchResults: widgetData?.searchResults || [], query: widgetData?.lastQuery || '' };
+            outputType = 'data';
+            outputContent = widgetData?.searchResults?.[0]?.content || JSON.stringify(widgetData?.searchResults || []);
+          } else if (widgetData?.generatedContent) {
+            finalResult = { content: widgetData.generatedContent, params: widgetData?.params };
+            outputType = 'text';
+            outputContent = widgetData.generatedContent;
+          } else if (widgetData?.analysisResult) {
+            finalResult = { analysis: widgetData.analysisResult };
+            outputType = 'analysis';
+            outputContent = typeof widgetData.analysisResult === 'string' ? widgetData.analysisResult : JSON.stringify(widgetData.analysisResult);
+          }
         }
         
-        // Update output with actual results
-        if (currentOutput) {
-          const updatedOutput = {
-            ...currentOutput,
-            type: outputType as any,
-            title: `${config.type} processing completed`,
-            content: outputContent,
-            isStreaming: false
-          };
-          
-          setCurrentOutput(updatedOutput);
-          
-          // Update in history as well
-          setOutputHistory(prev =>
-            prev.map(item => item.id === currentOutput.id ? updatedOutput : item)
-          );
-        }
+        // Update output with actual results (create new output if none exists)
+        const updatedOutput = {
+          ...(currentOutputValue || {}),
+          type: outputType as any,
+          title: outputTitle,
+          content: outputContent,
+          isStreaming: false,
+          id: currentOutputValue?.id || `output_${Date.now()}`,
+          timestamp: currentOutputValue?.timestamp || new Date()
+        };
+        
+        setCurrentOutput(updatedOutput);
+        
+        // Update in history as well
+        setOutputHistory(prev => {
+          if (currentOutputValue && prev.some(item => item.id === currentOutputValue.id)) {
+            // Update existing item in history
+            return prev.map(item => item.id === currentOutputValue.id ? updatedOutput : item);
+          } else {
+            // Add new item to history
+            return [updatedOutput, ...prev].slice(0, config.maxHistoryItems || 10);
+          }
+        });
         
         setIsProcessing(false);
         setIsStreaming(false);
@@ -267,14 +362,16 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
         
         // Notify parent with real results
         if (finalResult) {
-          config.onProcessComplete?.(finalResult as TResult);
-          onResultGenerated?.(finalResult as TResult);
+          // Safe type conversion - we've validated the structure above
+          const typedResult = finalResult as unknown as TResult;
+          config.onProcessComplete?.(typedResult);
+          onResultGenerated?.(typedResult);
         }
         
         logger.info(LogCategory.ARTIFACT_CREATION, `${config.type} real processing completed, parent notified`);
       }
     }
-  }, [isProcessing, widgetState, widgetData?.generatedImage, widgetData?.searchResults, widgetData?.generatedContent, widgetData?.lastQuery, currentOutput?.id, config.type, widget.currentApp]);
+  }, [widgetState, widgetData?.generatedImage, widgetData?.searchResults, widgetData?.generatedContent, widgetData?.analysisResult, config.type, widget.currentApp]);
   
   // Clear output history
   const handleClearHistory = useCallback(() => {

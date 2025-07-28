@@ -1,420 +1,129 @@
 /**
  * ============================================================================
- * Chat Hook (useChat.ts)
+ * Chat Hook (useChat.ts) - 聊天状态监听和聚合
  * ============================================================================
  * 
- * Core Responsibilities:
- * - Single state management access point for chat interface
- * - Listen and aggregate 4 types of chat-related events
- * - Provide unified data interface for chat UI components
+ * 【核心职责】
+ * - 选择性订阅各个Store的状态变化
+ * - 聚合聊天相关的状态数据
+ * - 提供统一的数据接口给UI组件
  * 
- * 4 Types of Events Monitored:
- * 1. API response events - streaming message data (streaming tokens, status updates)
- * 2. App artifact events - generated artifact content (images, documents, etc.)
- * 3. User send message events - user message sending state (loading, typing states)
- * 4. Widget events - sidebar widget generation events (Dream, Hunt, Omni, etc.)
+ * 【架构原则】
+ * ✅ 只负责状态监听和数据聚合
+ * ✅ 使用选择性订阅优化性能
+ * ✅ 不包含业务逻辑和副作用
  * 
- * Architecture Position:
- * - ChatLayout and other UI components get data through this hook, not direct store access
- * - This is the only bridge between chat interface and stores
- * - Listens to widget stores to create chat artifacts when widgets generate content
- * - Completely separated from BaseSidebar app interface hooks
+ * ❌ 不负责：
+ *   - 业务逻辑处理（由ChatModule处理）
+ *   - 消息创建和修改（由ChatModule处理）
+ *   - API调用和副作用（由ChatModule处理）
+ *   - Widget状态管理（由各Widget Module处理）
  */
-import { useMemo, useEffect, useState } from 'react';
-import { useAppStore } from '../stores/useAppStore';
+
+import { useMemo } from 'react';
+import { useChatMessages, useChatLoading, useChatTyping } from '../stores/useChatStore';
+import { useCurrentSession } from '../stores/useSessionStore'; // 从session获取历史messages
 import { useArtifactStore } from '../stores/useArtifactStore';
-import { useChatMessages, useChatLoading, useChatTyping, useChatActions } from '../stores/useChatStore';
-import { useDreamState, useHuntState, useOmniState, useAssistantState, useDataScientistState, useKnowledgeState } from '../stores/useWidgetStores';
+import { useCurrentApp, useShowRightSidebar } from '../stores/useAppStore';
+import { useAllWidgetStates, useIsAnyWidgetGenerating } from '../stores/useWidgetStores';
 import { ChatHookState, ChatMessage } from '../types/chatTypes';
 import { AppArtifact } from '../types/appTypes';
 
 /**
- * Chat Hook - Single point for chat UI state
+ * Chat状态监听Hook - 纯数据聚合，无副作用
  * 
- * This hook encapsulates all chat interface state by listening to:
- * - Store messages (API streaming responses)
- * - Store artifacts (generated content)  
- * - Store loading states (user interactions)
- * - Widget stores (sidebar app generated content)
+ * 使用选择性订阅监听所有聊天相关状态：
+ * 1. 聊天消息状态 (从当前session获取，而不是useChatStore)
+ * 2. 应用导航状态 (useAppStore) 
+ * 3. 工件状态 (useArtifactStore)
+ * 4. Widget状态聚合 (useWidgetStores)
  * 
- * UI components should use this instead of direct store access.
+ * @returns 聚合的聊天状态数据
  */
 export const useChat = (): ChatHookState => {
-  // 1. API response events - streaming messages
-  const messages = useChatMessages();
+  // 1. 获取实时消息（包括流式消息）和历史消息
+  const chatStoreMessages = useChatMessages(); // 实时消息，包括流式
+  const currentSession = useCurrentSession(); // 历史消息
+  
+  // 2. 合并消息：优先显示chatStore中的实时消息，补充session中的历史消息
+  const messages = useMemo((): ChatMessage[] => {
+    // 如果chatStore有消息（包括流式消息），优先使用
+    if (chatStoreMessages.length > 0) {
+      return chatStoreMessages;
+    }
+    
+    // 否则使用session中的历史消息
+    if (!currentSession?.messages) return [];
+    
+    return currentSession.messages.map(msg => ({
+      id: msg.id,
+      role: msg.role,
+      content: msg.content,
+      timestamp: msg.timestamp,
+      metadata: msg.metadata,
+      processed: true // session中的消息都是已处理的
+    }));
+  }, [chatStoreMessages, currentSession?.messages]);
+  
+  // 2. 聊天状态 - 从useChatStore获取（这些状态是实时的）
   const isLoading = useChatLoading();
   const isTyping = useChatTyping();
-  const chatActions = useChatActions();
   
-  // 2. App artifact events - generated artifacts
-  const { artifacts, addArtifact } = useArtifactStore();
-  const { currentApp, showRightSidebar } = useAppStore();
+  // 3. 应用导航状态 - 选择性订阅
+  const currentApp = useCurrentApp();
+  const showRightSidebar = useShowRightSidebar();
   
-  // 3. Widget events - sidebar widget generated content
-  const dreamState = useDreamState();
-  const huntState = useHuntState();
-  const omniState = useOmniState();
-  const assistantState = useAssistantState();
-  const dataScientistState = useDataScientistState();
-  const knowledgeState = useKnowledgeState();
+  // 4. 工件状态 - 选择性订阅
+  const artifacts = useArtifactStore(state => state.artifacts);
   
-  // Track latest artifacts from widgets
-  const [latestWidgetArtifact, setLatestWidgetArtifact] = useState<AppArtifact | null>(null);
+  // 5. Widget状态聚合 - 选择性订阅
+  const widgetStates = useAllWidgetStates();
+  const isAnyWidgetGenerating = useIsAnyWidgetGenerating();
   
-  useEffect(() => {
-    // Create artifact message when Dream generation starts
-    if (dreamState.isGenerating && dreamState.lastParams && !messages.find(m => m.id === `dream-${dreamState.lastParams.prompt || 'unknown'}-generating`)) {
-      const artifactMessage: ChatMessage = {
-        id: `dream-${dreamState.lastParams.prompt || 'unknown'}-generating`,
-        role: 'assistant',
-        content: dreamState.generatedImage || '', // Will be updated when generation completes
-        timestamp: new Date().toISOString(),
-        metadata: {
-          type: 'artifact',
-          appId: 'dream',
-          appName: 'Dream',
-          appIcon: '🎨',
-          title: dreamState.isGenerating ? 'Generating Image...' : 'Generated Image',
-          userInput: dreamState.lastParams.prompt || 'Image generation request',
-          artifactData: {
-            type: 'image',
-            content: dreamState.generatedImage || 'Loading...',
-            metadata: dreamState.lastParams
-          }
-        },
-        isStreaming: dreamState.isGenerating,
-        streamingStatus: dreamState.isGenerating ? 'Generating image...' : undefined
-      };
-      chatActions.addMessage(artifactMessage);
-      console.log('🎨 CHAT_HOOK: Dream artifact message created:', dreamState.lastParams.prompt);
-    }
-  }, [dreamState.isGenerating, dreamState.lastParams, dreamState.generatedImage, messages, chatActions]);
-  
-  useEffect(() => {
-    // Create artifact message when Hunt search starts
-    if (huntState.isSearching && huntState.lastQuery && !messages.find(m => m.id === `hunt-${huntState.lastQuery}-searching`)) {
-      const artifactMessage: ChatMessage = {
-        id: `hunt-${huntState.lastQuery}-searching`,
-        role: 'assistant',
-        content: huntState.searchResults[0]?.content || '', // Will be updated when search completes
-        timestamp: new Date().toISOString(),
-        metadata: {
-          type: 'artifact',
-          appId: 'hunt',
-          appName: 'Hunt',
-          appIcon: '🔍',
-          title: huntState.isSearching ? 'Searching...' : `Search Results: ${huntState.lastQuery}`,
-          userInput: huntState.lastQuery,
-          artifactData: {
-            type: 'search_results',
-            content: huntState.isSearching ? [] : huntState.searchResults,
-            metadata: { 
-              query: huntState.lastQuery, 
-              isSearching: huntState.isSearching,
-              resultCount: huntState.searchResults.length
-            }
-          }
-        },
-        isStreaming: huntState.isSearching,
-        streamingStatus: huntState.isSearching ? 'Searching...' : undefined
-      };
-      chatActions.addMessage(artifactMessage);
-      console.log('🔍 CHAT_HOOK: Hunt artifact message created:', huntState.lastQuery);
-    }
-  }, [huntState.isSearching, huntState.lastQuery, huntState.searchResults, messages, chatActions]);
-
-  // Update Hunt message when search completes
-  useEffect(() => {
-    if (!huntState.isSearching && huntState.lastQuery && huntState.searchResults.length > 0) {
-      const messageId = `hunt-${huntState.lastQuery}-searching`;
-      const existingMessage = messages.find(m => m.id === messageId);
-      
-      if (existingMessage && existingMessage.isStreaming) {
-        // Debug: check the actual search results structure
-        console.log('🔍 CHAT_HOOK: Hunt search results:', {
-          resultsLength: huntState.searchResults.length,
-          firstResult: huntState.searchResults[0],
-          allResults: huntState.searchResults
-        });
-
-        const updatedMessage: ChatMessage = {
-          ...existingMessage,
-          content: `Found ${huntState.searchResults.length} search results for "${huntState.lastQuery}"`,
-          isStreaming: false,
-          streamingStatus: undefined,
-          metadata: {
-            ...existingMessage.metadata,
-            title: `Search Results: ${huntState.lastQuery}`,
-            artifactData: {
-              type: 'search_results',
-              content: huntState.searchResults, // Pass the full search results array
-              metadata: { 
-                query: huntState.lastQuery, 
-                isSearching: false,
-                resultCount: huntState.searchResults.length
-              }
-            }
-          }
-        };
-        chatActions.addMessage(updatedMessage); // This will update due to deduplication logic
-        console.log('🔍 CHAT_HOOK: Hunt message updated with search results:', huntState.searchResults.length, 'results');
-      }
-    }
-  }, [huntState.isSearching, huntState.lastQuery, huntState.searchResults, messages, chatActions]);
-  
-  useEffect(() => {
-    // Create artifact message when Omni generation starts
-    if (omniState.isGenerating && omniState.lastParams && !messages.find(m => m.id === `omni-${omniState.lastParams.prompt || 'unknown'}-generating`)) {
-      const artifactMessage: ChatMessage = {
-        id: `omni-${omniState.lastParams.prompt || 'unknown'}-generating`,
-        role: 'assistant',
-        content: omniState.generatedContent || '', // Will be updated when generation completes
-        timestamp: new Date().toISOString(),
-        metadata: {
-          type: 'artifact',
-          appId: 'omni',
-          appName: 'Omni Content',
-          appIcon: '⚡',
-          title: omniState.isGenerating ? 'Generating Content...' : 'Generated Content',
-          userInput: omniState.lastParams.prompt || 'Content generation request',
-          artifactData: {
-            type: 'text',
-            content: omniState.generatedContent || 'Loading...',
-            metadata: omniState.lastParams
-          }
-        },
-        isStreaming: omniState.isGenerating,
-        streamingStatus: omniState.isGenerating ? 'Generating content...' : undefined
-      };
-      chatActions.addMessage(artifactMessage);
-      console.log('⚡ CHAT_HOOK: Omni artifact message created:', omniState.lastParams.prompt);
-    }
-  }, [omniState.isGenerating, omniState.lastParams, omniState.generatedContent, messages, chatActions]);
-
-  // Update Omni message when generation completes
-  useEffect(() => {
-    if (!omniState.isGenerating && omniState.lastParams && omniState.generatedContent) {
-      const messageId = `omni-${omniState.lastParams.prompt || 'unknown'}-generating`;
-      const existingMessage = messages.find(m => m.id === messageId);
-      
-      if (existingMessage && existingMessage.isStreaming) {
-        const updatedMessage: ChatMessage = {
-          ...existingMessage,
-          content: omniState.generatedContent,
-          isStreaming: false,
-          streamingStatus: undefined,
-          metadata: {
-            ...existingMessage.metadata,
-            title: 'Generated Content',
-            artifactData: {
-              type: 'text',
-              content: omniState.generatedContent,
-              metadata: omniState.lastParams
-            }
-          }
-        };
-        chatActions.addMessage(updatedMessage); // This will update due to deduplication logic
-        console.log('⚡ CHAT_HOOK: Omni message updated with generated content');
-      }
-    }
-  }, [omniState.isGenerating, omniState.lastParams, omniState.generatedContent, messages, chatActions]);
-
-  useEffect(() => {
-    // Create artifact message when DataScientist analysis starts
-    if (dataScientistState.isAnalyzing && dataScientistState.lastParams && !messages.find(m => m.id === `data-scientist-${dataScientistState.lastParams.query || 'unknown'}-analyzing`)) {
-      const artifactMessage: ChatMessage = {
-        id: `data-scientist-${dataScientistState.lastParams.query || 'unknown'}-analyzing`,
-        role: 'assistant',
-        content: dataScientistState.analysisResult?.analysis?.summary || '', // Will be updated when analysis completes
-        timestamp: new Date().toISOString(),
-        metadata: {
-          type: 'artifact',
-          appId: 'data-scientist',
-          appName: 'DataWise Analytics',
-          appIcon: '📊',
-          title: dataScientistState.isAnalyzing ? 'Analyzing Data...' : 'Data Analysis Results',
-          userInput: dataScientistState.lastParams.query || 'Data analysis request',
-          artifactData: {
-            type: 'data_analysis',
-            content: dataScientistState.analysisResult || { analysis: { summary: 'Loading...', insights: [], recommendations: [] }, visualizations: [], statistics: {} },
-            metadata: dataScientistState.lastParams
-          }
-        },
-        isStreaming: dataScientistState.isAnalyzing,
-        streamingStatus: dataScientistState.isAnalyzing ? 'Analyzing data...' : undefined
-      };
-      chatActions.addMessage(artifactMessage);
-      console.log('📊 CHAT_HOOK: DataScientist artifact message created:', dataScientistState.lastParams.query);
-    }
-  }, [dataScientistState.isAnalyzing, dataScientistState.lastParams, dataScientistState.analysisResult, messages, chatActions]);
-
-  // Update DataScientist message when analysis completes
-  useEffect(() => {
-    if (!dataScientistState.isAnalyzing && dataScientistState.lastParams && dataScientistState.analysisResult) {
-      const messageId = `data-scientist-${dataScientistState.lastParams.query || 'unknown'}-analyzing`;
-      const existingMessage = messages.find(m => m.id === messageId);
-      
-      if (existingMessage && existingMessage.isStreaming) {
-        const updatedMessage: ChatMessage = {
-          ...existingMessage,
-          content: dataScientistState.analysisResult.analysis?.summary || 'Analysis completed',
-          isStreaming: false,
-          streamingStatus: undefined,
-          metadata: {
-            ...existingMessage.metadata,
-            title: 'Data Analysis Results',
-            artifactData: {
-              type: 'data_analysis',
-              content: dataScientistState.analysisResult,
-              metadata: dataScientistState.lastParams
-            }
-          }
-        };
-        chatActions.addMessage(updatedMessage); // This will update due to deduplication logic
-        console.log('📊 CHAT_HOOK: DataScientist message updated with analysis results');
-      }
-    }
-  }, [dataScientistState.isAnalyzing, dataScientistState.lastParams, dataScientistState.analysisResult, messages, chatActions]);
-
-  useEffect(() => {
-    // Create artifact message when Knowledge analysis starts
-    if (knowledgeState.isProcessing && knowledgeState.lastParams && !messages.find(m => m.id === `knowledge-${knowledgeState.lastParams.query || 'unknown'}-processing`)) {
-      const artifactMessage: ChatMessage = {
-        id: `knowledge-${knowledgeState.lastParams.query || 'unknown'}-processing`,
-        role: 'assistant',
-        content: knowledgeState.analysisResult || '', // Will be updated when analysis completes
-        timestamp: new Date().toISOString(),
-        metadata: {
-          type: 'artifact',
-          appId: 'knowledge',
-          appName: 'Knowledge Hub',
-          appIcon: '📚',
-          title: knowledgeState.isProcessing ? 'Analyzing Documents...' : 'Document Analysis Results',
-          userInput: knowledgeState.lastParams.query || 'Document analysis request',
-          artifactData: {
-            type: 'document_analysis',
-            content: knowledgeState.analysisResult || 'Loading...',
-            metadata: { 
-              ...knowledgeState.lastParams,
-              documentCount: knowledgeState.documents.length
-            }
-          }
-        },
-        isStreaming: knowledgeState.isProcessing,
-        streamingStatus: knowledgeState.isProcessing ? 'Analyzing documents...' : undefined
-      };
-      chatActions.addMessage(artifactMessage);
-      console.log('📚 CHAT_HOOK: Knowledge artifact message created:', knowledgeState.lastParams.query);
-    }
-  }, [knowledgeState.isProcessing, knowledgeState.lastParams, knowledgeState.analysisResult, knowledgeState.documents, messages, chatActions]);
-
-  // Update Knowledge message when analysis completes
-  useEffect(() => {
-    if (!knowledgeState.isProcessing && knowledgeState.lastParams && knowledgeState.analysisResult) {
-      const messageId = `knowledge-${knowledgeState.lastParams.query || 'unknown'}-processing`;
-      const existingMessage = messages.find(m => m.id === messageId);
-      
-      if (existingMessage && existingMessage.isStreaming) {
-        const updatedMessage: ChatMessage = {
-          ...existingMessage,
-          content: knowledgeState.analysisResult,
-          isStreaming: false,
-          streamingStatus: undefined,
-          metadata: {
-            ...existingMessage.metadata,
-            title: 'Document Analysis Results',
-            artifactData: {
-              type: 'document_analysis',
-              content: knowledgeState.analysisResult,
-              metadata: { 
-                ...knowledgeState.lastParams,
-                documentCount: knowledgeState.documents.length
-              }
-            }
-          }
-        };
-        chatActions.addMessage(updatedMessage); // This will update due to deduplication logic
-        console.log('📚 CHAT_HOOK: Knowledge message updated with analysis results');
-      }
-    }
-  }, [knowledgeState.isProcessing, knowledgeState.lastParams, knowledgeState.analysisResult, knowledgeState.documents, messages, chatActions]);
-
-  // Assistant widget artifact - memoized to prevent duplicates
-  const assistantArtifact = useMemo(() => {
-    if (assistantState.lastInput) {
-      const artifactId = `assistant-${assistantState.lastInput}-${assistantState.isProcessing ? 'processing' : 'completed'}`;
-      return {
-        id: artifactId,
-        appId: 'assistant',
-        appName: 'Assistant',
-        appIcon: '🤖',
-        title: assistantState.isProcessing ? 'Processing...' : 'Conversation Context',
-        userInput: assistantState.lastInput || 'Assistant interaction',
-        createdAt: `${artifactId}-timestamp`, // Stable timestamp based on ID
-        isOpen: false,
-        generatedContent: {
-          type: 'text',
-          content: assistantState.conversationContext ? JSON.stringify(assistantState.conversationContext) : 'Loading...',
-          metadata: {}
-        }
-      } as AppArtifact;
-    }
-    return null;
-  }, [assistantState.lastInput, assistantState.isProcessing, assistantState.conversationContext]);
-
-  useEffect(() => {
-    if (assistantArtifact && assistantState.lastInput) {
-      addArtifact(assistantArtifact);
-      setLatestWidgetArtifact(assistantArtifact);
-      console.log('🤖 CHAT_HOOK: Assistant artifact created/updated');
-    }
-  }, [assistantArtifact, addArtifact]);
-  
-  // 4. Derived state for streaming status
-  const streamingMessage = useMemo(() => 
+  // 6. 派生状态计算 - 使用useMemo优化性能
+  const streamingMessage = useMemo((): ChatMessage | undefined => 
     messages.find(m => m.isStreaming), 
     [messages]
   );
   
-  const hasStreamingMessage = useMemo(() => 
+  const hasStreamingMessage = useMemo((): boolean => 
     !!streamingMessage,
     [streamingMessage]
   );
   
-  console.log('🔍 CHAT_INTERFACE: State update:', {
-    messagesCount: messages.length,
-    artifactsCount: artifacts.length,
-    isLoading,
-    isTyping,
-    hasStreaming: hasStreamingMessage,
-    streamingStatus: streamingMessage?.streamingStatus,
-    latestWidgetArtifact: latestWidgetArtifact?.appName,
-    dreamGenerating: dreamState.isGenerating,
-    huntSearching: huntState.isSearching,
-    omniGenerating: omniState.isGenerating,
-    assistantProcessing: assistantState.isProcessing,
-    dataScientistAnalyzing: dataScientistState.isAnalyzing,
-    knowledgeProcessing: knowledgeState.isProcessing
-  });
+  const latestWidgetArtifact = useMemo((): AppArtifact | null => {
+    if (artifacts.length === 0) return null;
+    
+    // 找到最新的Widget生成的工件
+    const widgetArtifacts = artifacts.filter(artifact => 
+      ['dream', 'hunt', 'omni', 'data-scientist', 'knowledge'].includes(artifact.appId)
+    );
+    
+    return widgetArtifacts.length > 0 
+      ? widgetArtifacts[widgetArtifacts.length - 1] 
+      : null;
+  }, [artifacts]);
   
+  // 7. 聚合所有状态并返回
   return {
-    // 1. API response events
+    // 聊天核心数据
     messages,
     isLoading,
     isTyping,
     
-    // 2. App artifact events  
-    artifacts,
-    
-    // 3. User send message events context
+    // 应用导航上下文
     currentApp,
     showRightSidebar,
     
-    // 4. Widget events state
+    // 工件数据
+    artifacts,
     latestWidgetArtifact,
-    isAnyWidgetGenerating: dreamState.isGenerating || huntState.isSearching || omniState.isGenerating || assistantState.isProcessing || dataScientistState.isAnalyzing || knowledgeState.isProcessing,
     
-    // Derived state
+    // Widget状态聚合
+    widgetStates,
+    isAnyWidgetGenerating,
+    
+    // 派生状态
     hasStreamingMessage,
     streamingMessage
   };

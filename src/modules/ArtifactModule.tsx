@@ -18,7 +18,7 @@
  * - 不包含任何UI组件或JSX渲染
  * - 使用React hooks进行状态管理和性能优化
  */
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useChat } from '../hooks/useChat';
 import { useAppStore } from '../stores/useAppStore';
 import { ChatMessage } from '../types/chatTypes';
@@ -63,13 +63,25 @@ export const useArtifactLogic = () => {
       latestArtifact: latestWidgetArtifact,
       totalArtifacts: artifacts?.length || 0
     };
-  }, [isAnyWidgetGenerating, latestWidgetArtifact, artifacts]);
+  }, [isAnyWidgetGenerating, latestWidgetArtifact, artifacts?.length]);
 
-  console.log('🎨 ARTIFACT_MODULE: Business logic state:', {
-    artifactsCount: artifacts?.length || 0,
-    latestArtifact: latestWidgetArtifact?.appName,
-    isGenerating: isAnyWidgetGenerating
-  });
+  // 移除这个导致无限循环的 console.log
+  // console.log('🎨 ARTIFACT_MODULE: Business logic state:', {
+  //   artifactsCount: artifacts?.length || 0,
+  //   latestArtifact: latestWidgetArtifact?.appName,
+  //   isGenerating: isAnyWidgetGenerating
+  // });
+
+  // 完全禁用日志以解决无限循环问题
+  // useEffect(() => {
+  //   if (process.env.NODE_ENV === 'development') {
+  //     console.log('🎨 ARTIFACT_MODULE: State changed:', {
+  //       artifactsCount: artifacts?.length || 0,
+  //       latestArtifact: latestWidgetArtifact?.appName,
+  //       isGenerating: isAnyWidgetGenerating
+  //     });
+  //   }
+  // }, [artifacts?.length, latestWidgetArtifact?.appName, isAnyWidgetGenerating]);
 
   return {
     // Data

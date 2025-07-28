@@ -74,27 +74,22 @@ interface KnowledgeWidgetModuleProps {
  * - rag_search: Intelligent RAG search and retrieval
  */
 
-// Knowledge search type to MCP template mapping
+// Knowledge search type to MCP template mapping (基于实际可用的MCP prompts)
 const KNOWLEDGE_TEMPLATE_MAPPING = {
-  'rag_search': {
-    template_id: 'intelligent_rag_search_prompt',
-    focus: 'knowledge_retrieval'
-  },
   'semantic': {
-    template_id: 'intelligent_rag_search_prompt',
-    focus: 'semantic_search'
+    template_id: 'rag_synthesis_prompt'  // 语义搜索使用RAG合成
   },
   'keyword': {
-    template_id: 'knowledge_analyze_prompt',
-    focus: 'keyword_search'
+    template_id: 'rag_collection_analysis_prompt'  // 关键词搜索使用集合分析
   },
   'hybrid': {
-    template_id: 'intelligent_rag_search_prompt',
-    focus: 'hybrid_search'
+    template_id: 'rag_synthesis_prompt'  // 混合搜索使用RAG合成
   },
   'document_analysis': {
-    template_id: 'knowledge_analyze_prompt',
-    focus: 'document_analysis'
+    template_id: 'knowledge_analyze_prompt'  // 文档分析使用知识分析
+  },
+  'rag_search': {
+    template_id: 'rag_synthesis_prompt'  // RAG搜索使用合成提示
   }
 };
 
@@ -104,13 +99,44 @@ const prepareKnowledgeTemplateParams = (params: KnowledgeWidgetParams) => {
   
   const mapping = KNOWLEDGE_TEMPLATE_MAPPING[searchType] || KNOWLEDGE_TEMPLATE_MAPPING['hybrid'];
   
-  // Build prompt_args for knowledge search
-  const prompt_args = {
-    query: query || 'Search knowledge base',
-    search_type: searchType,
-    context_size: contextSize,
-    has_documents: documents && documents.length > 0
-  };
+  // Build prompt_args based on the specific MCP prompt requirements
+  let prompt_args: Record<string, any>;
+  
+  switch (mapping.template_id) {
+    case 'knowledge_analyze_prompt':
+      // 需要: prompt, file_url, depth (optional)
+      prompt_args = {
+        prompt: query || 'Analyze the knowledge documents',
+        file_url: documents && documents.length > 0 ? 'uploaded_files' : 'knowledge_base',
+        depth: contextSize === 'large' ? 'deep' : 'shallow'
+      };
+      break;
+      
+    case 'rag_collection_analysis_prompt':
+      // 需要: collection_name, user_query (optional), analysis_type (optional)
+      prompt_args = {
+        collection_name: 'knowledge_base',
+        user_query: query || 'Search and analyze collection',
+        analysis_type: searchType === 'keyword' ? 'content' : 'relevance'
+      };
+      break;
+      
+    case 'rag_synthesis_prompt':
+      // 需要: search_results, original_query, sources_info (optional)
+      prompt_args = {
+        search_results: 'Retrieved from knowledge base',
+        original_query: query || 'Knowledge search and synthesis',
+        sources_info: `Context: ${contextSize}, Search type: ${searchType}`
+      };
+      break;
+      
+    default:
+      prompt_args = {
+        query: query || 'Search knowledge base',
+        search_type: searchType,
+        context_size: contextSize
+      };
+  }
   
   console.log('🧠 KNOWLEDGE_MODULE: Prepared template params for search type', searchType, ':', {
     template_id: mapping.template_id,
@@ -130,6 +156,24 @@ const knowledgeWidgetConfig = createWidgetConfig({
   icon: '🧠',
   sessionIdPrefix: 'knowledge_widget',
   maxHistoryItems: 25,
+  
+  // Result extraction configuration
+  resultExtractor: {
+    outputType: 'knowledge',
+    extractResult: (widgetData: any) => {
+      if (widgetData?.analysisResult) {
+        return {
+          finalResult: { 
+            answer: widgetData.analysisResult,
+            documents: widgetData.documents || []
+          },
+          outputContent: widgetData.analysisResult,
+          title: 'Knowledge Analysis Complete'
+        };
+      }
+      return null;
+    }
+  },
   
   // Extract parameters from triggered input
   extractParamsFromInput: (input: string) => {
@@ -227,7 +271,7 @@ export const KnowledgeWidgetModule: React.FC<KnowledgeWidgetModuleProps> = ({
   children
 }) => {
   // Local state for knowledge base (in real app, this would be in a store)
-  const [isProcessing, setIsProcessing] = React.useState(false);
+  const [isProcessing] = React.useState(false);
   const [knowledgeBase, setKnowledgeBase] = React.useState<KnowledgeDocument[]>([]);
   const [searchResult, setSearchResult] = React.useState<KnowledgeWidgetResult | null>(null);
   
@@ -261,7 +305,7 @@ export const KnowledgeWidgetModule: React.FC<KnowledgeWidgetModuleProps> = ({
     <BaseWidgetModule
       config={knowledgeWidgetConfig}
       triggeredInput={triggeredInput}
-      onCompleted={onAnalysisCompleted}
+      onResultGenerated={onAnalysisCompleted}
     >
       {(moduleProps) => {
         // Pass state to KnowledgeWidget via props with template support
@@ -285,6 +329,9 @@ export const KnowledgeWidgetModule: React.FC<KnowledgeWidgetModuleProps> = ({
               });
               
               const enrichedParams = {
+                query: 'Document upload',
+                searchType: 'semantic' as const,
+                contextSize: 'medium' as const,
                 documents: files,
                 templateParams
               };
@@ -302,6 +349,9 @@ export const KnowledgeWidgetModule: React.FC<KnowledgeWidgetModuleProps> = ({
               
               // Add template information to params before sending to store
               const enrichedParams = {
+                query: params.query || '',
+                searchType: params.searchType || 'semantic',
+                contextSize: params.contextSize || 'medium',
                 ...params,
                 templateParams // Add template configuration
               };
@@ -326,6 +376,9 @@ export const KnowledgeWidgetModule: React.FC<KnowledgeWidgetModuleProps> = ({
               
               // Add template information to params before sending to store
               const enrichedParams = {
+                query: params.query || '',
+                searchType: params.searchType || 'semantic',
+                contextSize: params.contextSize || 'medium',
                 ...params,
                 templateParams // Add template configuration
               };

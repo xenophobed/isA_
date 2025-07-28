@@ -16,7 +16,6 @@
  * - Custom UI optimized for toolbar context
  */
 import React, { useState, useRef, useEffect } from 'react';
-import { AssistantWidgetModule } from '../../modules/widgets/AssistantWidgetModule';
 
 interface AssistantToolbarProps {
   className?: string;
@@ -154,118 +153,40 @@ export const AssistantToolbar: React.FC<AssistantToolbarProps> = ({
               </div>
             </div>
 
-            {/* Custom Assistant Interface */}
-            <AssistantWidgetModule>
-              {(moduleProps) => (
-                <div className="flex flex-col">
-                  {/* Input Area */}
-                  <div className="p-4 border-b border-gray-700/50">
-                    <div className="space-y-3">
-                      {/* Main Input */}
-                      <div className="relative">
-                        <textarea
-                          ref={inputRef}
-                          value={currentInput}
-                          onChange={(e) => setCurrentInput(e.target.value)}
-                          placeholder="What can I help you with today?"
-                          className="w-full p-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 resize-none text-sm"
-                          rows={3}
-                          onKeyDown={(e) => {
-                            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                              e.preventDefault();
-                              if (currentInput.trim()) {
-                                moduleProps.onSendMessage({ task: currentInput });
-                                setCurrentInput('');
-                              }
-                            }
-                          }}
-                        />
-                        
-                        {/* Send Button */}
-                        <button
-                          onClick={() => {
-                            if (currentInput.trim()) {
-                              moduleProps.onSendMessage({ task: currentInput });
-                              setCurrentInput('');
-                            }
-                          }}
-                          disabled={!currentInput.trim() || moduleProps.isProcessing}
-                          className="absolute bottom-2 right-2 w-8 h-8 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center justify-center text-white transition-colors"
-                        >
-                          {moduleProps.isProcessing ? (
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          ) : (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Quick Actions */}
-                      <div className="grid grid-cols-2 gap-2">
-                        {quickActions.map((action, index) => (
-                          <button
-                            key={index}
-                            onClick={action.action}
-                            className="flex items-center gap-2 p-2 bg-gray-800/30 hover:bg-gray-700/50 border border-gray-700/50 rounded text-left transition-colors"
-                          >
-                            <span className="text-sm">{action.icon}</span>
-                            <span className="text-xs text-gray-300 truncate">{action.text}</span>
-                          </button>
-                        ))}
-                      </div>
+            {/* Assistant Coming Soon Notice */}
+            <div className="flex flex-col">
+              {/* Notice Area */}
+              <div className="p-6 text-center">
+                <div className="text-4xl mb-4">🚧</div>
+                <h3 className="text-lg font-semibold text-white mb-2">Assistant Coming Soon</h3>
+                <p className="text-sm text-gray-400 mb-4">
+                  The personal assistant feature is currently being redesigned. In the meantime, you can use our specialized widgets for specific tasks.
+                </p>
+                
+                {/* Redirect to Main Widgets */}
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500 mb-3">Try these instead:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center gap-2 p-2 bg-gray-800/30 border border-gray-700/50 rounded text-left">
+                      <span className="text-sm">⚡</span>
+                      <span className="text-xs text-gray-300">Omni Widget</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 bg-gray-800/30 border border-gray-700/50 rounded text-left">
+                      <span className="text-sm">🧠</span>
+                      <span className="text-xs text-gray-300">Knowledge</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 bg-gray-800/30 border border-gray-700/50 rounded text-left">
+                      <span className="text-sm">🎨</span>
+                      <span className="text-xs text-gray-300">Dream</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 bg-gray-800/30 border border-gray-700/50 rounded text-left">
+                      <span className="text-sm">🔍</span>
+                      <span className="text-xs text-gray-300">Hunt</span>
                     </div>
                   </div>
-
-                  {/* Response Area */}
-                  <div className="max-h-80 overflow-y-auto">
-                    {moduleProps.conversationContext ? (
-                      <div className="p-4">
-                        <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
-                          <div className="flex items-start gap-2 mb-2">
-                            <span className="text-sm">🤖</span>
-                            <div className="text-xs text-gray-400">Assistant</div>
-                          </div>
-                          <div className="text-sm text-white whitespace-pre-wrap">
-                            {typeof moduleProps.conversationContext === 'string' 
-                              ? moduleProps.conversationContext 
-                              : moduleProps.conversationContext?.response || 'Processing your request...'
-                            }
-                          </div>
-                          
-                          {/* Quick Actions for Response */}
-                          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-700/50">
-                            <button
-                              onClick={() => {
-                                const content = typeof moduleProps.conversationContext === 'string' 
-                                  ? moduleProps.conversationContext 
-                                  : moduleProps.conversationContext?.response || '';
-                                navigator.clipboard.writeText(content);
-                              }}
-                              className="flex items-center gap-1 px-2 py-1 bg-gray-700/50 hover:bg-gray-600/50 rounded text-xs text-gray-300 transition-colors"
-                            >
-                              📋 Copy
-                            </button>
-                            <button
-                              onClick={() => moduleProps.onClearContext()}
-                              className="flex items-center gap-1 px-2 py-1 bg-gray-700/50 hover:bg-gray-600/50 rounded text-xs text-gray-300 transition-colors"
-                            >
-                              🗑️ Clear
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 text-center text-gray-400 text-sm">
-                        <div className="text-2xl mb-2">💬</div>
-                        <div>Ask me anything or use the quick actions above</div>
-                      </div>
-                    )}
-                  </div>
                 </div>
-              )}
-            </AssistantWidgetModule>
+              </div>
+            </div>
 
             {/* Footer with shortcuts */}
             <div className="p-3 border-t border-gray-700/50 bg-gray-800/30">

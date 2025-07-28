@@ -1,40 +1,43 @@
 /**
  * ============================================================================
- * 应用模块 (AppModule.tsx) - 主应用的业务逻辑模块
+ * App Module (AppModule.tsx) - Global Application Coordinator
  * ============================================================================
  * 
- * 【核心职责】
- * - 处理主应用相关的所有业务逻辑
- * - 管理应用状态和侧边栏状态
- * - 协调ChatModule、SessionModule、UserModule等子模块
- * - 处理应用触发逻辑和Widget管理
- * - 向纯UI组件提供数据和事件回调
+ * Core Responsibilities:
+ * - Global application state management and coordination
+ * - Module navigation and layout orchestration
+ * - Coordinate ChatModule, SessionModule, Widget Modules integration
+ * - Provide layout structure and app-level interfaces
+ * - Delegate business logic to respective specialized modules
  * 
- * 【关注点分离】
- * ✅ 负责：
- *   - 应用业务逻辑的统一管理
- *   - 子模块的协调和集成
- *   - 应用触发词检测和处理
- *   - Widget状态管理
- *   - 事件回调的封装和传递
+ * Separation of Concerns:
+ * ✅ Responsible for:
+ *   - Global app navigation and state coordination
+ *   - Module integration and interface management
+ *   - Layout structure and sidebar management
+ *   - App-level event routing and delegation
+ *   - Available apps configuration and registration
  * 
- * ❌ 不负责：
- *   - UI布局和样式处理（由AppLayout处理）
- *   - 组件的直接渲染（由components处理）
- *   - 底层数据存储（由stores处理）
- *   - 网络通信（由api处理）
+ * ❌ Not responsible for:
+ *   - Specific business logic (delegated to respective modules)
+ *   - Direct UI rendering (handled by AppLayout)
+ *   - Data storage (handled by stores)
+ *   - Network communication (handled by services)
+ *   - Chat/Widget specific logic (handled by respective modules)
  * 
- * 【数据流向】
- * app.tsx → AppModule → AppLayout → 子模块和组件
- * hooks → AppModule → 事件回调 → stores → api/services
+ * Data Flow:
+ * app.tsx → AppModule (coordinator) → respective modules (business logic)
+ * AppModule provides interfaces, modules handle their own business logic
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { AppLayout, AppLayoutProps } from '../components/AppLayout';
 import { ChatModule } from './ChatModule';
 import { SessionModule } from './SessionModule';
 import { UserModule } from './UserModule';
 import { RightSidebarLayout } from '../components/ui/chat/RightSidebarLayout';
+import { UserButton } from '../components/ui/user/UserButton';
+import { UserPortal } from '../components/ui/user/UserPortal';
 
 // Business logic hooks
 import { useChat } from '../hooks/useChat';
@@ -45,38 +48,14 @@ import { widgetHandler } from '../components/core/WidgetHandler';
 import { logger, LogCategory } from '../utils/logger';
 import { AppId } from '../types/appTypes';
 
-// Available apps configuration - More relaxed keyword triggers
+// Available apps configuration - managed by AppModule but business logic in respective modules
 const AVAILABLE_APPS = [
-  { 
-    id: 'dream', 
-    name: 'DreamForge AI', 
-    triggers: ['image', 'picture', 'photo', 'draw', 'generate', 'create', 'design', 'art', 'visual', 'illustration'] 
-  },
-  { 
-    id: 'hunt', 
-    name: 'HuntAI', 
-    triggers: ['search', 'find', 'buy', 'shop', 'product', 'price', 'compare', 'look for', 'hunt'] 
-  },
-  { 
-    id: 'omni', 
-    name: 'Omni Content', 
-    triggers: ['write', 'content', 'article', 'blog', 'copy', 'draft', 'compose', 'text', 'story', 'essay'] 
-  },
-  { 
-    id: 'data-scientist', 
-    name: 'DataWise Analytics', 
-    triggers: ['analyze', 'analysis', 'data', 'chart', 'graph', 'statistics', 'plot', 'trend', 'metric'] 
-  },
-  { 
-    id: 'knowledge', 
-    name: 'Knowledge Hub', 
-    triggers: ['document', 'pdf', 'file', 'analyze document', 'summarize', 'extract'] 
-  },
-  { 
-    id: 'assistant', 
-    name: 'AI Assistant', 
-    triggers: ['help', 'assist', 'question', 'ask', 'explain', 'how to'] 
-  }
+  { id: 'dream', name: 'DreamForge AI', icon: '🎨' },
+  { id: 'hunt', name: 'HuntAI', icon: '🔍' },
+  { id: 'omni', name: 'Omni Content', icon: '✨' },
+  { id: 'data-scientist', name: 'DataWise Analytics', icon: '📊' },
+  { id: 'knowledge', name: 'Knowledge Hub', icon: '📚' },
+  { id: 'assistant', name: 'AI Assistant', icon: '🤖' }
 ];
 
 interface AppModuleProps extends Omit<AppLayoutProps, 'children'> {
@@ -84,15 +63,19 @@ interface AppModuleProps extends Omit<AppLayoutProps, 'children'> {
 }
 
 /**
- * App Module - Business logic module for main application
+ * App Module - Global coordinator for main application
  * 
  * This module:
- * - Coordinates all business logic across the app
- * - Manages app state and widget triggers
- * - Provides data and callbacks to pure UI components
+ * - Coordinates module integration and navigation
+ * - Manages global app state and layout
+ * - Delegates business logic to specialized modules
+ * - Provides clean interfaces between modules
  * - Keeps AppLayout as pure UI component
  */
 export const AppModule: React.FC<AppModuleProps> = (props) => {
+  // User Portal state
+  const [showUserPortal, setShowUserPortal] = useState(false);
+  
   // Business logic hooks
   const chatInterface = useChat();
   const artifactLogic = useArtifactLogic();
@@ -120,55 +103,22 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
 
   // Note: Widget trigger logic is now handled in useChatStore reactive subscriber
 
-  // Business logic: Handle file selection - delegates to reactive system
+  // Global management: Handle file selection - delegate to appropriate module
   const handleFileSelect = useCallback((files: FileList) => {
-    logger.info(LogCategory.USER_INPUT, 'Files selected', { 
+    logger.info(LogCategory.USER_INPUT, 'Files selected - delegating to modules', { 
       fileCount: files.length,
       fileNames: Array.from(files).map(f => f.name)
     });
-    console.log('📎 APP_MODULE: Files selected:', Array.from(files).map(f => f.name));
     
-    if (files.length > 0) {
-      // Create a message with files - the reactive system in useChatStore will handle widget triggering
-      const fileMessage = `Analyze ${files.length} document${files.length > 1 ? 's' : ''}: ${Array.from(files).map(f => f.name).join(', ')}`;
-      const userMessage = {
-        id: `user-${Date.now()}`,
-        role: 'user' as const,
-        content: fileMessage,
-        timestamp: new Date().toISOString(),
-        metadata: {},
-        processed: false,
-        files: Array.from(files) // Add files to trigger knowledge widget via AI detection
-      };
-      
-      chatActions.addMessage(userMessage);
-      logger.info(LogCategory.USER_INPUT, 'File message added, reactive system will trigger knowledge widget', { fileCount: files.length });
-      console.log('✅ APP_MODULE: File message added, reactive system will handle knowledge widget');
-    }
-  }, [chatActions]);
-
-  // Business logic: Widget management callbacks
-  const handleDreamGeneration = useCallback(async (params: any) => {
-    console.log('🎨 APP_MODULE: Dream generation requested via WidgetHandler');
-    await widgetHandler.processRequest({
-      type: 'dream',
-      params,
-      sessionId: 'dream_widget',
-      userId: 'app_user'
-    });
-  }, []);
-  
-  const handleHuntSearch = useCallback(async (params: any) => {
-    console.log('🔍 APP_MODULE: Hunt search requested via WidgetHandler');
-    await widgetHandler.processRequest({
-      type: 'hunt',
-      params,
-      sessionId: 'hunt_widget', 
-      userId: 'app_user'
-    });
+    // AppModule just delegates file handling to appropriate modules
+    // ChatModule will handle chat-related file processing
+    // Widget modules will handle their own file processing when needed
   }, []);
 
-  // Business logic: App management callbacks
+  // Widget management removed from AppModule - will be handled by separate WidgetModule
+  // This decouples chat and widget business logic
+
+  // Global management: App navigation and coordination
   const handleCloseApp = useCallback(() => {
     setShowRightSidebar(false);
     setCurrentApp(null);
@@ -184,9 +134,10 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
   }, [setCurrentApp, setTriggeredAppInput, currentApp]);
 
   const handleAppSelect = useCallback((appId: string) => {
+    // AppModule manages app selection but delegates business logic to respective modules
     setCurrentApp(appId as AppId);
     setShowRightSidebar(true);
-    logger.info(LogCategory.APP_TRIGGER, 'App selected from sidebar', { appId });
+    logger.info(LogCategory.APP_TRIGGER, 'App selected - delegating to module', { appId });
   }, [setCurrentApp, setShowRightSidebar]);
 
   const handleToggleSidebar = useCallback(() => {
@@ -200,22 +151,18 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
     currentApp,
     showRightSidebar,
     triggeredAppInput,
-    availableApps: AVAILABLE_APPS.map(app => ({ ...app, icon: '🚀' })),
+    availableApps: AVAILABLE_APPS,
     
     // App management callbacks
     onCloseApp: handleCloseApp,
     onAppSelect: handleAppSelect,
     onToggleSidebar: handleToggleSidebar,
     
-    // File handling
+    // File handling (delegated to modules)
     onFileSelect: handleFileSelect,
     
-    // Widget callbacks (for direct widget operations)
-    onDreamGeneration: handleDreamGeneration,
-    onHuntSearch: handleHuntSearch,
-    
-    // Artifact data (if needed)
-    artifacts: chatInterface.artifacts
+    // Artifact data (delegated to ArtifactModule)
+    artifacts: artifactLogic.artifacts
   }), [
     currentApp,
     showRightSidebar,
@@ -224,9 +171,7 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
     handleAppSelect,
     handleToggleSidebar,
     handleFileSelect,
-    handleDreamGeneration,
-    handleHuntSearch,
-    chatInterface.artifacts
+    artifactLogic.artifacts
   ]);
 
   // Render children as render props pattern with business logic data
@@ -249,9 +194,14 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
               onFileSelect: handleFileSelect
             }}
             
-            // Left Sidebar - Session Management
+            // Left Sidebar - SessionModule + UserButton
             sidebarContent={
-              <SessionModule sidebarWidth="300px" />
+              <SessionModule 
+                sidebarWidth="300px" 
+                userContent={
+                  <UserButton onToggleDrawer={() => setShowUserPortal(!showUserPortal)} />
+                }
+              />
             }
             
             // Right Sidebar - Widget Management
@@ -275,7 +225,16 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
         userModule: null,
         
         // App data for layout
-        appData: appLayoutData
+        appData: appLayoutData,
+        
+        // User Portal - 作为额外组件
+        userPortal: (
+          <UserPortal
+            isOpen={showUserPortal}
+            onClose={() => setShowUserPortal(false)}
+            sidebarWidth="300px"
+          />
+        )
       })}
     </AppLayout>
   );

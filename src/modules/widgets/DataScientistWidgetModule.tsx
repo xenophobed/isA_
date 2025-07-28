@@ -64,16 +64,15 @@ const DATA_SCIENTIST_TEMPLATE_MAPPING = {
 
 // DataScientist-specific template parameter preparation
 const prepareDataScientistTemplateParams = (params: DataScientistWidgetParams) => {
-  const { query, analysisType = 'exploratory', visualizationType = 'chart', data } = params;
+  const { query, analysisType = 'exploratory', data } = params;
   
   const mapping = DATA_SCIENTIST_TEMPLATE_MAPPING[analysisType] || DATA_SCIENTIST_TEMPLATE_MAPPING['exploratory'];
   
-  // Build prompt_args for CSV analysis
+  // Build prompt_args for csv_analyze_prompt (requires: prompt, csv_url, depth)
   const prompt_args = {
-    query: query || 'Analyze the provided data',
-    analysis_type: analysisType,
-    visualization_type: visualizationType,
-    data_context: data ? 'CSV data provided' : 'Request for data analysis'
+    prompt: query || `Perform ${analysisType} analysis on the provided data`,
+    csv_url: data ? 'uploaded_csv_file' : 'sample_data',
+    depth: analysisType === 'prescriptive' || analysisType === 'predictive' ? 'deep' : 'shallow'
   };
   
   console.log('📊 DATA_SCIENTIST_MODULE: Prepared template params for analysis type', analysisType, ':', {
@@ -94,6 +93,24 @@ const dataScientistWidgetConfig = createWidgetConfig({
   icon: '📊',
   sessionIdPrefix: 'data_scientist_widget',
   maxHistoryItems: 15,
+  
+  // Result extraction configuration
+  resultExtractor: {
+    outputType: 'analysis',
+    extractResult: (widgetData: any) => {
+      if (widgetData?.analysisResult) {
+        const content = typeof widgetData.analysisResult === 'string' 
+          ? widgetData.analysisResult 
+          : JSON.stringify(widgetData.analysisResult);
+        return {
+          finalResult: { analysis: widgetData.analysisResult },
+          outputContent: content,
+          title: 'Data Analysis Complete'
+        };
+      }
+      return null;
+    }
+  },
   
   // Extract parameters from triggered input
   extractParamsFromInput: (input: string) => {
@@ -227,7 +244,7 @@ export const DataScientistWidgetModule: React.FC<DataScientistWidgetModuleProps>
     <BaseWidgetModule
       config={dataScientistWidgetConfig}
       triggeredInput={triggeredInput}
-      onCompleted={onAnalysisCompleted}
+      onResultGenerated={onAnalysisCompleted}
     >
       {(moduleProps) => {
         // Pass store state to DataScientistWidget via props with template support
@@ -245,6 +262,9 @@ export const DataScientistWidgetModule: React.FC<DataScientistWidgetModuleProps>
               
               // Add template information to params before sending to store
               const enrichedParams = {
+                query: params.query || '', // Ensure query is always provided
+                analysisType: params.analysisType || 'exploratory',
+                visualizationType: params.visualizationType || 'chart',
                 ...params,
                 templateParams // Add template configuration
               };

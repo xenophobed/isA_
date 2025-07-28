@@ -45,6 +45,7 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -108,76 +109,48 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
     setShowSuggestions(false);
   };
 
-  // Voice recording functions
+  // File handling functions
+  const handleFileSelection = (files: FileList) => {
+    // Temporarily disabled - return early
+    console.log('📎 File upload temporarily disabled');
+    return;
+  };
+
+  // Voice recording functions - temporarily disabled
   const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        const audioFile = new File([audioBlob], `recording-${Date.now()}.wav`, { type: 'audio/wav' });
-        
-        // Add recorded audio to attached files
-        setAttachedFiles(prev => [...prev, audioFile]);
-        
-        // Stop all tracks to release microphone
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-      playAudioFeedback('success');
-      
-      console.log('🎤 Recording started');
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-      playAudioFeedback('error');
-      if (onError) {
-        onError(error instanceof Error ? error : new Error('Recording failed'));
-      }
-    }
+    console.log('🎤 Audio recording temporarily disabled');
+    return;
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      playAudioFeedback('success');
-      console.log('🎤 Recording stopped');
-    }
+    console.log('🎤 Audio recording temporarily disabled');
+    return;
   };
 
   const toggleRecording = () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
-  };
-
-  // File handling functions
-  const handleFileSelection = (files: FileList) => {
-    const newFiles = Array.from(files);
-    setAttachedFiles(prev => [...prev, ...newFiles]);
-    playAudioFeedback('click');
-    
-    if (onFileSelect) {
-      onFileSelect(files);
-    }
-    
-    console.log('📎 Files attached:', newFiles.map(f => f.name));
+    console.log('🎤 Audio recording temporarily disabled');
+    return;
   };
 
   const removeFile = (index: number) => {
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
     playAudioFeedback('click');
+  };
+
+  // Handle input change with auto-resize
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+    
+    // Auto-resize textarea - use setTimeout to ensure DOM updates first
+    setTimeout(() => {
+      const textarea = e.target;
+      textarea.style.height = 'auto';
+      const scrollHeight = textarea.scrollHeight;
+      const newHeight = Math.min(Math.max(scrollHeight, 40), 150); // Min 40px, max 150px
+      textarea.style.height = newHeight + 'px';
+      console.log('Textarea resized:', { scrollHeight, newHeight });
+    }, 0);
   };
 
   const handleSendMessage = async () => {
@@ -355,10 +328,11 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
           {/* File Upload Button Container */}
           <div className="button-container">
             <FileUpload
-              className="upload-button"
+              className="upload-button disabled"
               onFileSelect={handleFileSelection}
               accept="image/*,application/pdf,text/*,.doc,.docx,.md,.wav,.mp3,.m4a,.flac,.ogg"
               multiple={true}
+              disabled={true}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -372,25 +346,17 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
           {/* Audio Recording Button Container */}
           <div className="button-container">
             <button
-              className={`audio-button ${isRecording ? 'recording' : ''}`}
+              className="audio-button disabled"
               onClick={toggleRecording}
-              disabled={isLoading}
+              disabled={true}
+              title="Audio recording temporarily disabled"
             >
-              {isRecording ? (
-                // Recording indicator (pulsing red dot)
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="8" fill="#ef4444" className="animate-pulse"/>
-                  <circle cx="12" cy="12" r="4" fill="white"/>
-                </svg>
-              ) : (
-                // Microphone icon
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M12 19v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M8 23h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12 19v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M8 23h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </button>
           </div>
           
@@ -399,16 +365,13 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
             <textarea
               ref={textareaRef}
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder={placeholder || "Type your message..."}
               disabled={disabled || isLoading}
               autoFocus={autoFocus}
               rows={1}
               className="chat-input"
-              style={{
-                maxHeight: maxRows ? `${maxRows * 1.5}rem` : '150px'
-              }}
             />
           </div>
           

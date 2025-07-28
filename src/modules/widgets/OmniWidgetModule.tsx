@@ -41,73 +41,114 @@ interface OmniWidgetModuleProps {
  * - academic: Research and academic writing
  */
 
-// Omni content type to MCP template mapping
+// Omni content type to MCP template mapping (基于实际可用的MCP prompts)
 const OMNI_TEMPLATE_MAPPING = {
+  // 基础内容类型 - 都使用general_content_prompt
   'general': {
-    template_id: 'general_content_prompt',
-    focus: 'comprehensive_content'
+    template_id: 'general_content_prompt'
   },
   'text': {
-    template_id: 'general_content_prompt',
-    focus: 'text_generation'
+    template_id: 'general_content_prompt'
   },
   'code': {
-    template_id: 'general_content_prompt',
-    focus: 'code_generation'
+    template_id: 'general_content_prompt'
   },
   'markdown': {
-    template_id: 'general_content_prompt',
-    focus: 'documentation_writing'
+    template_id: 'general_content_prompt'
   },
   'email': {
-    template_id: 'general_content_prompt',
-    focus: 'communication_writing'
+    template_id: 'general_content_prompt'
   },
-  'social': {
-    template_id: 'content_marketing_prompt',
-    focus: 'social_media_content'
+  'custom': {
+    template_id: 'general_content_prompt'
   },
+  
+  // 专业领域 - 使用对应的专业prompts
   'business': {
-    template_id: 'business_strategy_prompt',
-    focus: 'business_content'
-  },
-  'academic': {
-    template_id: 'research_paper_prompt',
-    focus: 'academic_writing'
+    template_id: 'business_strategy_prompt'
   },
   'marketing': {
-    template_id: 'content_marketing_prompt',
-    focus: 'marketing_content'
+    template_id: 'content_marketing_prompt'
+  },
+  'social': {
+    template_id: 'content_marketing_prompt'
   },
   'financial': {
-    template_id: 'financial_analysis_prompt',
-    focus: 'financial_content'
+    template_id: 'financial_analysis_prompt'
+  },
+  'market_analysis': {
+    template_id: 'market_analysis_prompt'
+  },
+  'academic': {
+    template_id: 'research_paper_prompt'
+  },
+  'science': {
+    template_id: 'research_paper_prompt'
+  },
+  'education': {
+    template_id: 'course_material_prompt'
+  },
+  'health': {
+    template_id: 'wellness_guide_prompt'
+  },
+  'lifestyle': {
+    template_id: 'general_content_prompt'
+  },
+  'professional': {
+    template_id: 'general_content_prompt'
+  },
+  'news': {
+    template_id: 'general_content_prompt'
+  },
+  'creative': {
+    template_id: 'general_content_prompt'
+  },
+  'technology': {
+    template_id: 'general_content_prompt'
   }
 };
 
-// Omni-specific template parameter preparation
-const prepareOmniTemplateParams = (params: OmniWidgetParams) => {
-  const { prompt, contentType = 'text', tone = 'professional', length = 'medium' } = params;
+// Omni-specific template parameter preparation (基于MCP prompt参数要求)
+const prepareOmniTemplateParams = (params: OmniWidgetParams & { 
+  referenceUrls?: string[]; 
+  referenceText?: string; 
+  actualTopic?: string;
+  templateId?: string;
+}) => {
+  const { 
+    prompt, 
+    contentType = 'text', 
+    tone = 'professional', 
+    length = 'medium',
+    referenceUrls = [],
+    referenceText = '',
+    actualTopic,
+    templateId
+  } = params;
   
-  const mapping = OMNI_TEMPLATE_MAPPING[contentType] || OMNI_TEMPLATE_MAPPING['general'];
+  // 使用实际的topic或者fallback到contentType
+  const topicForMapping = actualTopic || contentType;
+  const mapping = OMNI_TEMPLATE_MAPPING[topicForMapping as keyof typeof OMNI_TEMPLATE_MAPPING] || OMNI_TEMPLATE_MAPPING['general'];
   
-  // Build prompt_args for content generation
+  // 使用指定的templateId或者从mapping获取
+  const final_template_id = templateId || mapping.template_id;
+  
+  // 构建符合MCP要求的prompt_args
   const prompt_args = {
     subject: prompt || 'Content generation request',
-    content_type: contentType,
-    tone: tone,
-    length: length,
-    depth: 'deep',
-    reference_text: `Generate ${contentType} content with ${tone} tone and ${length} length`
+    depth: length === 'short' ? 'shallow' : 'deep', // 映射length到depth
+    reference_urls: referenceUrls,
+    reference_text: referenceText || `Create ${contentType} content with ${tone} tone. Focus on ${topicForMapping} domain expertise.`
   };
   
-  console.log('⚡ OMNI_MODULE: Prepared template params for content type', contentType, ':', {
-    template_id: mapping.template_id,
-    prompt_args
+  console.log('⚡ OMNI_MODULE: Prepared template params for topic', topicForMapping, ':', {
+    template_id: final_template_id,
+    prompt_args,
+    originalContentType: contentType
   });
   
   return {
-    template_id: mapping.template_id,
+    template_id: final_template_id,
     prompt_args
   };
 };
@@ -119,6 +160,24 @@ const omniWidgetConfig = createWidgetConfig({
   icon: '⚡',
   sessionIdPrefix: 'omni_widget',
   maxHistoryItems: 30,
+  
+  // Result extraction configuration
+  resultExtractor: {
+    outputType: 'text',
+    extractResult: (widgetData: any) => {
+      if (widgetData?.generatedContent) {
+        return {
+          finalResult: { 
+            content: widgetData.generatedContent, 
+            params: widgetData.params 
+          },
+          outputContent: widgetData.generatedContent,
+          title: 'Content Generated'
+        };
+      }
+      return null;
+    }
+  },
   
   // Extract parameters from triggered input
   extractParamsFromInput: (input: string) => {
@@ -276,7 +335,7 @@ export const OmniWidgetModule: React.FC<OmniWidgetModuleProps> = ({
     <BaseWidgetModule
       config={omniWidgetConfig}
       triggeredInput={triggeredInput}
-      onCompleted={onContentGenerated}
+      onResultGenerated={onContentGenerated}
     >
       {(moduleProps) => {
         // Pass store state to OmniWidget via props with template support
@@ -294,6 +353,10 @@ export const OmniWidgetModule: React.FC<OmniWidgetModuleProps> = ({
               
               // Add template information to params before sending to store
               const enrichedParams = {
+                prompt: params.prompt || '',
+                contentType: (params.contentType === 'research' ? 'academic' : params.contentType) as any || 'text',
+                tone: (params.tone === 'academic' ? 'professional' : params.tone) as any || 'professional',
+                length: params.length as any || 'medium',
                 ...params,
                 templateParams // Add template configuration
               };

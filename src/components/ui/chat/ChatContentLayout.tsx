@@ -32,6 +32,7 @@ export interface ChatContentLayoutProps {
   messages?: ChatMessage[];  // Accept messages as prop
   isLoading?: boolean;       // Accept loading state as prop
   isTyping?: boolean;        // Accept typing state as prop
+  onSendMessage?: (message: string) => void;
 }
 
 /**
@@ -51,7 +52,8 @@ export const ChatContentLayout: React.FC<ChatContentLayoutProps> = ({
   children,
   messages = [],  // Use prop instead of context
   isLoading = false,
-  isTyping = false
+  isTyping = false,
+  onSendMessage
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -59,16 +61,6 @@ export const ChatContentLayout: React.FC<ChatContentLayoutProps> = ({
   const streamingMessage = messages.find(m => m.isStreaming);
   const streamingStatus = streamingMessage?.streamingStatus;
   
-  // Debug streaming status
-  if (streamingMessage) {
-    console.log('🔍 CHAT_CONTENT: Streaming message found:', {
-      id: streamingMessage.id,
-      isStreaming: streamingMessage.isStreaming,
-      streamingStatus: streamingMessage.streamingStatus,
-      contentLength: streamingMessage.content.length
-    });
-  }
-
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (autoScroll) {
@@ -105,6 +97,7 @@ export const ChatContentLayout: React.FC<ChatContentLayoutProps> = ({
         messages={messages}
         isLoading={isLoading}
         isTyping={isTyping}
+        onSendMessage={onSendMessage}
       />
 
       {/* Auto-scroll anchor */}

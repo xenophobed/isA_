@@ -15,8 +15,7 @@
  */
 
 import React, { useState } from 'react';
-import { useUserHandler, formatCredits, getCreditColor, getPlanDisplayName } from '../../core/userHandler';
-import { PRICING_PLANS } from '../../../modules/UserModule';
+import { useUserModule, PRICING_PLANS, formatCredits } from '../../../modules/UserModule';
 import { PlanType } from '../../../types/userTypes';
 
 interface UserPortalProps {
@@ -26,29 +25,46 @@ interface UserPortalProps {
 }
 
 export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose, sidebarWidth = '16.67%' }) => {
-  const userHandler = useUserHandler();
+  const userModule = useUserModule();
   const [activeTab, setActiveTab] = useState<'account' | 'billing' | 'usage'>('account');
   const [upgradingPlan, setUpgradingPlan] = useState<string | null>(null);
 
   // Don't render if not open or not authenticated
-  if (!isOpen || !userHandler.isAuthenticated || !userHandler.user) {
+  if (!isOpen || !userModule.isAuthenticated || !userModule.auth0User) {
     return null;
   }
 
-  const user = userHandler.user;
-  const credits = userHandler.credits;
-  const totalCredits = userHandler.totalCredits;
-  const hasCredits = userHandler.hasCredits;
-  const currentPlan = userHandler.currentPlan;
-  const usagePercentage = userHandler.usagePercentage;
+  const user = userModule.auth0User;
+  const externalUser = userModule.externalUser;
+  const credits = userModule.credits;
+  const totalCredits = userModule.totalCredits;
+  const hasCredits = userModule.hasCredits;
+  const currentPlan = userModule.currentPlan;
+  const usagePercentage = totalCredits > 0 ? Math.round(((totalCredits - credits) / totalCredits) * 100) : 0;
+  
+  // Helper functions
+  const getPlanDisplayName = (plan: string) => {
+    const planNames = { free: 'Free', pro: 'Pro', enterprise: 'Enterprise' };
+    return planNames[plan as keyof typeof planNames] || plan;
+  };
+  
+  const getCreditColor = (credits: number) => {
+    if (credits > 1000) return 'text-green-400';
+    if (credits > 100) return 'text-yellow-400';
+    return 'text-red-400';
+  };
 
   // Handle plan upgrade
   const handleUpgrade = async (planType: PlanType) => {
     try {
       setUpgradingPlan(planType);
-      await userHandler.handleUpgrade(planType);
+      const checkoutUrl = await userModule.createCheckout(planType);
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+      }
     } catch (error) {
-      userHandler.handleError(error as Error, 'upgrade plan');
+      console.error('Upgrade failed:', error);
+      // TODO: Show error toast
     } finally {
       setUpgradingPlan(null);
     }
@@ -57,15 +73,16 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose, sidebar
   // Handle user refresh
   const handleRefreshUser = async () => {
     try {
-      await userHandler.handleRefreshUser();
+      await userModule.refreshUser();
     } catch (error) {
-      userHandler.handleError(error as Error, 'refresh user');
+      console.error('Refresh failed:', error);
+      // TODO: Show error toast
     }
   };
 
   // Handle logout
   const handleLogout = () => {
-    userHandler.handleLogout();
+    userModule.logout();
     onClose();
   };
 
@@ -153,19 +170,13 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose, sidebar
           )}
 
           {/* Error Display */}
-          {userHandler.error && (
+          {userModule.error && (
             <div className="mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
               <div className="flex items-center space-x-2">
                 <span className="text-red-400">❌</span>
                 <span className="text-red-300 text-sm font-medium">Error</span>
               </div>
-              <p className="text-red-200 text-xs mt-1">{userHandler.error}</p>
-              <button
-                onClick={userHandler.handleClearErrors}
-                className="text-red-400 hover:text-red-300 text-xs mt-1 underline"
-              >
-                Clear Error
-              </button>
+              <p className="text-red-200 text-xs mt-1">{userModule.error}</p>
             </div>
           )}
         </div>
@@ -197,7 +208,7 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose, sidebar
           {activeTab === 'account' && (
             <AccountTab 
               user={user}
-              isLoading={userHandler.isLoading}
+              isLoading={userModule.isLoading}
               onRefresh={handleRefreshUser}
               onLogout={handleLogout}
             />
@@ -209,8 +220,9 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose, sidebar
               pricingPlans={PRICING_PLANS}
               upgradingPlan={upgradingPlan}
               onUpgrade={handleUpgrade}
-              onViewPricing={userHandler.handleViewPricing}
-              onManageSubscription={userHandler.handleManageSubscription}
+              onViewPricing={() => window.open('/pricing', '_blank')}
+              onManageSubscription={() => window.open('/account/billing', '_blank')}
+              getPlanDisplayName={getPlanDisplayName}
             />
           )}
 
@@ -220,6 +232,8 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose, sidebar
               totalCredits={totalCredits}
               hasCredits={hasCredits}
               usagePercentage={usagePercentage}
+              getCreditColor={getCreditColor}
+              formatCredits={formatCredits}
             />
           )}
         </div>
@@ -281,7 +295,8 @@ const BillingTab: React.FC<{
   onUpgrade: (planType: PlanType) => void;
   onViewPricing: () => void;
   onManageSubscription: () => void;
-}> = ({ currentPlan, pricingPlans, upgradingPlan, onUpgrade, onViewPricing, onManageSubscription }) => (
+  getPlanDisplayName: (plan: string) => string;
+}> = ({ currentPlan, pricingPlans, upgradingPlan, onUpgrade, onViewPricing, onManageSubscription, getPlanDisplayName }) => (
   <div className="space-y-6">
     {/* Current Plan */}
     <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 p-4 rounded-xl border border-purple-500/30">
@@ -419,7 +434,9 @@ const UsageTab: React.FC<{
   totalCredits: number;
   hasCredits: boolean;
   usagePercentage: number;
-}> = ({ credits, totalCredits, usagePercentage }) => (
+  getCreditColor: (credits: number) => string;
+  formatCredits: (credits: number) => string;
+}> = ({ credits, totalCredits, usagePercentage, getCreditColor, formatCredits }) => (
   <div className="space-y-4">
     <div className="bg-white/5 p-4 rounded-xl border border-white/10">
       <h3 className="text-white font-medium mb-4">Usage Statistics</h3>

@@ -165,10 +165,10 @@ export const ChatLayout = memo<ChatLayoutProps>(({
     <div className={`${layoutClass} flex flex-col h-full text-white overflow-hidden`} style={{ background: 'transparent' }}>
       
       {showHeader && (
-        <header className="isa-chat-header h-16 bg-black/20 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-6 z-10">
+        <header className="isa-chat-header h-16 backdrop-blur-xl flex items-center justify-between px-6 z-10" style={{ background: 'var(--glass-primary)' }}>
           {headerContent || (
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--gradient-secondary)', boxShadow: '0 0 20px var(--accent-soft)' }}>
                 <span className="text-white font-bold text-lg">A</span>
               </div>
               <div>
@@ -183,8 +183,8 @@ export const ChatLayout = memo<ChatLayoutProps>(({
       <div className="flex flex-1 overflow-hidden" style={{ height: showHeader ? 'calc(100% - 4rem)' : '100%' }}>
         {actualShowLeftSidebar && sidebarContent && (
           <aside 
-            className={`${sidebarClass} bg-black/20 backdrop-blur-xl border-r border-white/10 flex-shrink-0 order-1 z-10`}
-            style={{ width: formattedSidebarWidth }}
+            className={`${sidebarClass} backdrop-blur-xl flex-shrink-0 order-1 z-10`}
+            style={{ width: formattedSidebarWidth, background: 'var(--glass-primary)' }}
           >
             {sidebarContent}
           </aside>
@@ -198,6 +198,7 @@ export const ChatLayout = memo<ChatLayoutProps>(({
             messages={messages}
             isLoading={isLoading}
             isTyping={isTyping}
+            onSendMessage={onSendMessage}
           />
           
           {/* Input area */}
@@ -220,8 +221,8 @@ export const ChatLayout = memo<ChatLayoutProps>(({
         
         {actualShowRightSidebar && rightSidebarContent && (
           <aside 
-            className={`${rightSidebarClass} bg-black/30 backdrop-blur-xl border-l border-white/10 flex-shrink-0 order-3 z-20`}
-            style={{ width: formattedRightSidebarWidth }}
+            className={`${rightSidebarClass} backdrop-blur-xl flex-shrink-0 order-3 z-20`}
+            style={{ width: formattedRightSidebarWidth, background: 'var(--glass-secondary)' }}
           >
             {rightSidebarContent}
           </aside>

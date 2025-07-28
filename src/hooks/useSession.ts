@@ -1,93 +1,134 @@
 /**
  * ============================================================================
- * Session Hook (useSession.ts) - 会话状态监听钩子
+ * Session Hook (useSession.ts) - Session State Subscription Hook
  * ============================================================================
  * 
- * 【核心职责】
- * - 监听和获取会话相关的状态数据
- * - 提供会话状态的响应式接口
- * - 连接业务逻辑模块和状态管理器
- * - 不包含业务逻辑，仅负责状态监听
+ * Core Responsibilities:
+ * - Monitor and access session-related state data
+ * - Provide reactive interfaces for session state
+ * - Connect business logic modules with SessionProvider
+ * - No business logic, only state subscription
  * 
- * 【关注点分离】
- * ✅ 负责：
- *   - 从stores获取会话状态数据
- *   - 提供响应式的状态接口
- *   - 状态变化的监听和通知
- *   - 状态选择器的封装
+ * Separation of Concerns:
+ * ✅ Responsible for:
+ *   - Getting session state data from SessionProvider
+ *   - Providing reactive state interfaces
+ *   - State change monitoring and notification
+ *   - State selector encapsulation
  * 
- * ❌ 不负责：
- *   - 会话的创建、删除、切换逻辑（由SessionModule处理）
- *   - UI组件的渲染（由LeftSidebarLayout处理）
- *   - 数据持久化逻辑（由SessionModule处理）
- *   - 业务规则和验证（由SessionModule处理）
+ * ❌ Not responsible for:
+ *   - Session creation, deletion, switching logic (handled by SessionModule)
+ *   - UI component rendering (handled by LeftSidebarLayout)
+ *   - Data persistence logic (handled by SessionProvider)
+ *   - Business rules and validation (handled by SessionModule)
  * 
- * 【数据流向】
- * SessionModule → stores → useSession → UI组件
+ * Data Flow:
+ * SessionProvider → useSession → SessionModule → UI components
  */
 
-import { useSessionStore } from '../stores/useSessionStore';
+import { useCallback, useMemo } from 'react';
+import { 
+  useSession as useSessionContext,
+  useCurrentSession as useCurrentSessionFromProvider,
+  useSessions as useSessionsFromProvider,
+  useSessionActions as useSessionActionsFromProvider,
+  ChatSession
+} from '../providers/SessionProvider';
 
-export interface ChatSession {
-  id: string;
-  title: string;
-  lastMessage: string;
-  timestamp: string;
-  messageCount: number;
-  artifacts: string[];
-  messages: Array<{
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: string;
-    metadata?: any;
-  }>;
-  metadata?: {
-    apps_used?: string[];
-    total_messages?: number;
-    last_activity?: string;
-  };
-}
+// Re-export types for compatibility
+export { ChatSession } from '../providers/SessionProvider';
 
 /**
- * Hook to access session state from the store
+ * Hook to access session state from SessionProvider
  * Pure state listener - no business logic
  */
 export const useSession = () => {
-  // Listen to session-related state from the store
-  const sessions = useSessionStore(state => state.sessions || []);
-  const currentSessionId = useSessionStore(state => state.currentSessionId || 'default');
-  const isLoadingSession = useSessionStore(state => state.isLoadingSession || false);
+  // Get session state from SessionProvider
+  const sessionContext = useSessionContext();
   
-  // Derived state
-  const currentSession = sessions.find(session => session.id === currentSessionId);
-  const sessionCount = sessions.length;
+  if (!sessionContext) {
+    throw new Error('useSession must be used within SessionProvider');
+  }
   
-  return {
-    // Session data
-    sessions,
-    currentSession,
-    currentSessionId,
-    sessionCount,
-    
-    // Loading states
-    isLoadingSession,
-    
-    // Computed values
-    hasMultipleSessions: sessionCount > 1,
-    isDefaultSession: currentSessionId === 'default'
-  };
+  return sessionContext;
 };
 
 /**
- * Hook to access session actions from the store
- * These are bound to business logic in SessionModule
+ * Get current session with selective subscription
  */
-export const useSessionActions = () => useSessionStore(state => ({
-  createSession: state.createSession,
-  selectSession: state.selectSession,
-  deleteSession: state.deleteSession,
-  renameSession: state.renameSession,
-  updateCurrentSession: state.updateCurrentSession,
-  setLoadingSession: state.setLoadingSession
-}));
+export const useCurrentSession = () => {
+  return useCurrentSessionFromProvider();
+};
+
+/**
+ * Get all sessions with selective subscription
+ */
+export const useSessions = () => {
+  return useSessionsFromProvider();
+};
+
+/**
+ * Get session actions with memoization
+ */
+export const useSessionActions = () => {
+  return useSessionActionsFromProvider();
+};
+
+/**
+ * Get session state summary - optimized for components that need overview
+ */
+export const useSessionSummary = () => {
+  const { sessions, currentSessionId, isLoading, error } = useSession();
+  
+  return useMemo(() => ({
+    sessionCount: sessions.length,
+    currentSessionId,
+    hasCurrentSession: !!currentSessionId,
+    isLoading,
+    hasError: !!error,
+    error
+  }), [sessions.length, currentSessionId, isLoading, error]);
+};
+
+/**
+ * Get specific session by ID with memoization
+ */
+export const useSessionById = (sessionId: string) => {
+  const { sessions } = useSession();
+  
+  return useMemo(() => 
+    sessions.find(session => session.id === sessionId) || null,
+    [sessions, sessionId]
+  );
+};
+
+/**
+ * Get session operations with selective callbacks
+ */
+export const useSessionOperations = () => {
+  const { 
+    createSession, 
+    selectSession, 
+    deleteSession, 
+    updateSession 
+  } = useSessionActions();
+  
+  return useMemo(() => ({
+    createSession,
+    selectSession,
+    deleteSession,
+    updateSession
+  }), [createSession, selectSession, deleteSession, updateSession]);
+};
+
+/**
+ * Get session content operations
+ */
+export const useSessionContent = () => {
+  const { addMessage, clearMessages } = useSessionActions();
+  
+  return useMemo(() => ({
+    addMessage,
+    clearMessages
+  }), [addMessage, clearMessages]);
+};

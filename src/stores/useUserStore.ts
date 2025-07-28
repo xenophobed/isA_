@@ -187,6 +187,13 @@ export const useUserStore = create<UserStore>()(
     updateCredits: (credits: number) => {
       const currentUser = get().externalUser;
       if (currentUser) {
+        console.log('💳 USER_STORE: Updating credits', { 
+          auth0_id: currentUser.auth0_id,
+          oldCredits: currentUser.credits,
+          newCredits: credits,
+          difference: currentUser.credits - credits
+        });
+        
         logger.info(LogCategory.USER_AUTH, 'Updating user credits', { 
           auth0_id: currentUser.auth0_id,
           oldCredits: currentUser.credits,

@@ -29,14 +29,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       <div className="flex items-center gap-6">
         {/* Brand Logo & Title */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--gradient-secondary)' }}>
             <span className="text-white text-sm font-bold">I</span>
           </div>
           <div className="flex flex-col">
-            <h1 className="text-lg font-semibold text-white tracking-tight">
+            <h1 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               ISA
             </h1>
-            <p className="text-xs text-gray-400 -mt-0.5">
+            <p className="text-xs -mt-0.5" style={{ color: 'var(--text-muted)' }}>
               Intelligent Agent Platform
             </p>
           </div>
@@ -44,9 +44,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
         {/* Active App Indicator */}
         {currentApp && currentAppData && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/60 border border-gray-700 rounded-lg">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: 'var(--glass-primary)', border: '1px solid var(--glass-border)' }}>
             <span className="text-sm">{currentAppData.icon}</span>
-            <span className="text-sm font-medium text-white">{currentAppData.name}</span>
+            <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{currentAppData.name}</span>
             <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
           </div>
         )}

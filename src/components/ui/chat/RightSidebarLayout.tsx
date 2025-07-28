@@ -99,6 +99,16 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
                 onGenerateImage={moduleProps.onGenerateImage}
                 onClearImage={moduleProps.onClearImage}
                 triggeredInput={triggeredAppInput}
+                onBack={() => {
+                  logger.trackSidebarInteraction('widget_back_to_list_clicked', currentApp || undefined, { 
+                    widgetTitle: 'DreamForge AI' 
+                  });
+                  if (onBackToList) {
+                    onBackToList();
+                  } else {
+                    onCloseApp();
+                  }
+                }}
               />
             )}
           </DreamWidgetModule>
@@ -114,6 +124,17 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
           >
             <HuntWidget 
               triggeredInput={triggeredAppInput}
+              onBack={() => {
+                logger.trackSidebarInteraction('widget_back_to_list_clicked', currentApp || undefined, { 
+                  widgetTitle: 'HuntAI' 
+                });
+                // Use onBackToList if available, otherwise fall back to onCloseApp
+                if (onBackToList) {
+                  onBackToList();
+                } else {
+                  onCloseApp();
+                }
+              }}
             />
           </HuntWidgetModule>
         );
@@ -128,6 +149,21 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
           >
             <OmniWidget 
               triggeredInput={triggeredAppInput}
+              isGenerating={false}
+              generatedContent={null}
+              lastParams={null}
+              onGenerateContent={async () => {}}
+              onClearContent={() => {}}
+              onBack={() => {
+                logger.trackSidebarInteraction('widget_back_to_list_clicked', currentApp || undefined, { 
+                  widgetTitle: 'Omni Content' 
+                });
+                if (onBackToList) {
+                  onBackToList();
+                } else {
+                  onCloseApp();
+                }
+              }}
             />
           </OmniWidgetModule>
         );
@@ -142,6 +178,20 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
           >
             <KnowledgeWidget 
               triggeredInput={triggeredAppInput}
+              isProcessing={false}
+              result={null}
+              onProcess={async () => {}}
+              onClearResults={() => {}}
+              onBack={() => {
+                logger.trackSidebarInteraction('widget_back_to_list_clicked', currentApp || undefined, { 
+                  widgetTitle: 'Knowledge Hub' 
+                });
+                if (onBackToList) {
+                  onBackToList();
+                } else {
+                  onCloseApp();
+                }
+              }}
             />
           </KnowledgeWidgetModule>
         );
@@ -156,6 +206,20 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
           >
             <DataScientistWidget 
               triggeredInput={triggeredAppInput}
+              isAnalyzing={false}
+              analysisResult={null}
+              onAnalyzeData={async () => {}}
+              onClearAnalysis={() => {}}
+              onBack={() => {
+                logger.trackSidebarInteraction('widget_back_to_list_clicked', currentApp || undefined, { 
+                  widgetTitle: 'DataWise Analytics' 
+                });
+                if (onBackToList) {
+                  onBackToList();
+                } else {
+                  onCloseApp();
+                }
+              }}
             />
           </DataScientistWidgetModule>
         );
@@ -183,33 +247,8 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
     const widgetInfo = getWidgetInfo(currentApp);
     return (
       <div className="h-full flex flex-col isa-right-sidebar">
-        {/* Widget Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span>{widgetInfo.icon}</span>
-            {widgetInfo.title}
-          </h2>
-          <button
-            onClick={() => {
-              logger.trackSidebarInteraction('widget_back_to_list_clicked', currentApp || undefined, { 
-                widgetTitle: widgetInfo.title 
-              });
-              // Use onBackToList if available, otherwise fall back to onCloseApp
-              if (onBackToList) {
-                onBackToList();
-              } else {
-                onCloseApp();
-              }
-            }}
-            className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center text-white transition-all"
-            title="Back to Widget List"
-          >
-            ←
-          </button>
-        </div>
-        
-        {/* Widget Content */}
-        <div className="flex-1 p-4 overflow-y-auto">
+        {/* Widget Content - Full Height */}
+        <div className="flex-1 overflow-hidden">
           {widgetContent}
         </div>
       </div>
@@ -264,8 +303,8 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
             return date.toLocaleDateString();
           };
           
-          const renderWidget = ({ id: appId, usage }, isActive = false, isFeatured = false) => {
-            const app = widgetInfo[appId];
+          const renderWidget = ({ id: appId, usage }: { id: string; usage: any }, isActive = false, isFeatured = false) => {
+            const app = widgetInfo[appId as keyof typeof widgetInfo];
             if (!app) return null;
             
             return (

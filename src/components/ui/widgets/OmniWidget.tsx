@@ -18,7 +18,7 @@
  */
 import React, { useState } from 'react';
 import { OmniWidgetParams } from '../../../types/widgetTypes';
-import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction } from './BaseWidget';
+import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction, EmptyStateConfig } from './BaseWidget';
 
 interface OmniWidgetProps {
   isGenerating: boolean;
@@ -33,6 +33,7 @@ interface OmniWidgetProps {
   onClearContent: () => void;
   onSelectOutput?: (item: OutputHistoryItem) => void;
   onClearHistory?: () => void;
+  onBack?: () => void;
 }
 
 // Content Generation Arguments (copied from omni_sidebar.tsx)
@@ -664,6 +665,41 @@ Begin your scientific analysis now.`
     return topicConfigs['custom'].templates[0];
   };
   
+  // 映射OmniWidget的复杂topic/template配置到MCP prompt的函数
+  const mapTopicTemplateToMCP = (topic: string, template: string) => {
+    // 基于topic和template的组合来确定最合适的MCP prompt
+    const combinations = {
+      // Business combinations
+      'business.market_analysis': { mcpTopic: 'market_analysis', templateId: 'market_analysis_prompt' },
+      'business.business_strategy': { mcpTopic: 'business', templateId: 'business_strategy_prompt' },
+      'business.financial_analysis': { mcpTopic: 'financial', templateId: 'financial_analysis_prompt' },
+      
+      // Education combinations  
+      'education.tutorial': { mcpTopic: 'education', templateId: 'course_material_prompt' },
+      'education.course': { mcpTopic: 'education', templateId: 'course_material_prompt' },
+      
+      // Marketing combinations
+      'marketing.campaign': { mcpTopic: 'marketing', templateId: 'content_marketing_prompt' },
+      'marketing.content_marketing': { mcpTopic: 'marketing', templateId: 'content_marketing_prompt' },
+      
+      // Health combinations
+      'health.wellness_guide': { mcpTopic: 'health', templateId: 'wellness_guide_prompt' },
+      
+      // Science combinations
+      'science.research_paper': { mcpTopic: 'science', templateId: 'research_paper_prompt' },
+      
+      // Technology combinations
+      'technology.tech_review': { mcpTopic: 'technology', templateId: 'general_content_prompt' },
+      'technology.implementation_guide': { mcpTopic: 'technology', templateId: 'general_content_prompt' },
+    };
+    
+    const key = `${topic}.${template}`;
+    return combinations[key as keyof typeof combinations] || { 
+      mcpTopic: topic, 
+      templateId: 'general_content_prompt' 
+    };
+  };
+
   const handleGenerate = async () => {
     if (!args.subject.trim() || !onGenerateContent || isGenerating) {
       console.log('⚡ OMNI: Aborting generation - invalid input');
@@ -671,20 +707,36 @@ Begin your scientific analysis now.`
     }
 
     try {
-      const prompt = generatePromptTemplate(args);
+      // 获取当前模板生成的prompt (用于reference_text)
+      const generatedPrompt = generatePromptTemplate(args);
+      
+      // 映射topic和template到MCP配置
+      const mcpMapping = mapTopicTemplateToMCP(args.topic, args.template);
+      
       console.log('⚡ OMNI: Selected topic:', args.topic);
       console.log('⚡ OMNI: Selected template:', args.template);
+      console.log('⚡ OMNI: MCP mapping:', mcpMapping);
       console.log('⚡ OMNI: Topic config exists:', !!topicConfigs[args.topic]);
       console.log('⚡ OMNI: Template info:', getCurrentTemplate());
-      console.log('⚡ OMNI: Generated prompt preview:', prompt.substring(0, 200) + '...');
       
-      const params: OmniWidgetParams = {
-        prompt: prompt,
+      const params: OmniWidgetParams & { 
+        referenceUrls?: string[]; 
+        referenceText?: string; 
+        actualTopic?: string;
+        templateId?: string;
+      } = {
+        prompt: args.subject, // 使用用户输入的subject而不是生成的prompt
         contentType: args.topic as any,
         tone: 'professional',
-        length: args.depth === 'deep' ? 'long' : 'medium'
+        length: args.depth === 'deep' ? 'long' : 'medium',
+        // 添加MCP需要的参数
+        referenceUrls: args.referenceUrls,
+        referenceText: args.referenceText || generatedPrompt, // 使用生成的prompt作为reference
+        actualTopic: mcpMapping.mcpTopic,
+        templateId: mcpMapping.templateId
       };
       
+      console.log('⚡ OMNI: Final params for MCP:', params);
       await onGenerateContent(params);
     } catch (error) {
       console.error('Generation failed:', error);
@@ -827,7 +879,8 @@ export const OmniWidget: React.FC<OmniWidgetProps> = ({
   onGenerateContent,
   onClearContent,
   onSelectOutput,
-  onClearHistory
+  onClearHistory,
+  onBack
 }) => {
   
   // Custom edit actions for generated content
@@ -881,6 +934,7 @@ export const OmniWidget: React.FC<OmniWidgetProps> = ({
         tone: 'professional',
         length: 'medium'
       }),
+      variant: 'primary' as const,
       disabled: false
     },
     {
@@ -921,8 +975,22 @@ export const OmniWidget: React.FC<OmniWidgetProps> = ({
     }
   ];
 
+  // Custom empty state for Omni Widget
+  const omniEmptyState: EmptyStateConfig = {
+    icon: '⚡',
+    title: 'Ready to Create Anything',
+    description: 'Generate content across 10 different categories including business, education, technology, marketing, and more. Choose your topic and let AI create exactly what you need.',
+    actionText: 'Choose Topic',
+    onAction: () => {
+      const firstCategory = document.querySelector('.topic-category-button') as HTMLElement;
+      firstCategory?.focus();
+    }
+  };
+
   return (
     <BaseWidget
+      title="Omni Content"
+      icon="⚡"
       isProcessing={isGenerating}
       outputHistory={outputHistory}
       currentOutput={currentOutput}
@@ -932,6 +1000,9 @@ export const OmniWidget: React.FC<OmniWidgetProps> = ({
       managementActions={managementActions}
       onSelectOutput={onSelectOutput}
       onClearHistory={onClearHistory}
+      emptyStateConfig={omniEmptyState}
+      onBack={onBack}
+      showBackButton={true}
     >
       <OmniInputArea
         isGenerating={isGenerating}

@@ -8,6 +8,7 @@
  * - 支持用户和AI消息的显示
  * - 支持流式消息显示，实时更新内容
  * - 处理消息状态显示和时间戳
+ * - 支持消息复制等交互功能
  * 
  * 【消息渲染逻辑】
  * - 如果有content内容 → 显示消息内容 + 流式光标
@@ -19,9 +20,14 @@
  * - 在新架构中被ChatContentLayout使用
  * - 不处理业务逻辑，只负责消息的视觉呈现
  */
-import React, { memo } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import { ChatMessage } from '../../../types/chatTypes';
 import { ArtifactComponent } from './ArtifactComponent';
+import { ContentType } from '../../../types/appTypes';
+import { ContentRenderer, StatusRenderer } from '../../shared';
+import { ChatWelcome } from './ChatWelcome';
+
+// MessageActions will be implemented later
 
 export interface MessageListProps {
   showTimestamps?: boolean;
@@ -36,6 +42,8 @@ export interface MessageListProps {
   messages?: ChatMessage[];
   isLoading?: boolean;
   isTyping?: boolean;
+  onSendMessage?: (message: string) => void;
+  // Message actions will be implemented later
 }
 
 /**
@@ -51,20 +59,30 @@ export const MessageList = memo<MessageListProps>(({
   className = '',
   messages = [],
   isLoading = false,
-  isTyping = false
+  isTyping = false,
+  onSendMessage
 }) => {
-  console.log('💬 MessageList: Rendering with', messages.length, 'messages');
+  // 完全禁用日志以解决无限循环问题
   
-  // Debug streaming messages
-  const streamingMessages = messages.filter(m => m.isStreaming);
-  if (streamingMessages.length > 0) {
-    console.log('🔄 MessageList: Streaming messages:', streamingMessages.map(m => ({
-      id: m.id,
-      contentLength: m.content.length,
-      status: m.streamingStatus,
-      isStreaming: m.isStreaming
-    })));
-  }
+  // useEffect(() => {
+  //   if (process.env.NODE_ENV === 'development') {
+  //     console.log('💬 MessageList: Messages updated, count:', messages.length);
+  //   }
+  // }, [messages.length]);
+  
+  // useEffect(() => {
+  //   if (process.env.NODE_ENV === 'development') {
+  //     const streamingMessages = messages.filter(m => m.isStreaming);
+  //     if (streamingMessages.length > 0) {
+  //       console.log('🔄 MessageList: Streaming messages:', streamingMessages.map(m => ({
+  //         id: m.id,
+  //         contentLength: m.content.length,
+  //         status: m.streamingStatus,
+  //         isStreaming: m.isStreaming
+  //       })));
+  //     }
+  //   }
+  // }, [messages.filter(m => m.isStreaming).length]);
 
   // Default message renderer
   const renderMessage = (message: ChatMessage, index: number) => {
@@ -85,12 +103,11 @@ export const MessageList = memo<MessageListProps>(({
     // Handle artifact messages specially
     if (isArtifact) {
       const artifactData = message.metadata?.artifactData;
-      const appIcon = message.metadata?.appIcon || '🤖';
-      const appName = message.metadata?.appName || 'AI';
+      const appIcon = (typeof message.metadata?.appIcon === 'string' ? message.metadata.appIcon : null) || '🤖';
+      const appName = (typeof message.metadata?.appName === 'string' ? message.metadata.appName : null) || 'AI';
       
       return (
         <div 
-          key={message.id} 
           className="mb-6"
           onClick={() => onMessageClick?.(message)}
           style={{ width: '100%', display: 'flex', justifyContent: 'flex-start' }}
@@ -98,16 +115,25 @@ export const MessageList = memo<MessageListProps>(({
           <div style={{ width: '100%', maxWidth: '100%' }}>
             {showAvatars && (
               <div className="flex items-center mb-3" style={{ justifyContent: 'flex-start' }}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
-                  isStreaming 
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-                    : 'bg-gray-700 text-white'
-                }`}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm" style={{
+                  background: isStreaming ? 'var(--gradient-secondary)' : 'var(--glass-secondary)',
+                  color: 'var(--text-primary)',
+                  boxShadow: isStreaming ? '0 0 15px var(--accent-soft)' : 'none'
+                }}>
                   {appIcon}
                 </div>
                 <span className="ml-2 text-sm font-medium text-gray-300">{appName}</span>
                 {isStreaming && (
-                  <span className="ml-2 text-xs text-blue-400 italic">{message.streamingStatus || 'Processing...'}</span>
+                  <div className="ml-3 flex items-center space-x-2 bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                    <div className="flex space-x-1">
+                      <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse shadow-sm shadow-blue-400/50"></div>
+                      <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-pulse delay-75 shadow-sm shadow-blue-300/30"></div>
+                      <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-pulse delay-150 shadow-sm shadow-blue-200/20"></div>
+                    </div>
+                    <span className="text-white/70 text-xs font-medium">
+                      {message.streamingStatus || 'Processing...'}
+                    </span>
+                  </div>
                 )}
               </div>
             )}
@@ -117,18 +143,24 @@ export const MessageList = memo<MessageListProps>(({
               <ArtifactComponent
                 artifact={{
                   id: message.id,
-                  appId: message.metadata?.appId || 'unknown',
+                  appId: (message.metadata?.appId as any) || 'assistant',
                   appName: appName,
                   appIcon: appIcon,
-                  title: message.metadata?.title || 'Generated Content',
-                  userInput: message.metadata?.userInput || '',
+                  title: (typeof message.metadata?.title === 'string' ? message.metadata.title : null) || 'Generated Content',
+                  userInput: (typeof message.metadata?.userInput === 'string' ? message.metadata.userInput : null) || '',
                   createdAt: message.timestamp,
                   isOpen: false,
-                  generatedContent: artifactData || {
-                    type: 'text',
-                    content: isStreaming ? 'Loading...' : (hasContent ? message.content : 'No content available'),
-                    metadata: {}
-                  }
+                  generatedContent: (artifactData && 
+                    typeof artifactData === 'object' && 
+                    'type' in artifactData && 
+                    'content' in artifactData &&
+                    typeof artifactData.type === 'string' &&
+                    typeof artifactData.content === 'string') 
+                    ? (artifactData as { type: ContentType; content: string; thumbnail?: string; metadata?: any })
+                    : (hasContent || isStreaming) ? {
+                        type: 'text' as ContentType,
+                        content: isStreaming ? 'Loading...' : message.content
+                      } : undefined
                 }}
                 onReopen={() => {
                   // Handle artifact reopening - could emit an event or callback
@@ -144,60 +176,84 @@ export const MessageList = memo<MessageListProps>(({
     // Default message rendering for non-artifact messages
     return (
       <div 
-        key={message.id} 
         className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
         onClick={() => onMessageClick?.(message)}
       >
         <div className={`max-w-[80%] group`}>
           {showAvatars && (
             <div className={`flex items-center mb-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                message.role === 'user' 
-                  ? 'bg-blue-600 text-white' 
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" style={{
+                background: message.role === 'user' 
+                  ? 'var(--accent-soft)' 
                   : isStreaming 
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-                    : 'bg-gray-700 text-white'
-              }`}>
+                    ? 'var(--gradient-secondary)'
+                    : 'var(--glass-secondary)',
+                color: 'var(--text-primary)',
+                boxShadow: isStreaming || message.role === 'user' ? '0 0 15px var(--accent-soft)' : 'none'
+              }}>
                 {message.role === 'user' ? 'U' : isStreaming ? '🤖' : 'AI'}
               </div>
               {/* Show streaming status next to AI avatar */}
               {message.role === 'assistant' && isStreaming && hasStatus && (
-                <div className="ml-3 flex items-center gap-2 text-blue-400 text-sm italic">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                  <span>{message.streamingStatus}</span>
+                <div className="ml-3 flex items-center space-x-2 bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                  <div className="flex space-x-1">
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse shadow-sm shadow-blue-400/50"></div>
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-pulse delay-75 shadow-sm shadow-blue-300/30"></div>
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-pulse delay-150 shadow-sm shadow-blue-200/20"></div>
+                  </div>
+                  <span className="text-white/70 text-xs font-medium">
+                    {message.streamingStatus}
+                  </span>
                 </div>
               )}
             </div>
           )}
           
           <div 
-            className={`p-3 rounded-lg ${
-              message.role === 'user' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-700 text-white border border-gray-600'
-            }`}
+            className="p-3 rounded-lg"
+            style={{
+              background: message.role === 'user' 
+                ? 'var(--accent-soft)' 
+                : 'var(--glass-primary)',
+              color: 'var(--text-primary)',
+              border: message.role === 'user' ? 'none' : '1px solid var(--glass-border)',
+              boxShadow: message.role === 'user' ? '0 0 20px var(--accent-soft)30' : 'none'
+            }}
           >
             {hasContent ? (
               <div className="whitespace-pre-wrap break-words">
-                {message.content}
+                <ContentRenderer
+                  content={message.content}
+                  type="markdown"  // 改为 markdown 类型以支持图片等
+                  variant="chat"
+                  size="sm"
+                  features={{
+                    markdown: true,      // 启用 markdown 渲染
+                    imagePreview: true,  // 启用图片预览
+                    wordBreak: true,
+                    copyButton: false,   // 聊天消息不需要复制按钮
+                    saveButton: true     // 图片可以保存
+                  }}
+                  className="inline"
+                />
                 {isStreaming && (
-                  <span className="inline-block w-2 h-4 bg-blue-400 ml-1 animate-pulse"></span>
+                  <span className="inline-flex items-center ml-2">
+                    <div className="w-1 h-4 bg-gradient-to-t from-blue-400 to-purple-400 rounded-full animate-pulse shadow-lg shadow-blue-400/50"></div>
+                    <div className="w-1 h-3 bg-gradient-to-t from-blue-300 to-purple-300 rounded-full animate-pulse ml-0.5 delay-150 shadow-md shadow-blue-300/30"></div>
+                    <div className="w-1 h-2 bg-gradient-to-t from-blue-200 to-purple-200 rounded-full animate-pulse ml-0.5 delay-300 shadow-sm shadow-blue-200/20"></div>
+                  </span>
                 )}
               </div>
             ) : isStreaming ? (
-              <div className="text-gray-400 text-sm italic flex items-center gap-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
-                <span>...</span>
+              <div className="flex items-center space-x-2">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-bounce shadow-lg shadow-blue-400/50"></div>
+                  <div className="w-2 h-2 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-bounce delay-100 shadow-md shadow-blue-300/30"></div>
+                  <div className="w-2 h-2 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-bounce delay-200 shadow-sm shadow-blue-200/20"></div>
+                </div>
+                <span className="text-white/60 text-xs">Processing...</span>
               </div>
             ) : null}
-            
-            {showTimestamps && !isStreaming && (
-              <div className={`text-xs mt-2 opacity-70 ${
-                message.role === 'user' ? 'text-blue-100' : 'text-gray-400'
-              }`}>
-                {new Date(message.timestamp).toLocaleTimeString()}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -207,20 +263,17 @@ export const MessageList = memo<MessageListProps>(({
   return (
     <div className={`conversation-stream ${className}`}>
       
-      {/* Welcome message when no messages */}
-      {messages.length === 0 && welcomeMessage && (
-        <div className="text-center py-8">
-          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 max-w-md mx-auto">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-white font-bold text-lg">AI</span>
-            </div>
-            <p className="text-gray-300 text-lg">{welcomeMessage}</p>
-          </div>
-        </div>
+      {/* Dynamic Widget-Driven Welcome */}
+      {messages.length === 0 && (
+        <ChatWelcome onSendMessage={onSendMessage} />
       )}
 
       {/* Messages - 现在包含流式消息 */}
-      {messages.map((message, index) => renderMessage(message, index))}
+      {messages.map((message, index) => (
+        <div key={message.id}>
+          {renderMessage(message, index)}
+        </div>
+      ))}
 
       {/* Typing indicator - 只在没有流式消息时显示 */}
       {isTyping && !messages.some(m => m.isStreaming) && (
@@ -228,17 +281,20 @@ export const MessageList = memo<MessageListProps>(({
           <div className="max-w-[80%]">
             {showAvatars && (
               <div className="flex items-center mb-2">
-                <div className="w-8 h-8 rounded-full bg-gray-700 text-white flex items-center justify-center text-sm font-bold">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: 'var(--glass-secondary)', color: 'var(--text-primary)' }}>
                   AI
                 </div>
               </div>
             )}
             
-            <div className="bg-gray-700 text-white border border-gray-600 p-3 rounded-lg">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            <div className="p-3 rounded-lg" style={{ background: 'var(--glass-primary)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
+              <div className="flex items-center space-x-2">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-bounce shadow-lg shadow-blue-400/50"></div>
+                  <div className="w-2 h-2 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-bounce delay-100 shadow-md shadow-blue-300/30"></div>
+                  <div className="w-2 h-2 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-bounce delay-200 shadow-sm shadow-blue-200/20"></div>
+                </div>
+                <span className="text-white/70 text-sm">AI is typing...</span>
               </div>
             </div>
           </div>
@@ -248,7 +304,14 @@ export const MessageList = memo<MessageListProps>(({
       {/* Loading indicator - 只在没有流式消息时显示 */}
       {isLoading && !isTyping && !messages.some(m => m.isStreaming) && (
         <div className="text-center py-4">
-          <div className="text-gray-400 text-sm">Processing your request...</div>
+          <div className="flex items-center justify-center space-x-2">
+            <div className="flex space-x-1">
+              <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-bounce shadow-lg shadow-blue-400/50"></div>
+              <div className="w-3 h-3 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-bounce delay-100 shadow-md shadow-blue-300/30"></div>
+              <div className="w-3 h-3 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-bounce delay-200 shadow-sm shadow-blue-200/20"></div>
+            </div>
+            <span className="text-white/60 text-sm font-medium">Processing your request...</span>
+          </div>
         </div>
       )}
     </div>

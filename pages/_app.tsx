@@ -1,6 +1,5 @@
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
-import { Auth0Provider } from '../src/providers/Auth0Provider'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 
@@ -18,17 +17,8 @@ export default function App({ Component, pageProps }: AppProps) {
     }
   }, [])
 
-  // 如果是营销站点，直接渲染，不使用 Auth0
-  if (isMarketingSite || pageProps.isMarketingSite) {
-    console.log('📄 Rendering without Auth0 for marketing site')
-    return <Component {...pageProps} />
-  }
-
-  // 否则使用 Auth0 Provider
-  console.log('🔐 Rendering with Auth0 for main app')
-  return (
-    <Auth0Provider>
-      <Component {...pageProps} />
-    </Auth0Provider>
-  )
+  // 移除重复的 Auth0Provider 包装
+  // Auth0Provider 现在只在 src/app.tsx 中使用，避免双重包装
+  console.log('📄 _app.tsx: Rendering without duplicate Auth0 wrapper')
+  return <Component {...pageProps} />
 }

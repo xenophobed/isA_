@@ -20,6 +20,7 @@ import React, { ReactNode } from 'react';
 import { BaseWidgetModule, createWidgetConfig } from './BaseWidgetModule';
 import { DreamWidgetParams, DreamWidgetResult } from '../../types/widgetTypes';
 import { EditAction, ManagementAction } from '../../components/ui/widgets/BaseWidget';
+import { useDreamGeneratedImage, useDreamIsGenerating, useDreamLastParams } from '../../stores/useWidgetStores';
 
 // Dream mode to MCP template mapping (based on the 9 MCP prompts)
 const DREAM_TEMPLATE_MAPPING = {
@@ -64,62 +65,93 @@ const DREAM_TEMPLATE_MAPPING = {
 // Prepare template parameters based on dream mode and user params
 const prepareDreamTemplateParams = (params: DreamWidgetParams) => {
   const mode = params.style || 'text_to_image'; // Use 'style' field as mode
-  const mapping = DREAM_TEMPLATE_MAPPING[mode] || DREAM_TEMPLATE_MAPPING['text_to_image'];
+  const mapping = DREAM_TEMPLATE_MAPPING[mode as keyof typeof DREAM_TEMPLATE_MAPPING] || DREAM_TEMPLATE_MAPPING['text_to_image'];
   
-  // Build prompt_args based on the mode - ONLY include relevant parameters for each template
-  // IMPORTANT: prompt must be first in the object!
-  const prompt_args = {
-    prompt: params.prompt || 'Generate an image',
-    ...mapping.defaultArgs
-  };
+  // Build prompt_args based on MCP prompt requirements
+  let prompt_args: Record<string, any> = {};
   
-  // Add mode-specific parameters ONLY for the current template
+  // Apply mode-specific parameter mapping based on actual MCP prompt requirements
   switch (mode) {
     case 'text_to_image':
-      if (params.style_preset) prompt_args.style_preset = params.style_preset;
-      if (params.quality) prompt_args.quality = params.quality;
+      prompt_args = {
+        prompt: params.prompt || 'Generate an image',
+        style_preset: params.stylePreset || 'photorealistic',
+        quality: params.quality || 'high'
+      };
       break;
       
     case 'image_to_image':
-      if (params.style_preset) prompt_args.style_preset = params.style_preset;
-      if (params.strength) prompt_args.strength = params.strength;
+      prompt_args = {
+        prompt: params.prompt || 'Transform this image',
+        style_preset: params.stylePreset || 'enhanced',
+        strength: params.strength || 'medium'
+      };
       break;
       
     case 'style_transfer':
-      if (params.style_preset) prompt_args.style_preset = params.style_preset;
-      if (params.strength) prompt_args.strength = params.strength;
+      prompt_args = {
+        prompt: params.prompt || 'Apply artistic style',
+        style_preset: params.stylePreset || 'impressionist',
+        strength: params.strength || 'medium'
+      };
       break;
       
     case 'face_swap':
-      if (params.hair_source) prompt_args.hair_source = params.hair_source;
-      if (params.quality) prompt_args.quality = params.quality;
+      // ⚠️ face_swap_prompt 不需要 prompt 参数！
+      prompt_args = {
+        hair_source: params.hairSource || 'preserve',
+        quality: params.quality || 'professional'
+      };
       break;
       
     case 'professional_headshot':
-      if (params.industry) prompt_args.industry = params.industry;
-      if (params.quality) prompt_args.quality = params.quality;
+      prompt_args = {
+        prompt: params.prompt || 'Create professional headshot',
+        industry: params.industry || 'corporate',
+        quality: params.quality || 'executive'
+      };
       break;
       
     case 'emoji_generation':
-      if (params.expression) prompt_args.expression = params.expression;
-      if (params.style_preset) prompt_args.style_preset = params.style_preset;
-      if (params.color_scheme) prompt_args.color_scheme = params.color_scheme;
+      prompt_args = {
+        prompt: params.prompt || 'Create custom emoji',
+        expression: params.expression || 'happy',
+        style_preset: params.stylePreset || 'kawaii',
+        color_scheme: params.colorScheme || 'vibrant'
+      };
       break;
       
     case 'photo_inpainting':
-      if (params.fill_method) prompt_args.fill_method = params.fill_method;
-      if (params.strength) prompt_args.strength = params.strength;
+      prompt_args = {
+        prompt: params.prompt || 'Remove unwanted objects',
+        fill_method: params.fillMethod || 'content_aware',
+        strength: params.strength || 'seamless'
+      };
       break;
       
     case 'photo_outpainting':
-      if (params.direction) prompt_args.direction = params.direction;
-      if (params.strength) prompt_args.strength = params.strength;
+      prompt_args = {
+        prompt: params.prompt || 'Expand image boundaries',
+        direction: params.direction || 'all_sides',
+        strength: params.strength || 'natural'
+      };
       break;
       
     case 'sticker_generation':
-      if (params.style_preset) prompt_args.style_preset = params.style_preset;
-      if (params.theme) prompt_args.theme = params.theme;
+      prompt_args = {
+        prompt: params.prompt || 'Create cute sticker',
+        style_preset: params.stylePreset || 'kawaii',
+        theme: params.theme || 'cute_animal'
+      };
       break;
+      
+    default:
+      // Fallback to text_to_image
+      prompt_args = {
+        prompt: params.prompt || 'Generate an image',
+        style_preset: params.stylePreset || 'photorealistic',
+        quality: params.quality || 'high'
+      };
   }
   
   console.log('🎨 DREAM_MODULE: Prepared template params for mode', mode, ':', {
@@ -224,6 +256,24 @@ const dreamConfig = createWidgetConfig<DreamWidgetParams, DreamWidgetResult>({
   sessionIdPrefix: 'dream_widget',
   maxHistoryItems: 30, // Keep more images for inspiration
   
+  // Result extraction configuration
+  resultExtractor: {
+    outputType: 'image',
+    extractResult: (widgetData: any) => {
+      if (widgetData?.generatedImage) {
+        return {
+          finalResult: { 
+            imageUrl: widgetData.generatedImage, 
+            prompt: widgetData.params?.prompt 
+          },
+          outputContent: widgetData.generatedImage,
+          title: 'AI Image Generated'
+        };
+      }
+      return null;
+    }
+  },
+  
   // Extract parameters from triggered input
   extractParamsFromInput: (input: string): DreamWidgetParams => ({
     prompt: input.trim(),
@@ -238,8 +288,8 @@ const dreamConfig = createWidgetConfig<DreamWidgetParams, DreamWidgetResult>({
   
   onProcessComplete: (result: DreamWidgetResult) => {
     console.log('🎨 DREAM_MODULE: Image generation completed:', {
-      hasImageUrl: !!result.imageUrl,
-      prompt: result.prompt?.substring(0, 50)
+      hasImageUrl: !!result.data?.imageUrl,
+      prompt: result.data?.prompt?.substring(0, 50)
     });
   },
   
@@ -284,8 +334,41 @@ export const DreamWidgetModule: React.FC<DreamWidgetModuleProps> = ({
   triggeredInput,
   children
 }) => {
+  // Read state from store directly (like HuntWidgetModule)
+  const generatedImage = useDreamGeneratedImage();
+  const isGenerating = useDreamIsGenerating();
+  const lastParams = useDreamLastParams();
+  
   console.log('🎨 DREAM_MODULE: Initializing with BaseWidgetModule architecture', {
-    hasTriggeredInput: !!triggeredInput
+    hasTriggeredInput: !!triggeredInput,
+    hasGeneratedImage: !!generatedImage,
+    generatedImageUrl: generatedImage?.substring(0, 80)
+  });
+
+  // Convert generatedImage to outputHistory format for BaseWidget display (like HuntWidgetModule)
+  const outputHistory = React.useMemo(() => {
+    if (!generatedImage) {
+      return [];
+    }
+    
+    return [{
+      id: `dream_result_${Date.now()}`,
+      timestamp: new Date(),
+      type: 'image' as const,
+      title: 'Generated Image',
+      content: generatedImage,
+      metadata: {
+        prompt: lastParams?.prompt,
+        style: lastParams?.style,
+        originalType: 'image_generation'
+      }
+    }];
+  }, [generatedImage, lastParams]);
+  
+  console.log('🎨 DREAM_MODULE: Converting image to output history:', {
+    hasGeneratedImage: !!generatedImage,
+    outputHistoryCount: outputHistory.length,
+    generatedImageUrl: generatedImage?.substring(0, 80)
   });
 
   return (
@@ -295,10 +378,17 @@ export const DreamWidgetModule: React.FC<DreamWidgetModuleProps> = ({
     >
       {(moduleProps) => {
         // Transform BaseWidgetModule props to match original DreamWidgetModule interface
+        console.log('🎨 DREAM_MODULE: Module props:', {
+          isProcessing: moduleProps.isProcessing,
+          currentOutput: moduleProps.currentOutput,
+          hasOutputContent: !!moduleProps.currentOutput?.content,
+          storeGeneratedImage: generatedImage?.substring(0, 80)
+        });
+        
         const legacyProps = {
-          isGenerating: moduleProps.isProcessing,
-          generatedImage: moduleProps.currentOutput?.content || null,
-          lastParams: moduleProps.currentOutput?.params || null,
+          isGenerating: isGenerating, // Use store state instead of moduleProps
+          generatedImage: generatedImage, // Use store state directly
+          lastParams: lastParams, // Use store state directly
           onGenerateImage: async (params: DreamWidgetParams) => {
             // Prepare template parameters based on the selected mode
             const templateParams = prepareDreamTemplateParams(params);
@@ -309,15 +399,15 @@ export const DreamWidgetModule: React.FC<DreamWidgetModuleProps> = ({
               templateParams // Add template configuration
             };
             
-            console.log('🎨 DREAM_MODULE: Sending enriched params to store:', enrichedParams);
+            console.log('🔥MODULE_DATA_FLOW🔥 DreamWidgetModule 发送数据到 BaseWidgetModule:', enrichedParams);
             await moduleProps.startProcessing(enrichedParams);
           },
           onClearImage: () => {
             moduleProps.onClearHistory();
           },
-          // Pass through BaseWidget props for UI display
-          outputHistory: moduleProps.outputHistory,
-          currentOutput: moduleProps.currentOutput,
+          // Use converted data instead of moduleProps (like HuntWidgetModule)
+          outputHistory: outputHistory, // Use converted data
+          currentOutput: outputHistory[0] || null, // Show latest image as current
           isStreaming: moduleProps.isStreaming,
           streamingContent: moduleProps.streamingContent,
           onSelectOutput: moduleProps.onSelectOutput,

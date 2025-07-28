@@ -17,8 +17,14 @@
  * - Significantly reduced code complexity
  */
 import React, { useState } from 'react';
-import { AssistantWidgetParams } from '../../../types/widgetTypes';
 import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction } from './BaseWidget';
+
+// AssistantWidgetParams interface - kept for backward compatibility
+interface AssistantWidgetParams {
+  context?: string;
+  task?: string;
+  specialInstructions?: string;
+}
 
 interface TodayItem {
   id: string;

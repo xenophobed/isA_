@@ -42,6 +42,9 @@ export interface ChatMessage {
     }>;
     [key: string]: unknown;
   };
+  // Store相关字段
+  processed?: boolean; // 标记用户消息是否已发送到API
+  files?: File[]; // 用户上传的文件
 }
 
 // 聊天会话接口
@@ -89,6 +92,7 @@ export interface ChatServiceCallbacks {
   onMessageComplete?: (completeMessage?: string) => void; // Now receives complete message content
   onError?: (error: Error) => void;
   onArtifactCreated?: (artifact: { id?: string; type: string; content: string }) => void;
+  onBillingUpdate?: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => void;
 }
 
 export interface ChatMetadata {
@@ -100,23 +104,24 @@ export interface ChatMetadata {
 
 // Chat Hook Interface - for useChat hook return type
 export interface ChatHookState {
-  // 1. API response events - streaming messages and status
+  // 聊天核心数据
   messages: ChatMessage[];
   isLoading: boolean;
   isTyping: boolean;
   
-  // 2. App artifact events - generated artifacts
-  artifacts: any[]; // Will be properly typed from appTypes.ts
-  
-  // 3. User send message events - current chat context
+  // 应用导航上下文
   currentApp: string | null;
   showRightSidebar: boolean;
   
-  // 4. Widget events - sidebar widget state and artifacts
+  // 工件数据
+  artifacts: any[]; // Will be properly typed from appTypes.ts
   latestWidgetArtifact: any | null; // Latest artifact from widget stores
+  
+  // Widget状态聚合
+  widgetStates: any; // Widget states aggregated from useAllWidgetStates
   isAnyWidgetGenerating: boolean; // True if any widget is generating content
   
-  // Derived state for UI
+  // 派生状态
   hasStreamingMessage: boolean;
   streamingMessage: ChatMessage | undefined;
 }

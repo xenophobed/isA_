@@ -18,7 +18,7 @@
  */
 import React, { useState } from 'react';
 import { DreamWidgetParams } from '../../../types/widgetTypes';
-import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction } from './BaseWidget';
+import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction, EmptyStateConfig } from './BaseWidget';
 
 // Atomic Image Intelligence Service modes (copied from dream_sidebar.tsx)
 interface ImageMode {
@@ -163,6 +163,7 @@ interface DreamWidgetProps {
   onClearImage: () => void;
   onSelectOutput?: (item: OutputHistoryItem) => void;
   onClearHistory?: () => void;
+  onBack?: () => void;
 }
 
 
@@ -220,17 +221,17 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
         prompt: prompt,
         style: selectedMode.id,
         size: '1024x1024',
-        // Add all MCP-specific parameters
-        style_preset: stylePreset,
-        quality: quality,
-        strength: strength,
-        hair_source: hairSource,
-        industry: industry,
-        expression: expression,
-        color_scheme: colorScheme,
-        theme: theme,
-        fill_method: fillMethod,
-        direction: direction
+        // MCP-specific parameters - 包含所有需要的参数
+        stylePreset,
+        quality,
+        strength,
+        hairSource,
+        industry,
+        expression,
+        colorScheme,
+        theme,
+        fillMethod,
+        direction
       };
       
       await onGenerateImage(params);
@@ -266,11 +267,14 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
   return (
     <div className="space-y-4 p-3">
       {/* Compact Mode Header */}
-      <div className="flex items-center gap-3 p-2 bg-purple-500/10 rounded border border-purple-500/20">
+      <div className="flex items-center gap-3 p-2 rounded" style={{
+        background: 'var(--glass-primary)',
+        border: '1px solid var(--glass-border)'
+      }}>
         <span className="text-lg">{selectedMode.icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-white truncate">{selectedMode.name}</div>
-          <div className="flex gap-3 text-xs text-white/50">
+          <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{selectedMode.name}</div>
+          <div className="flex gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
             <span>{selectedMode.cost}</span>
             <span>{selectedMode.estimatedTime}</span>
           </div>
@@ -291,7 +295,12 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
           placeholder={selectedMode.requiresImage 
             ? `Describe changes for ${selectedMode.name.toLowerCase()}...`
             : "Describe what you want to create..."}
-          className="w-full p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
+          className="w-full p-2 rounded resize-none text-sm focus:outline-none"
+          style={{
+            background: 'var(--glass-primary)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--text-primary)'
+          }}
           rows={2}
         />
 
@@ -304,12 +313,16 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
           id="image-upload"
         />
         {uploadedImage && (
-          <div className="flex items-center gap-2 p-2 bg-white/5 border border-white/10 rounded">
+          <div className="flex items-center gap-2 p-2 rounded" style={{
+            background: 'var(--glass-primary)',
+            border: '1px solid var(--glass-border)'
+          }}>
             <img src={uploadedImage} alt="Uploaded" className="w-6 h-6 object-cover rounded" />
-            <span className="text-white/70 text-xs">Image uploaded</span>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Image uploaded</span>
             <button 
               onClick={() => setUploadedImage(null)}
-              className="ml-auto text-white/40 hover:text-white/70 text-xs"
+              className="ml-auto text-xs"
+              style={{ color: 'var(--text-muted)' }}
             >
               ✕
             </button>
@@ -319,7 +332,7 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
 
       {/* Compact Mode Selector */}
       <div>
-        <div className="text-xs text-white/60 mb-2">🎯 Select Mode</div>
+        <div className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>🎯 Select Mode</div>
         <div className="grid grid-cols-3 gap-1">
           {imageModes.map((mode) => (
             <button
@@ -332,11 +345,13 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
                 setSelectedMode(mode);
                 console.log('🎨 Mode selected:', mode.name);
               }}
-              className={`p-1.5 rounded border transition-all text-center ${
-                selectedMode.id === mode.id
-                  ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
-                  : 'bg-white/5 border-white/10 hover:bg-white/10 text-white cursor-pointer'
-              }`}
+              className="p-1.5 rounded transition-all text-center cursor-pointer"
+              style={{
+                background: selectedMode.id === mode.id ? 'var(--glass-secondary)' : 'var(--glass-primary)',
+                border: '1px solid var(--glass-border)',
+                color: selectedMode.id === mode.id ? 'var(--accent-soft)' : 'var(--text-primary)',
+                boxShadow: selectedMode.id === mode.id ? '0 0 15px var(--accent-soft)30' : 'none'
+              }}
               title={`${mode.name} - ${mode.description}`}
             >
               <div className="text-xs mb-0.5">{mode.icon}</div>
@@ -349,7 +364,7 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
       {/* Advanced Options based on MCP prompts */}
       {selectedMode && (
         <div className="space-y-2">
-          <div className="text-xs text-white/60">⚙️ Options</div>
+          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>⚙️ Options</div>
           
           {/* text_to_image_prompt: style_preset, quality */}
           {selectedMode.id === 'text_to_image' && (
@@ -570,7 +585,7 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
       <button
         onClick={handleImageProcessing}
         disabled={isGenerating || !prompt.trim() || (selectedMode.requiresImage && !uploadedImage)}
-        className={`w-full p-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded text-white font-medium transition-all hover:from-purple-600 hover:to-blue-600 flex items-center justify-center gap-2 text-sm ${
+        className={`w-full p-3 bg-gradient-to-r from-green-500 to-blue-500 rounded text-white font-medium transition-all hover:from-green-600 hover:to-blue-600 flex items-center justify-center gap-2 text-sm ${
           isGenerating ? 'animate-pulse' : ''
         } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
@@ -605,7 +620,8 @@ export const DreamWidget: React.FC<DreamWidgetProps> = ({
   onGenerateImage,
   onClearImage,
   onSelectOutput,
-  onClearHistory
+  onClearHistory,
+  onBack
 }) => {
   
   // Simplified edit actions for generated images - only essential ones
@@ -676,8 +692,21 @@ export const DreamWidget: React.FC<DreamWidgetProps> = ({
     }
   ];
 
+  // Custom empty state for Dream Widget
+  const dreamEmptyState: EmptyStateConfig = {
+    icon: '🎨',
+    title: 'Ready to Create Art',
+    description: 'Transform your ideas into stunning images with AI. Choose from 9 different creation modes including text-to-image, style transfer, and more.',
+    actionText: 'Upload Image',
+    onAction: () => {
+      document.getElementById('image-upload')?.click();
+    }
+  };
+
   return (
     <BaseWidget
+      title="DreamForge AI"
+      icon="🎨"
       isProcessing={isGenerating}
       outputHistory={outputHistory}
       currentOutput={currentOutput}
@@ -687,6 +716,9 @@ export const DreamWidget: React.FC<DreamWidgetProps> = ({
       managementActions={managementActions}
       onSelectOutput={onSelectOutput}
       onClearHistory={onClearHistory}
+      onBack={onBack}
+      showBackButton={true}
+      emptyStateConfig={dreamEmptyState}
     >
       <DreamInputArea
         isGenerating={isGenerating}

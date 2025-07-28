@@ -19,235 +19,409 @@ a {
   box-sizing: border-box;
 }
 
+/* Elegant Dark System - Inspired by Luma Dream Machine */
+:root {
+  --gradient-primary: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+  --gradient-secondary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  --gradient-tertiary: linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #8b5cf6 100%);
+  --gradient-surface: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+  --gradient-overlay: linear-gradient(135deg, rgba(99, 102, 241, 0.02) 0%, rgba(139, 92, 246, 0.02) 100%);
+  --glass-primary: rgba(15, 15, 35, 0.8);
+  --glass-secondary: rgba(26, 26, 46, 0.9);
+  --glass-border: rgba(99, 102, 241, 0.1);
+  --accent-soft: #6366f1;
+  --accent-muted: #8b5cf6;
+  --accent-subtle: #a855f7;
+  --text-primary: #f8fafc;
+  --text-secondary: #e2e8f0;
+  --text-muted: #94a3b8;
+  --bottom-area-height: 80px;
+}
+
 @media (prefers-color-scheme: dark) {
   html {
     color-scheme: dark;
   }
   body {
     color: white;
-    background: black;
+    background: var(--gradient-primary);
+    min-height: 100vh;
   }
 }
 
-/* InputAreaLayout - Glassmorphism Container */
-div.input-area-container {
-  padding: min(6vw, 24px) !important;
-  background: rgba(0, 0, 0, 0.3) !important;
-  backdrop-filter: blur(20px) saturate(120%) !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-left: none !important;
-  border-right: none !important;
-  border-bottom: none !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 16px !important;
-  min-height: max(80px, 10vh) !important;
-  position: relative !important;
+/* ============================================================================
+ * BOTTOM LAYOUT - Three Area Consistency (UserButton, InputAreaLayout, BaseWidget)
+ * ============================================================================ */
+
+/* Common height for all bottom components */
+:root {
+  --bottom-area-height: 80px;
+  --bottom-area-height-mobile: 70px;
 }
 
-.suggestions-content {
-  margin-bottom: 16px;
+/* InputAreaLayout - Elegant Dark Container with Fixed Height */
+div.input-area-container {
+  padding: 16px 20px !important;
+  background: var(--glass-primary) !important;
+  backdrop-filter: blur(20px) saturate(120%) !important;
+  border: 1px solid var(--glass-border) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important; /* Center content vertically */
+  min-height: var(--bottom-area-height) !important;
+  max-height: var(--bottom-area-height) !important;
+  position: relative !important;
+  box-shadow: 0 8px 32px var(--accent-soft)20 !important;
+  border-radius: 20px !important;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  div.input-area-container {
+    padding: 12px 16px !important;
+    min-height: var(--bottom-area-height-mobile) !important;
+    max-height: var(--bottom-area-height-mobile) !important;
+    border-radius: 16px !important;
+  }
 }
 
 .input-controls {
   position: relative;
+  width: 100%;
 }
 
 .input-row {
   display: flex !important;
   gap: 12px !important;
   align-items: center !important;
-  height: 48px !important; /* Fixed height for alignment */
+  height: 48px !important; /* Fixed height for perfect alignment */
+  width: 100% !important;
+}
+
+/* Mobile responsive input row */
+@media (max-width: 768px) {
+  .input-row {
+    gap: 8px !important;
+    height: 44px !important;
+  }
 }
 
 /* Button containers - ensure all elements have same baseline */
-div.input-area-container .button-container,
-div.input-area-container .input-container {
+div.input-area-container .button-container {
   display: flex !important;
   align-items: center !important;
-  height: 48px !important; /* All containers same height */
+  justify-content: center !important;
+  height: 48px !important;
+  width: 48px !important;
+  flex-shrink: 0 !important;
   box-sizing: border-box !important;
 }
 
-/* ULTRA HIGH SPECIFICITY - BEAT TAILWIND */
-div.input-area-container .button-container button.upload-button.cursor-pointer {
+/* Mobile responsive button containers */
+@media (max-width: 768px) {
+  div.input-area-container .button-container {
+    height: 44px !important;
+    width: 44px !important;
+  }
+}
+
+/* Input container takes remaining space */
+div.input-area-container .input-container {
+  display: flex !important;
+  align-items: center !important;
+  height: 48px !important;
+  flex: 1 !important;
+  min-width: 0 !important; /* Allow shrinking */
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 768px) {
+  div.input-area-container .input-container {
+    height: 44px !important;
+  }
+}
+
+/* ULTRA HIGH SPECIFICITY - Button Styling */
+div.input-area-container .button-container button,
+div.input-area-container .button-container .upload-button {
   /* Size and positioning - FIXED SIZE */
   width: 48px !important;
   height: 48px !important;
   
-  /* Glassmorphism styling */
-  background: rgba(255, 255, 255, 0.1) !important;
+  /* Elegant glassmorphism styling */
+  background: var(--glass-secondary) !important;
   backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-radius: 12px !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 16px !important;
   
   /* Layout */
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  flex-shrink: 0 !important;
   
-  /* Interaction */
+  /* Colors and effects */
+  color: var(--text-primary) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   cursor: pointer !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   
-  /* Color and typography */
-  color: white !important;
-  font-family: inherit !important;
-  font-size: inherit !important;
-  text-decoration: none !important;
-  
-  /* Reset all button defaults */
-  box-sizing: border-box !important;
-  outline: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  background-image: none !important;
-  text-transform: none !important;
-  letter-spacing: normal !important;
-  word-spacing: normal !important;
-  line-height: normal !important;
-  -webkit-appearance: none !important;
-  -moz-appearance: none !important;
-  appearance: none !important;
-  
-  /* Final glassmorphism styling */
+  /* Hover effects */
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15) !important;
 }
 
-div.input-area-container button.upload-button:hover {
-  transform: scale(1.05) !important;
-  background: rgba(255, 255, 255, 0.15) !important;
+/* Mobile responsive buttons */
+@media (max-width: 768px) {
+  div.input-area-container .button-container button,
+  div.input-area-container .button-container .upload-button {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 14px !important;
+  }
 }
 
-div.input-area-container button.upload-button:active {
-  transform: scale(0.95) !important;
-}
-
-/* Audio Button - Same style as upload button */
-div.input-area-container .button-container button.audio-button {
-  width: 48px !important;
-  height: 48px !important;
-  background: rgba(255, 255, 255, 0.1) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-radius: 12px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  flex-shrink: 0 !important;
-  color: white !important;
-  box-sizing: border-box !important;
-  /* Reset button defaults */
-  font-family: inherit !important;
-  font-size: inherit !important;
-  text-decoration: none !important;
-  outline: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  background-image: none !important;
-  -webkit-appearance: none !important;
-  -moz-appearance: none !important;
-  appearance: none !important;
-}
-
-div.input-area-container button.audio-button:hover {
-  transform: scale(1.05) !important;
-  background: rgba(255, 255, 255, 0.15) !important;
-}
-
-div.input-area-container button.audio-button:active {
-  transform: scale(0.95) !important;
-}
-
-.input-container {
-  flex: 1;
-  position: relative;
-  min-width: 0;
-}
-
-div.input-area-container textarea.chat-input {
-  width: 100% !important;
-  resize: none !important;
-  padding: 14px 16px !important; /* Perfect padding for center alignment */
-  background: rgba(255, 255, 255, 0.08) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 16px !important;
-  color: white !important;
-  font-size: 16px !important;
-  font-family: inherit !important;
-  line-height: 1.2 !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  outline: none !important;
-  box-sizing: border-box !important;
-  margin: 0 !important;
-  height: 48px !important; /* EXACT same height as buttons */
-  max-height: 120px !important;
-}
-
-div.input-area-container textarea.chat-input:focus {
-  background: rgba(255, 255, 255, 0.12) !important;
-  border-color: #3b82f6 !important;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
-}
-
-div.input-area-container textarea.chat-input::placeholder {
-  color: rgba(255, 255, 255, 0.5) !important;
-}
-
-/* Send button - NOW IN BUTTON CONTAINER */
-div.input-area-container .button-container button.send-button {
-  width: 48px !important; /* Same size as other buttons */
-  height: 48px !important; /* Same size as other buttons */
-  border-radius: 12px !important; /* Same radius as other buttons */
-  border: none !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  color: white !important;
-  box-sizing: border-box !important;
-  flex-shrink: 0 !important; /* Prevent shrinking */
-}
-
-/* Send button DISABLED state - In button container */
-div.input-area-container .button-container button.send-button.disabled {
-  background: rgba(255, 255, 255, 0.1) !important;
+/* Disabled button states */
+div.input-area-container .button-container button.disabled,
+div.input-area-container .button-container .upload-button.disabled {
+  background: var(--glass-primary) !important;
+  color: var(--text-muted) !important;
+  opacity: 0.5 !important;
   cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+div.input-area-container .button-container button.disabled:hover,
+div.input-area-container .button-container .upload-button.disabled:hover {
+  background: var(--glass-primary) !important;
+  transform: none !important;
+}
+
+/* Active/hover states for enabled buttons */
+div.input-area-container .button-container button:not(.disabled):hover,
+div.input-area-container .button-container .upload-button:not(.disabled):hover {
+  background: var(--accent-soft) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3) !important;
+}
+
+/* Send button special styling */
+div.input-area-container .button-container button.send-button.active {
+  background: linear-gradient(135deg, var(--accent-soft), var(--accent-muted)) !important;
+  color: white !important;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4) !important;
+}
+
+div.input-area-container .button-container button.send-button.active:hover {
+  background: linear-gradient(135deg, var(--accent-muted), var(--accent-subtle)) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5) !important;
+}
+
+/* Chat Input Styling */
+div.input-area-container .input-container .chat-input {
+  width: 100% !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  max-height: 48px !important;
+  
+  /* Styling */
+  background: var(--glass-secondary) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 16px !important;
+  padding: 12px 16px !important;
+  
+  /* Typography */
+  color: var(--text-primary) !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  font-family: inherit !important;
+  
+  /* Behavior */
+  resize: none !important;
+  outline: none !important;
+  overflow: hidden !important;
+  
+  /* Transitions */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Mobile responsive chat input */
+@media (max-width: 768px) {
+  div.input-area-container .input-container .chat-input {
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 10px 14px !important;
+    font-size: 16px !important; /* Prevent zoom on iOS */
+    border-radius: 14px !important;
+  }
+}
+
+/* Chat input focus state */
+div.input-area-container .input-container .chat-input:focus {
+  border-color: var(--accent-soft) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+}
+
+/* Placeholder styling */
+div.input-area-container .input-container .chat-input::placeholder {
+  color: var(--text-muted) !important;
   opacity: 0.7 !important;
 }
 
-/* Send button ACTIVE state - In button container */
-div.input-area-container .button-container button.send-button.active {
-  background: linear-gradient(135deg, #10b981, #059669) !important;
-  cursor: pointer !important;
-  opacity: 1 !important;
+/* Remove file attachments display when disabled */
+div.input-area-container .attached-files {
+  display: none !important;
 }
 
-div.input-area-container button.send-button.active:hover {
-  transform: scale(1.1) !important;
-  background: linear-gradient(135deg, #059669, #047857) !important;
+/* Hide suggestions panel */
+div.input-area-container .suggestions-panel {
+  display: none !important;
 }
 
-div.input-area-container button.send-button.active:active {
-  transform: scale(0.9) !important;
+/* ============================================================================
+ * LEFT SIDEBAR (UserButton Area) - Consistent Height
+ * ============================================================================ */
+
+/* User area should match input area height */
+.isa-chat-sidebar.isa-sidebar-left {
+  min-height: var(--bottom-area-height) !important;
 }
 
-.suggestions-panel {
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  right: 0;
-  margin-bottom: 8px;
-  background: rgba(0, 0, 0, 0.9);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  padding: 16px;
-  z-index: 50;
-  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+@media (max-width: 768px) {
+  .isa-chat-sidebar.isa-sidebar-left {
+    min-height: var(--bottom-area-height-mobile) !important;
+  }
+}
+
+/* User Area Container - 统一样式 */
+.user-area-container {
+  min-height: var(--bottom-area-height) !important;
+  max-height: var(--bottom-area-height) !important;
+  background: var(--glass-primary) !important;
+  backdrop-filter: blur(20px) saturate(120%) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 8px 32px var(--accent-soft)20 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px 20px !important;
+}
+
+@media (max-width: 768px) {
+  .user-area-container {
+    min-height: var(--bottom-area-height-mobile) !important;
+    max-height: var(--bottom-area-height-mobile) !important;
+    padding: 12px 16px !important;
+    border-radius: 16px !important;
+  }
+}
+
+/* UserButton styling for consistency - 移除之前的重复样式 */
+.user-area-container .w-full {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* ============================================================================
+ * RIGHT SIDEBAR (BaseWidget Area) - Consistent Height
+ * ============================================================================ */
+
+/* Widget area should match input area height */
+.isa-chat-sidebar.isa-sidebar-right {
+  min-height: var(--bottom-area-height) !important;
+}
+
+@media (max-width: 768px) {
+  .isa-chat-sidebar.isa-sidebar-right {
+    min-height: var(--bottom-area-height-mobile) !important;
+  }
+}
+
+/* Widget Management Area - 统一样式 */
+.widget-management-area {
+  min-height: var(--bottom-area-height) !important;
+  max-height: var(--bottom-area-height) !important;
+  background: var(--glass-primary) !important;
+  backdrop-filter: blur(20px) saturate(120%) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 8px 32px var(--accent-soft)20 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px 20px !important;
+}
+
+@media (max-width: 768px) {
+  .widget-management-area {
+    min-height: var(--bottom-area-height-mobile) !important;
+    max-height: var(--bottom-area-height-mobile) !important;
+    padding: 12px 16px !important;
+    border-radius: 16px !important;
+  }
+}
+
+/* Widget management buttons */
+.widget-management-area .grid {
+  width: 100% !important;
+  height: 100% !important;
+  display: grid !important;
+  align-items: center !important;
+}
+
+/* BaseWidget bottom area styling - 移除之前的通用样式 */
+/* 这些样式已被更具体的 .widget-management-area 替代 */
+
+@media (max-width: 768px) {
+  /* 这些样式已被更具体的 .widget-management-area 替代 */
+}
+
+/* ============================================================================
+ * RESPONSIVE LAYOUT - Mobile Optimizations
+ * ============================================================================ */
+
+/* Mobile: Stack elements vertically or adjust layout */
+@media (max-width: 768px) {
+  /* Ensure all three areas maintain consistent spacing */
+  .isa-chat-layout .flex {
+    gap: 8px !important;
+  }
+  
+  /* Adjust sidebar widths for mobile */
+  .isa-chat-sidebar {
+    min-width: 280px !important;
+  }
+  
+  /* Mobile-friendly touch targets */
+  button, .upload-button, input, textarea {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+}
+
+/* ============================================================================
+ * ACCESSIBILITY & TOUCH IMPROVEMENTS
+ * ============================================================================ */
+
+/* Ensure all interactive elements have proper touch targets */
+@media (pointer: coarse) {
+  div.input-area-container .button-container button,
+  div.input-area-container .button-container .upload-button {
+    min-width: 48px !important;
+    min-height: 48px !important;
+  }
+  
+  div.input-area-container .input-container .chat-input {
+    min-height: 48px !important;
+    font-size: 16px !important; /* Prevent zoom on iOS */
+  }
+}
+
+.suggestions-content {
+  margin-bottom: 16px;
 }
 
 .suggestions-header {
@@ -274,7 +448,7 @@ div.input-area-container button.send-button.active:active {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--glass-secondary);
   border: none;
   display: flex;
   align-items: center;
@@ -285,8 +459,9 @@ div.input-area-container button.send-button.active:active {
 }
 
 .close-suggestions:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
+  background: var(--glass-secondary);
+  color: var(--text-primary);
+  box-shadow: 0 0 15px var(--accent-soft);
 }
 
 .suggestions-grid {
@@ -297,9 +472,9 @@ div.input-area-container button.send-button.active:active {
 
 .suggestion-item {
   padding: 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--glass-secondary);
+  border: none;
   color: white;
   font-size: 14px;
   cursor: pointer;
@@ -310,16 +485,17 @@ div.input-area-container button.send-button.active:active {
 }
 
 .suggestion-item:hover {
-  background: rgba(59, 130, 246, 0.1);
-  border-color: rgba(59, 130, 246, 0.3);
-  transform: translateY(-1px);
+  background: var(--glass-secondary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px var(--accent-soft), 0 0 20px var(--accent-muted);
 }
 
 .suggestion-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+  background: var(--gradient-secondary);
+  box-shadow: 0 0 10px var(--accent-soft);
 }
 
 .additional-content {
@@ -328,10 +504,11 @@ div.input-area-container button.send-button.active:active {
 
 /* File Attachments Display */
 .attached-files {
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: var(--glass-primary) !important;
   backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-radius: 12px !important;
+  border: none !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.1) !important;
   padding: 12px !important;
   margin-bottom: 12px !important;
 }
@@ -356,16 +533,17 @@ div.input-area-container button.send-button.active:active {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  background: rgba(255, 255, 255, 0.03) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 8px !important;
+  background: var(--glass-secondary) !important;
+  border: none !important;
+  border-radius: 12px !important;
   padding: 8px 12px !important;
   transition: all 0.2s ease !important;
 }
 
 .attached-file-item:hover {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border-color: rgba(255, 255, 255, 0.15) !important;
+  background: var(--glass-secondary) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 8px var(--accent-soft), 0 0 15px var(--accent-muted) !important;
 }
 
 .file-info {
@@ -459,6 +637,98 @@ div.input-area-container button.audio-button.recording {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Toast animations */
+@keyframes slide-in-top {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-bottom {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-top-left {
+  from {
+    opacity: 0;
+    transform: translate(-100%, -100%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes slide-in-top-right {
+  from {
+    opacity: 0;
+    transform: translate(100%, -100%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes slide-in-bottom-left {
+  from {
+    opacity: 0;
+    transform: translate(-100%, 100%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes slide-in-bottom-right {
+  from {
+    opacity: 0;
+    transform: translate(100%, 100%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+/* Utility classes for animations */
+.animate-slide-in-top {
+  animation: slide-in-top 0.3s ease-out;
+}
+
+.animate-slide-in-bottom {
+  animation: slide-in-bottom 0.3s ease-out;
+}
+
+.animate-slide-in-top-left {
+  animation: slide-in-top-left 0.3s ease-out;
+}
+
+.animate-slide-in-top-right {
+  animation: slide-in-top-right 0.3s ease-out;
+}
+
+.animate-slide-in-bottom-left {
+  animation: slide-in-bottom-left 0.3s ease-out;
+}
+
+.animate-slide-in-bottom-right {
+  animation: slide-in-bottom-right 0.3s ease-out;
 }
 
 /* Mobile responsive */

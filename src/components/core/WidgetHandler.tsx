@@ -14,12 +14,10 @@
  * API Response → chatService → stores → hooks → modules → UI
  */
 
-import { useDreamWidgetStore, useHuntWidgetStore, useOmniWidgetStore, useAssistantWidgetStore, useDataScientistWidgetStore } from '../../stores/useWidgetStores';
+import { useDreamWidgetStore, useHuntWidgetStore, useOmniWidgetStore, useDataScientistWidgetStore, useKnowledgeWidgetStore } from '../../stores/useWidgetStores';
 import { logger, LogCategory } from '../../utils/logger';
 import { OutputHistoryItem, EditAction, ManagementAction } from '../ui/widgets/BaseWidget';
-
-// Widget type definitions
-export type WidgetType = 'dream' | 'hunt' | 'omni' | 'assistant' | 'knowledge' | 'data_scientist';
+import { WidgetType } from '../../types/widgetTypes';
 
 // Generic widget request interface
 export interface WidgetRequest {
@@ -71,9 +69,6 @@ export class WidgetHandler {
         case 'omni':
           await this.processOmniRequest(request.params, request.sessionId, request.userId);
           break;
-        case 'assistant':
-          await this.processAssistantRequest(request.params, request.sessionId, request.userId);
-          break;
         case 'knowledge':
           await this.processKnowledgeRequest(request.params, request.sessionId, request.userId);
           break;
@@ -105,7 +100,7 @@ export class WidgetHandler {
     });
     
     // Trigger dream generation via store's chatService integration
-    await dreamStore.triggerDreamGeneration(params);
+    await dreamStore.triggerAction(params);
   }
 
   /**
@@ -121,7 +116,7 @@ export class WidgetHandler {
     });
     
     // Trigger hunt search via store's chatService integration
-    await huntStore.triggerHuntSearch(params);
+    await huntStore.triggerAction(params);
   }
 
   /**
@@ -137,35 +132,23 @@ export class WidgetHandler {
     });
     
     // Trigger omni generation via store's chatService integration
-    await omniStore.triggerOmniGeneration(params);
+    await omniStore.triggerAction(params);
   }
 
   /**
-   * Process Assistant widget request - Route to Assistant store
-   */
-  private async processAssistantRequest(params: any, sessionId?: string, userId?: string): Promise<void> {
-    const assistantStore = useAssistantWidgetStore.getState();
-    
-    logger.debug(LogCategory.ARTIFACT_CREATION, 'Assistant request routed to store', { 
-      params, 
-      sessionId, 
-      userId 
-    });
-    
-    // Trigger assistant request via store's chatService integration
-    await assistantStore.triggerAssistantRequest(params);
-  }
-
-  /**
-   * Process Knowledge widget request (placeholder for future implementation)
+   * Process Knowledge widget request - Route to Knowledge store
    */
   private async processKnowledgeRequest(params: any, sessionId?: string, userId?: string): Promise<void> {
-    logger.debug(LogCategory.ARTIFACT_CREATION, 'Knowledge widget request - placeholder implementation', { 
+    const knowledgeStore = useKnowledgeWidgetStore.getState();
+    
+    logger.debug(LogCategory.ARTIFACT_CREATION, 'Knowledge request routed to store', { 
       params, 
       sessionId, 
       userId 
     });
-    // TODO: Implement knowledge widget store routing
+    
+    // Trigger knowledge analysis via store's chatService integration
+    await knowledgeStore.triggerAction(params);
   }
 
   /**
@@ -181,7 +164,7 @@ export class WidgetHandler {
     });
     
     // Trigger data scientist analysis via store's chatService integration
-    await dataScientistStore.triggerDataScientistAnalysis(params);
+    await dataScientistStore.triggerAction(params);
   }
 
   /**
@@ -292,23 +275,23 @@ export class WidgetHandler {
       switch (type) {
         case 'dream':
           const dreamStore = useDreamWidgetStore.getState();
-          dreamStore.clearDreamData?.();
+          dreamStore.clearData?.();
           break;
         case 'hunt':
           const huntStore = useHuntWidgetStore.getState();
-          huntStore.clearHuntData?.();
+          huntStore.clearData?.();
           break;
         case 'omni':
           const omniStore = useOmniWidgetStore.getState();
-          omniStore.clearOmniData?.();
+          omniStore.clearData?.();
           break;
-        case 'assistant':
-          const assistantStore = useAssistantWidgetStore.getState();
-          assistantStore.clearAssistantData?.();
+        case 'knowledge':
+          const knowledgeStore = useKnowledgeWidgetStore.getState();
+          knowledgeStore.clearData?.();
           break;
         case 'data_scientist':
           const dataScientistStore = useDataScientistWidgetStore.getState();
-          dataScientistStore.clearDataScientistData?.();
+          dataScientistStore.clearData?.();
           break;
         default:
           console.log(`⚠️ Clear operation not implemented for widget type: ${type}`);
@@ -370,11 +353,13 @@ export const processHuntWidget = (params: any, sessionId?: string, userId?: stri
 export const processOmniWidget = (params: any, sessionId?: string, userId?: string) => 
   widgetHandler.processRequest({ type: 'omni', params, sessionId, userId });
 
-export const processAssistantWidget = (params: any, sessionId?: string, userId?: string) => 
-  widgetHandler.processRequest({ type: 'assistant', params, sessionId, userId });
+// export const processAssistantWidget - removed (Assistant widget no longer exists)
 
 export const processDataScientistWidget = (params: any, sessionId?: string, userId?: string) => 
   widgetHandler.processRequest({ type: 'data_scientist', params, sessionId, userId });
+
+export const processKnowledgeWidget = (params: any, sessionId?: string, userId?: string) => 
+  widgetHandler.processRequest({ type: 'knowledge', params, sessionId, userId });
 
 // Convenience functions for UI actions
 export const processWidgetUIAction = (request: WidgetUIActionRequest) => 

@@ -39,8 +39,7 @@ export {
   useChatTyping,
   useChatLoading,
   useChatActions,
-  type ChatStore,
-  type ChatMessage
+  type ChatStore
 } from './useChatStore';
 
 // === 会话状态 ===
@@ -90,11 +89,7 @@ export {
   useOmniActions,
   type OmniWidgetStore,
   
-  // Assistant Widget
-  useAssistantWidgetStore,
-  useAssistantState,
-  useAssistantActions,
-  type AssistantWidgetStore,
+  // Assistant Widget - removed (Assistant widget no longer exists)
   
   // Utility
   clearAllWidgetData

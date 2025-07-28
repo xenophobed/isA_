@@ -18,7 +18,7 @@
  */
 import React, { useState } from 'react';
 import { HuntWidgetParams } from '../../../types/widgetTypes';
-import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction } from './BaseWidget';
+import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction, EmptyStateConfig } from './BaseWidget';
 import { processHuntWidget } from '../../core/WidgetHandler';
 
 // AI Search Intelligence Service modes (based on admin categories)
@@ -109,6 +109,7 @@ interface HuntWidgetProps {
   onClearResults?: () => void;
   onSelectOutput?: (item: OutputHistoryItem) => void;
   onClearHistory?: () => void;
+  onBack?: () => void;
 }
 
 /**
@@ -168,9 +169,9 @@ const HuntInputArea: React.FC<{
       const params: HuntWidgetParams = {
         query: query,
         category: selectedMode.id,
-        // Add simplified search-specific parameters
-        search_depth: searchDepth,
-        result_format: resultFormat
+        // Add simplified search-specific parameters if supported
+        ...(searchDepth && { searchDepth }),
+        ...(resultFormat && { resultFormat })
       };
       
       // Use WidgetHandler instead of direct store/onSearch
@@ -185,11 +186,11 @@ const HuntInputArea: React.FC<{
   return (
     <div className="space-y-4 p-3">
       {/* Compact Mode Header */}
-      <div className="flex items-center gap-3 p-2 bg-blue-500/10 rounded border border-blue-500/20">
+      <div className="flex items-center gap-3 p-2 rounded border" style={{backgroundColor: 'var(--glass-secondary)', borderColor: 'var(--glass-border)'}}>
         <span className="text-lg">{selectedMode.icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-white truncate">{selectedMode.name}</div>
-          <div className="flex gap-3 text-xs text-white/50">
+          <div className="text-sm font-medium truncate" style={{color: 'var(--text-primary)'}}>{selectedMode.name}</div>
+          <div className="flex gap-3 text-xs" style={{color: 'var(--text-secondary)'}}>
             <span>{selectedMode.estimatedTime}</span>
             <span>{selectedMode.isActive ? 'Active' : 'Coming Soon'}</span>
           </div>
@@ -210,16 +211,24 @@ const HuntInputArea: React.FC<{
           placeholder={selectedMode.isActive 
             ? `Search for ${selectedMode.name.toLowerCase()}...`
             : "Enter your search query..."}
-          className="w-full p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
+          className="w-full p-2 rounded resize-none text-sm focus:outline-none"
+          style={{
+            backgroundColor: 'var(--glass-primary)',
+            borderColor: 'var(--glass-border)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--glass-border)'
+          }}
+          onFocus={(e) => (e.target as HTMLElement).style.borderColor = 'var(--accent-soft)'}
+          onBlur={(e) => (e.target as HTMLElement).style.borderColor = 'var(--glass-border)'}
           rows={2}
         />
       </div>
 
       {/* Mode Recommendation Alert */}
       {recommendedMode && (
-        <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/20 rounded">
+        <div className="flex items-center gap-2 p-2 rounded border" style={{backgroundColor: 'var(--accent-soft)', borderColor: 'var(--accent-muted)'}}>
           <span className="text-sm">💡</span>
-          <div className="flex-1 text-xs text-green-300">
+          <div className="flex-1 text-xs" style={{color: 'var(--text-primary)'}}>
             Suggested: <span className="font-medium">{recommendedMode.name}</span> mode for better results
           </div>
           <button
@@ -228,13 +237,22 @@ const HuntInputArea: React.FC<{
               setRecommendedMode(null);
               console.log('🔍 Accepted recommendation:', recommendedMode.name);
             }}
-            className="px-2 py-1 bg-green-500/20 hover:bg-green-500/30 rounded text-xs text-green-300"
+            className="px-2 py-1 rounded text-xs"
+            style={{
+              backgroundColor: 'var(--accent-muted)',
+              color: 'var(--text-primary)'
+            }}
+            onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--accent-soft)'}
+            onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--accent-muted)'}
           >
             Use
           </button>
           <button
             onClick={() => setRecommendedMode(null)}
-            className="px-1 py-1 hover:bg-white/10 rounded text-xs text-white/50"
+            className="px-1 py-1 rounded text-xs"
+            style={{color: 'var(--text-secondary)'}}
+            onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--glass-secondary)'}
+            onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
           >
             ✕
           </button>
@@ -243,7 +261,7 @@ const HuntInputArea: React.FC<{
 
       {/* Compact Mode Selector */}
       <div>
-        <div className="text-xs text-white/60 mb-2">🎯 Select Search Mode ({searchModes.length} modes)</div>
+        <div className="text-xs mb-2" style={{color: 'var(--text-muted)'}}>🎯 Select Search Mode ({searchModes.length} modes)</div>
         <div className="grid grid-cols-2 gap-1">
           {searchModes.filter(mode => mode.isActive).map((mode) => (
             <button
@@ -252,19 +270,29 @@ const HuntInputArea: React.FC<{
                 setSelectedMode(mode);
                 console.log('🔍 Mode selected:', mode.name);
               }}
-              className={`p-1.5 rounded border transition-all text-center ${
-                selectedMode.id === mode.id
-                  ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
-                  : mode.isActive 
-                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white cursor-pointer'
-                    : 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
-              }`}
+              className="p-1.5 rounded border transition-all text-center cursor-pointer"
+              style={{
+                backgroundColor: selectedMode.id === mode.id ? 'var(--accent-soft)' : 'var(--glass-primary)',
+                borderColor: selectedMode.id === mode.id ? 'var(--accent-muted)' : 'var(--glass-border)',
+                color: selectedMode.id === mode.id ? 'var(--text-primary)' : (mode.isActive ? 'var(--text-primary)' : 'var(--text-muted)'),
+                cursor: mode.isActive ? 'pointer' : 'not-allowed'
+              }}
+              onMouseEnter={(e) => {
+                if (mode.isActive && selectedMode.id !== mode.id) {
+                  (e.target as HTMLElement).style.backgroundColor = 'var(--glass-secondary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (mode.isActive && selectedMode.id !== mode.id) {
+                  (e.target as HTMLElement).style.backgroundColor = 'var(--glass-primary)';
+                }
+              }}
               title={`${mode.name} - ${mode.description}${!mode.isActive ? ' (Coming Soon)' : ''}`}
               disabled={!mode.isActive}
             >
               <div className="text-xs mb-0.5">{mode.icon}</div>
               <div className="text-xs font-medium truncate leading-tight">{mode.name}</div>
-              {!mode.isActive && <div className="text-xs text-white/30">Soon</div>}
+              {!mode.isActive && <div className="text-xs" style={{color: 'var(--text-muted)'}}>Soon</div>}
             </button>
           ))}
         </div>
@@ -273,11 +301,11 @@ const HuntInputArea: React.FC<{
       {/* Advanced Search Options - Simplified */}
       {selectedMode && selectedMode.isActive && (
         <div className="space-y-2">
-          <div className="text-xs text-white/60">⚙️ Advanced Options</div>
+          <div className="text-xs" style={{color: 'var(--text-muted)'}}>⚙️ Advanced Options</div>
           
           <div>
-            <label className="block text-xs text-white/60 mb-1">Search Depth</label>
-            <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={searchDepth} onChange={(e) => setSearchDepth(e.target.value)}>
+            <label className="block text-xs mb-1" style={{color: 'var(--text-muted)'}}>Search Depth</label>
+            <select className="w-full p-1.5 rounded text-xs" value={searchDepth} onChange={(e) => setSearchDepth(e.target.value)} style={{backgroundColor: 'var(--glass-primary)', borderColor: 'var(--glass-border)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)'}}>
               <option value="standard">Standard</option>
               <option value="comprehensive">Comprehensive</option>
               <option value="deep_analysis">Deep Analysis</option>
@@ -285,8 +313,8 @@ const HuntInputArea: React.FC<{
           </div>
           
           <div>
-            <label className="block text-xs text-white/60 mb-1">Result Format</label>
-            <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={resultFormat} onChange={(e) => setResultFormat(e.target.value)}>
+            <label className="block text-xs mb-1" style={{color: 'var(--text-muted)'}}>Result Format</label>
+            <select className="w-full p-1.5 rounded text-xs" value={resultFormat} onChange={(e) => setResultFormat(e.target.value)} style={{backgroundColor: 'var(--glass-primary)', borderColor: 'var(--glass-border)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)'}}>
               <option value="summary">Summary</option>
               <option value="detailed">Detailed</option>
               <option value="comparison">Comparison Table</option>
@@ -299,7 +327,7 @@ const HuntInputArea: React.FC<{
       <button
         onClick={handleSearchProcessing}
         disabled={isSearching || !query.trim() || !selectedMode.isActive}
-        className={`w-full p-3 bg-gradient-to-r from-blue-500 to-green-500 rounded text-white font-medium transition-all hover:from-blue-600 hover:to-green-600 flex items-center justify-center gap-2 text-sm ${
+        className={`w-full p-3 bg-gradient-to-r from-green-500 to-blue-500 rounded text-white font-medium transition-all hover:from-green-600 hover:to-blue-600 flex items-center justify-center gap-2 text-sm ${
           isSearching ? 'animate-pulse' : ''
         } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
@@ -334,7 +362,8 @@ export const HuntWidget: React.FC<HuntWidgetProps> = ({
   onSearch,
   onClearResults,
   onSelectOutput,
-  onClearHistory
+  onClearHistory,
+  onBack
 }) => {
   
   // Search-specific edit actions for search results - simplified like DreamWidget
@@ -368,7 +397,7 @@ export const HuntWidget: React.FC<HuntWidgetProps> = ({
   ];
 
   // Hunt-specific management actions for bottom menu
-  const managementActions = [
+  const managementActions: ManagementAction[] = [
     {
       id: 'search',
       label: 'Search',
@@ -400,8 +429,22 @@ export const HuntWidget: React.FC<HuntWidgetProps> = ({
     }
   ];
 
+  // Custom empty state for Hunt Widget
+  const huntEmptyState: EmptyStateConfig = {
+    icon: '🔍',
+    title: 'Ready to Hunt Information',
+    description: 'Search the web with AI-powered intelligence. Find academic papers, news, videos, social media, and more across multiple search engines.',
+    actionText: 'Start Searching',
+    onAction: () => {
+      const textarea = document.querySelector('textarea[placeholder*="search"]') as HTMLTextAreaElement;
+      textarea?.focus();
+    }
+  };
+
   return (
     <BaseWidget
+      title="HuntAI"
+      icon="🔍"
       isProcessing={isSearching}
       outputHistory={outputHistory}
       currentOutput={currentOutput}
@@ -411,6 +454,9 @@ export const HuntWidget: React.FC<HuntWidgetProps> = ({
       managementActions={managementActions}
       onSelectOutput={onSelectOutput}
       onClearHistory={onClearHistory}
+      onBack={onBack}
+      showBackButton={true}
+      emptyStateConfig={huntEmptyState}
     >
       <HuntInputArea
         isSearching={isSearching}

@@ -60,15 +60,19 @@ const HUNT_TEMPLATE_MAPPING = {
 
 // Hunt-specific template parameter preparation (像DreamModule一样)
 const prepareHuntTemplateParams = (params: HuntWidgetParams) => {
-  const { query, category = 'general', search_depth = 'standard', result_format = 'summary' } = params;
+  const { query, category = 'general', search_depth = 'standard', result_format = 'summary', priceRange } = params;
   
-  const mapping = HUNT_TEMPLATE_MAPPING[category] || HUNT_TEMPLATE_MAPPING['general'];
+  const mapping = HUNT_TEMPLATE_MAPPING[category as keyof typeof HUNT_TEMPLATE_MAPPING] || HUNT_TEMPLATE_MAPPING['general'];
   
-  // Build prompt_args - query must be first!
-  const prompt_args = {
+  // Build prompt_args dynamically - much cleaner approach
+  const prompt_args: Record<string, any> = {
     query: query || 'Search for information',
-    search_depth: search_depth,
-    result_format: result_format
+    search_depth,
+    result_format,
+    ...(priceRange && { 
+      price_min: priceRange.min,
+      price_max: priceRange.max 
+    })
   };
   
   console.log('🔍 HUNT_MODULE: Prepared template params for mode', category, ':', {
@@ -89,6 +93,24 @@ const huntWidgetConfig = createWidgetConfig({
   icon: '🔍',
   sessionIdPrefix: 'hunt_widget',
   maxHistoryItems: 20,
+  
+  // Result extraction configuration
+  resultExtractor: {
+    outputType: 'search',
+    extractResult: (widgetData: any) => {
+      if (widgetData?.searchResults?.length > 0) {
+        return {
+          finalResult: { 
+            searchResults: widgetData.searchResults, 
+            query: widgetData.lastQuery 
+          },
+          outputContent: widgetData.searchResults[0]?.content || JSON.stringify(widgetData.searchResults),
+          title: `Search Results (${widgetData.searchResults.length} found)`
+        };
+      }
+      return null;
+    }
+  },
   
   // Extract parameters from triggered input
   extractParamsFromInput: (input: string) => ({
@@ -203,7 +225,7 @@ export const HuntWidgetModule: React.FC<HuntWidgetModuleProps> = ({
     <BaseWidgetModule
       config={huntWidgetConfig}
       triggeredInput={triggeredInput}
-      onCompleted={onSearchCompleted}
+      onResultGenerated={onSearchCompleted}
     >
       {(moduleProps) => {
         // Pass store state to HuntWidget via props with template support
@@ -221,6 +243,10 @@ export const HuntWidgetModule: React.FC<HuntWidgetModuleProps> = ({
               
               // Add template information to params before sending to store
               const enrichedParams = {
+                query: params.query || '',
+                category: params.category || 'general',
+                search_depth: params.search_depth || 'standard',
+                result_format: params.result_format || 'summary',
                 ...params,
                 templateParams // Add template configuration
               };

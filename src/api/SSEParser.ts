@@ -51,6 +51,7 @@ export interface SSEParserCallbacks {
   onError?: (error: Error) => void;
   onArtifactCreated?: (artifact: { id?: string; type: string; content: string }) => void;
   onMessageExtracted?: (extractedContent: string) => void; // 新增：用于传递提取的纯净内容
+  onBillingUpdate?: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => void; // 新增：计费更新回调
 }
 
 // ================================================================================
@@ -111,6 +112,9 @@ export class SSEParser {
         case 'memory_update':
           this.handleMemoryUpdateEvent(eventData, callbacks);
           break;
+        case 'billing':
+          this.handleBillingEvent(eventData, callbacks);
+          break;
         case 'node_update':
           this.handleNodeUpdate(eventData, callbacks);
           break;
@@ -145,7 +149,8 @@ export class SSEParser {
       onStreamStatus: callbacks.onMessageStatus,
       onStreamComplete: callbacks.onMessageComplete,
       onError: callbacks.onError,
-      onArtifactCreated: callbacks.onArtifactCreated
+      onArtifactCreated: callbacks.onArtifactCreated,
+      onBillingUpdate: callbacks.onBillingUpdate
     };
 
     this.parseSSEEvent(data, adaptedCallbacks);
@@ -278,7 +283,11 @@ export class SSEParser {
       
       // 提取content="..."部分的纯净内容
       let extractedContent = content.raw_message;
-      const contentMatch = content.raw_message.match(/content="([^"]*(?:\\"[^"]*)*)"/);
+      // 先尝试双引号，再尝试单引号
+      const doubleQuoteMatch = content.raw_message.match(/content="([^"]*(?:\\"[^"]*)*)"/);
+      const singleQuoteMatch = content.raw_message.match(/content='([^']*(?:\\'[^']*)*)'/);
+      const contentMatch = doubleQuoteMatch || singleQuoteMatch;
+      
       if (contentMatch) {
         extractedContent = contentMatch[1];
         // Unescape quotes
@@ -287,8 +296,11 @@ export class SSEParser {
         
         // 通知chatService使用提取的纯净内容
         if (extractedContent && extractedContent.trim() && !extractedContent.includes('tool_calls')) {
+          console.log(`📨 SSE_PARSER: Calling onMessageExtracted with content: ${extractedContent}`);
           callbacks.onMessageExtracted?.(extractedContent);
         }
+      } else {
+        console.log(`⚠️ SSE_PARSER: Could not extract content from raw_message: ${content.raw_message}`);
       }
       
       // 解析图片URL - 检查markdown格式的图片
@@ -365,6 +377,29 @@ export class SSEParser {
       callbacks.onStreamStatus?.(`💾 Stored ${data.memories_stored} memories`);
     } else {
       callbacks.onStreamStatus?.('💾 Updating memory...');
+    }
+  }
+
+  private static handleBillingEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
+    const content = (eventData as any).content;
+    const data = (eventData as any).data;
+    
+    console.log(`💰 SSE_PARSER: Billing update: ${content}`, data);
+    
+    if (data?.success && data.credits_remaining !== undefined) {
+      const billingData = {
+        creditsRemaining: data.credits_remaining,
+        totalCredits: data.total_credits || data.credits_remaining, // fallback if total not provided
+        modelCalls: data.model_calls || 0,
+        toolCalls: data.tool_calls || 0
+      };
+      
+      console.log(`💰 SSE_PARSER: Updating user credits:`, billingData);
+      callbacks.onBillingUpdate?.(billingData);
+      callbacks.onStreamStatus?.(`💰 Credits used: ${data.total_credits || 1}, Remaining: ${data.credits_remaining}`);
+    } else if (data?.error_message) {
+      console.error(`💰 SSE_PARSER: Billing error: ${data.error_message}`);
+      callbacks.onError?.(new Error(`Billing Error: ${data.error_message}`));
     }
   }
 

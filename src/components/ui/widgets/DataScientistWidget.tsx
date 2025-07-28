@@ -17,7 +17,7 @@
  * - Data-specific actions (export, visualize, share)
  */
 import React, { useState } from 'react';
-import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction } from './BaseWidget';
+import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction, EmptyStateConfig } from './BaseWidget';
 
 // Data analysis modes
 interface DataMode {
@@ -117,6 +117,7 @@ interface DataScientistWidgetProps {
   onClearAnalysis: () => void;
   onSelectOutput?: (item: OutputHistoryItem) => void;
   onClearHistory?: () => void;
+  onBack?: () => void;
 }
 
 /**
@@ -180,11 +181,11 @@ const DataScientistInputArea: React.FC<DataScientistWidgetProps> = ({
   return (
     <div className="space-y-4 p-3">
       {/* Compact Mode Header - like other widgets */}
-      <div className="flex items-center gap-3 p-2 bg-cyan-500/10 rounded border border-cyan-500/20">
+      <div className="flex items-center gap-3 p-2 rounded border" style={{backgroundColor: 'var(--glass-secondary)', borderColor: 'var(--glass-border)'}}>
         <span className="text-lg">{selectedMode.icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-white truncate">{selectedMode.name}</div>
-          <div className="flex gap-3 text-xs text-white/50">
+          <div className="text-sm font-medium truncate" style={{color: 'var(--text-primary)'}}>{selectedMode.name}</div>
+          <div className="flex gap-3 text-xs" style={{color: 'var(--text-secondary)'}}>
             <span>{selectedMode.estimatedTime}</span>
             <span>Data Analysis</span>
           </div>
@@ -204,12 +205,28 @@ const DataScientistInputArea: React.FC<DataScientistWidgetProps> = ({
               setQuery(newValue);
             }}
             placeholder={`Describe your ${selectedMode.name.toLowerCase()} request...`}
-            className="flex-1 p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
+            className="flex-1 p-2 rounded resize-none text-sm focus:outline-none"
+            style={{
+              backgroundColor: 'var(--glass-primary)',
+              borderColor: 'var(--glass-border)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--glass-border)'
+            }}
+            onFocus={(e) => (e.target as HTMLElement).style.borderColor = 'var(--accent-soft)'}
+            onBlur={(e) => (e.target as HTMLElement).style.borderColor = 'var(--glass-border)'}
             rows={2}
           />
           <button
             onClick={() => document.getElementById('data-upload')?.click()}
-            className="px-3 py-2 bg-white/5 border border-white/10 rounded text-white/80 hover:bg-white/10 transition-all text-xs flex items-center gap-1"
+            className="px-3 py-2 rounded transition-all text-xs flex items-center gap-1"
+            style={{
+              backgroundColor: 'var(--glass-primary)',
+              borderColor: 'var(--glass-border)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--glass-border)'
+            }}
+            onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--glass-secondary)'}
+            onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--glass-primary)'}
           >
             📁 Upload
           </button>
@@ -226,12 +243,15 @@ const DataScientistInputArea: React.FC<DataScientistWidgetProps> = ({
         
         {/* Show uploaded file info */}
         {uploadedFile && (
-          <div className="flex items-center gap-2 p-2 bg-white/5 border border-white/10 rounded">
+          <div className="flex items-center gap-2 p-2 rounded border" style={{backgroundColor: 'var(--glass-primary)', borderColor: 'var(--glass-border)'}}>
             <span className="text-sm">📁</span>
-            <span className="text-white/70 text-xs">{uploadedFile.name}</span>
+            <span className="text-xs" style={{color: 'var(--text-secondary)'}}>{uploadedFile.name}</span>
             <button 
               onClick={() => setUploadedFile(null)}
-              className="ml-auto text-white/40 hover:text-white/70 text-xs"
+              className="ml-auto text-xs"
+              style={{color: 'var(--text-muted)'}}
+              onMouseEnter={(e) => (e.target as HTMLElement).style.color = 'var(--text-secondary)'}
+              onMouseLeave={(e) => (e.target as HTMLElement).style.color = 'var(--text-muted)'}
             >
               ✕
             </button>
@@ -241,7 +261,7 @@ const DataScientistInputArea: React.FC<DataScientistWidgetProps> = ({
 
       {/* Compact Mode Selector */}
       <div>
-        <div className="text-xs text-white/60 mb-2">🎯 Select Mode</div>
+        <div className="text-xs mb-2" style={{color: 'var(--text-muted)'}}>🎯 Select Mode</div>
         <div className="grid grid-cols-3 gap-1">
           {dataModes.map((mode) => (
             <button
@@ -255,18 +275,28 @@ const DataScientistInputArea: React.FC<DataScientistWidgetProps> = ({
                 }
               }}
               disabled={!mode.isActive}
-              className={`p-1.5 rounded border transition-all text-center ${
-                selectedMode.id === mode.id
-                  ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
-                  : mode.isActive 
-                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white cursor-pointer'
-                    : 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
-              }`}
+              className="p-1.5 rounded border transition-all text-center"
+              style={{
+                backgroundColor: selectedMode.id === mode.id ? 'var(--accent-soft)' : 'var(--glass-primary)',
+                borderColor: selectedMode.id === mode.id ? 'var(--accent-muted)' : 'var(--glass-border)',
+                color: selectedMode.id === mode.id ? 'var(--text-primary)' : (mode.isActive ? 'var(--text-primary)' : 'var(--text-muted)'),
+                cursor: mode.isActive ? 'pointer' : 'not-allowed'
+              }}
+              onMouseEnter={(e) => {
+                if (mode.isActive && selectedMode.id !== mode.id) {
+                  (e.target as HTMLElement).style.backgroundColor = 'var(--glass-secondary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (mode.isActive && selectedMode.id !== mode.id) {
+                  (e.target as HTMLElement).style.backgroundColor = 'var(--glass-primary)';
+                }
+              }}
               title={`${mode.name} - ${mode.description}${!mode.isActive ? ' (Coming Soon)' : ''}`}
             >
               <div className="text-xs mb-0.5">{mode.icon}</div>
               <div className="text-xs font-medium truncate leading-tight">{mode.name}</div>
-              {!mode.isActive && <div className="text-xs text-white/30">Soon</div>}
+              {!mode.isActive && <div className="text-xs" style={{color: 'var(--text-muted)'}}>Soon</div>}
             </button>
           ))}
         </div>
@@ -275,12 +305,18 @@ const DataScientistInputArea: React.FC<DataScientistWidgetProps> = ({
       {/* Advanced Options - Only Analysis Depth */}
       {selectedMode && (
         <div className="space-y-2">
-          <div className="text-xs text-white/60">⚙️ Advanced Options</div>
+          <div className="text-xs" style={{color: 'var(--text-muted)'}}>⚙️ Advanced Options</div>
           
           <div>
-            <label className="block text-xs text-white/60 mb-1">Analysis Depth</label>
+            <label className="block text-xs mb-1" style={{color: 'var(--text-muted)'}}>Analysis Depth</label>
             <select 
-              className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" 
+              className="w-full p-1.5 rounded text-xs"
+              style={{
+                backgroundColor: 'var(--glass-primary)',
+                borderColor: 'var(--glass-border)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--glass-border)'
+              }} 
               value={analysisDepth} 
               onChange={(e) => setAnalysisDepth(e.target.value)}
             >
@@ -296,7 +332,7 @@ const DataScientistInputArea: React.FC<DataScientistWidgetProps> = ({
       <button
         onClick={handleDataAnalysis}
         disabled={isAnalyzing || !query.trim()}
-        className={`w-full p-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded text-white font-medium transition-all hover:from-cyan-600 hover:to-blue-600 flex items-center justify-center gap-2 text-sm ${
+        className={`w-full p-3 bg-gradient-to-r from-green-500 to-blue-500 rounded text-white font-medium transition-all hover:from-green-600 hover:to-blue-600 flex items-center justify-center gap-2 text-sm ${
           isAnalyzing ? 'animate-pulse' : ''
         } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
@@ -330,7 +366,8 @@ export const DataScientistWidget: React.FC<DataScientistWidgetProps> = ({
   onAnalyzeData,
   onClearAnalysis,
   onSelectOutput,
-  onClearHistory
+  onClearHistory,
+  onBack
 }) => {
   
   // Custom edit actions for data analysis results
@@ -374,6 +411,7 @@ export const DataScientistWidget: React.FC<DataScientistWidgetProps> = ({
         query: 'Process CSV file data',
         analysisType: 'descriptive'
       }),
+      variant: 'primary' as const,
       disabled: false
     },
     {
@@ -399,8 +437,21 @@ export const DataScientistWidget: React.FC<DataScientistWidgetProps> = ({
     }
   ];
 
+  // Custom empty state for Data Scientist Widget
+  const dataScientistEmptyState: EmptyStateConfig = {
+    icon: '📊',
+    title: 'Ready to Analyze Data',
+    description: 'Upload CSV files, connect to databases, or provide data URLs. Perform queries, create visualizations, and build ML models with AI assistance.',
+    actionText: 'Upload CSV',
+    onAction: () => {
+      document.getElementById('csv-upload')?.click();
+    }
+  };
+
   return (
     <BaseWidget
+      title="DataWise Analytics"
+      icon="📊"
       isProcessing={isAnalyzing}
       outputHistory={outputHistory}
       currentOutput={currentOutput}
@@ -410,6 +461,9 @@ export const DataScientistWidget: React.FC<DataScientistWidgetProps> = ({
       managementActions={managementActions}
       onSelectOutput={onSelectOutput}
       onClearHistory={onClearHistory}
+      onBack={onBack}
+      showBackButton={true}
+      emptyStateConfig={dataScientistEmptyState}
     >
       <DataScientistInputArea
         isAnalyzing={isAnalyzing}

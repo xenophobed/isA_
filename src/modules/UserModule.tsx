@@ -37,6 +37,7 @@ import { useUserStore } from '../stores/useUserStore';
 import { UserService } from '../api/userService';
 import { logger, LogCategory } from '../utils/logger';
 import { PlanType, CreateExternalUserData, CreditConsumption } from '../types/userTypes';
+import { useUser } from '../hooks/useUser';
 
 // ================================================================================
 // UserModule Interface
@@ -126,24 +127,16 @@ export const UserModule: React.FC<{ children: React.ReactNode }> = ({ children }
     getAccessTokenSilently
   } = useAuth0();
 
-  // User Store Integration  
-  const {
-    externalUser,
-    subscription,
-    isLoading: userLoading,
-    userError,
-    creditsError,
-    subscriptionError,
-    setExternalUser,
-    setSubscription,
-    clearUserState
-  } = useUserStore();
+  // User Hook Integration (正确的架构：通过useUser访问store)
+  const userHook = useUser();
 
-  // Computed user values
-  const credits = externalUser?.credits || 0;
-  const totalCredits = externalUser?.credits_total || 0;
-  const hasCredits = credits > 0;
-  const currentPlan = subscription?.plan_type || externalUser?.plan || 'free';
+  // Computed user values from useUser hook
+  const credits = userHook.credits;
+  const totalCredits = userHook.totalCredits;
+  const hasCredits = userHook.hasCredits;
+  const currentPlan = userHook.currentPlan;
+  const externalUser = userHook.externalUser;
+  const subscription = userHook.subscription;
 
   // Create authenticated userService instance
   const userService = useMemo(() => {
@@ -210,25 +203,28 @@ export const UserModule: React.FC<{ children: React.ReactNode }> = ({ children }
     });
   }, [loginWithRedirect]);
 
-  const logout = useCallback(() => {
-    clearUserState();
-    auth0Logout({
-      logoutParams: {
-        returnTo: window.location.origin
-      }
-    });
-  }, [clearUserState, auth0Logout]);
-
   // ================================================================================
   // User Synchronization Logic
   // ================================================================================
 
   const initializeUser = useCallback(async () => {
     if (!auth0User?.sub || !auth0User?.email || !auth0User?.name || !isAuthenticated) {
+      console.log('👤 UserModule: Skipping user initialization - missing auth data', {
+        hasSub: !!auth0User?.sub,
+        hasEmail: !!auth0User?.email,
+        hasName: !!auth0User?.name,
+        isAuthenticated
+      });
       return;
     }
 
     try {
+      console.log('👤 UserModule: Starting user initialization', {
+        auth0_id: auth0User.sub,
+        email: auth0User.email,
+        name: auth0User.name
+      });
+
       logger.info(LogCategory.USER_AUTH, 'Starting user initialization', {
         auth0_id: auth0User.sub,
         email: auth0User.email,
@@ -241,42 +237,70 @@ export const UserModule: React.FC<{ children: React.ReactNode }> = ({ children }
         name: auth0User.name
       };
 
-      // Ensure external user exists and sync with store
+      // Use userService through useUser hook (if available) or direct service
       try {
+        console.log('👤 UserModule: Calling userService.ensureUserExists');
         const userResult = await userService.ensureUserExists(userData);
-        setExternalUser(userResult);
-        logger.info(LogCategory.USER_AUTH, 'External user ensured successfully', { auth0_id: userResult.auth0_id });
+        console.log('👤 UserModule: User ensured successfully', { 
+          auth0_id: userResult.auth0_id, 
+          credits: userResult.credits,
+          plan: userResult.plan 
+        });
+        logger.info(LogCategory.USER_AUTH, 'External user ensured successfully', { 
+          auth0_id: userResult.auth0_id,
+          credits: userResult.credits 
+        });
+        
+        // IMPORTANT: Save the user data to store through userHook
+        // This was the missing piece - we need to update the store with the fetched user data
+        const userStore = useUserStore.getState();
+        userStore.setExternalUser(userResult);
+        console.log('👤 UserModule: User data saved to store', { 
+          credits: userResult.credits,
+          plan: userResult.plan 
+        });
+        
       } catch (error) {
+        console.error('👤 UserModule: Failed to ensure user exists', error);
         logger.error(LogCategory.USER_AUTH, 'Failed to ensure user exists', { error });
         throw error;
       }
 
-      // Since user data already contains plan info, we can skip subscription API for now
-      // Only fetch detailed subscription when needed (e.g., for billing info)
-      
-      // For now, we'll rely on the plan info in the user data
-      // TODO: Only fetch subscription details when accessing billing/upgrade features
-
     } catch (error) {
+      console.error('👤 UserModule: User initialization failed', error);
       logger.error(LogCategory.USER_AUTH, 'User initialization failed', { error });
     }
-  }, [auth0User, isAuthenticated, getAccessToken]);
+  }, [auth0User?.sub, auth0User?.email, auth0User?.name, isAuthenticated, userService]);
 
   const refreshUser = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      console.log('👤 UserModule: Skipping user refresh - not authenticated');
+      return;
+    }
 
     try {
-      const currentUser = await userService.getCurrentUser();
-      setExternalUser(currentUser);
-      
-      // User data already contains plan info, so we don't need to fetch subscription
-      // unless we specifically need detailed billing information
+      console.log('👤 UserModule: Refreshing user data');
+      // Use userHook's fetchCurrentUser method instead of direct service call
+      const token = await getAccessToken();
+      await userHook.fetchCurrentUser(token);
+      console.log('👤 UserModule: User data refreshed successfully');
       
     } catch (error) {
+      console.error('👤 UserModule: Failed to refresh user', error);
       logger.error(LogCategory.USER_AUTH, 'Failed to refresh user', { error });
       throw error;
     }
-  }, [isAuthenticated, userService]);
+  }, [isAuthenticated, userHook.fetchCurrentUser, getAccessToken]);
+
+  const logout = useCallback(() => {
+    // Use userHook's clearUser method instead of direct store access
+    userHook.clearUser();
+    auth0Logout({
+      logoutParams: {
+        returnTo: window.location.origin
+      }
+    });
+  }, [userHook.clearUser, auth0Logout]);
 
   // ================================================================================
   // Business Logic Methods
@@ -288,14 +312,14 @@ export const UserModule: React.FC<{ children: React.ReactNode }> = ({ children }
     }
 
     try {
-      await userService.consumeCredits(externalUser.auth0_id, consumption);
-      // Update user state after consuming credits
-      await refreshUser();
+      // Use userHook's consumeCredits method instead of direct service call
+      const token = await getAccessToken();
+      await userHook.consumeCredits(externalUser.auth0_id, consumption, token);
     } catch (error) {
       logger.error(LogCategory.USER_AUTH, 'Failed to consume credits', { error, consumption });
       throw error;
     }
-  }, [externalUser?.auth0_id, isAuthenticated, userService, refreshUser]);
+  }, [externalUser?.auth0_id, isAuthenticated, userHook.consumeCredits, getAccessToken]);
 
   const createCheckout = useCallback(async (planType: PlanType): Promise<string> => {
     if (!isAuthenticated || !externalUser?.auth0_id) {
@@ -308,14 +332,15 @@ export const UserModule: React.FC<{ children: React.ReactNode }> = ({ children }
         throw new Error(`Invalid plan type: ${planType}`);
       }
       
-      const result = await userService.createCheckoutSession(planType);
+      // Use userHook's createCheckout method instead of direct service call
+      const token = await getAccessToken();
+      return await userHook.createCheckout(planType, token);
       
-      return result.url || '';
     } catch (error) {
       logger.error(LogCategory.USER_AUTH, 'Failed to create checkout', { error, planType });
       throw error;
     }
-  }, [isAuthenticated, externalUser?.auth0_id, userService]);
+  }, [isAuthenticated, externalUser?.auth0_id, userHook.createCheckout, getAccessToken]);
 
   const checkHealth = useCallback(async () => {
     try {
@@ -332,12 +357,34 @@ export const UserModule: React.FC<{ children: React.ReactNode }> = ({ children }
 
   // Initialize user when Auth0 authentication completes
   useEffect(() => {
+    console.log('👤 UserModule: useEffect triggered', {
+      auth0Loading,
+      isAuthenticated,
+      hasAuth0User: !!auth0User,
+      auth0UserId: auth0User?.sub
+    });
+
     if (!auth0Loading && isAuthenticated && auth0User) {
+      console.log('👤 UserModule: Conditions met, initializing user');
       initializeUser();
     } else if (!auth0Loading && !isAuthenticated) {
-      clearUserState();
+      console.log('👤 UserModule: User not authenticated, clearing state');
+      userHook.clearUser();
+    } else {
+      console.log('👤 UserModule: Waiting for auth completion', {
+        auth0Loading,
+        isAuthenticated,
+        hasAuth0User: !!auth0User
+      });
     }
-  }, [auth0Loading, isAuthenticated, auth0User, initializeUser]);
+  }, [auth0Loading, isAuthenticated, auth0User?.sub, auth0User?.email, auth0User?.name, initializeUser, userHook.clearUser]);
+
+  // Separate effect for initializeUser to avoid dependency issues
+  useEffect(() => {
+    if (!auth0Loading && isAuthenticated && auth0User?.sub && auth0User?.email && auth0User?.name) {
+      initializeUser();
+    }
+  }, [initializeUser]);
 
   // ================================================================================
   // Computed Values
@@ -346,8 +393,8 @@ export const UserModule: React.FC<{ children: React.ReactNode }> = ({ children }
   const moduleInterface: UserModuleInterface = useMemo(() => ({
     // Auth State
     isAuthenticated,
-    isLoading: auth0Loading || userLoading,
-    error: auth0Error?.message || userError || creditsError || subscriptionError,
+    isLoading: auth0Loading || userHook.isLoading,
+    error: auth0Error?.message || userHook.userError || userHook.creditsError || userHook.subscriptionError || null,
     
     // User Data
     auth0User,
@@ -374,11 +421,11 @@ export const UserModule: React.FC<{ children: React.ReactNode }> = ({ children }
   }), [
     isAuthenticated,
     auth0Loading,
-    userLoading,
+    userHook.isLoading,
     auth0Error,
-    userError,
-    creditsError,
-    subscriptionError,
+    userHook.userError,
+    userHook.creditsError,
+    userHook.subscriptionError,
     auth0User,
     externalUser,
     subscription,

@@ -23,7 +23,8 @@
 import { BaseApiService } from './BaseApiService';
 import { config } from '../config';
 import { ChatServiceCallbacks, ChatMetadata } from '../types/chatTypes';
-import { SSEParser } from './SSEParser';
+import { SSEParser, SSEParserCallbacks } from './SSEParser';
+import { logger, LogCategory } from '../utils/logger';
 
 // ================================================================================
 // ChatService Class
@@ -42,14 +43,80 @@ export class ChatService {
   // ================================================================================
 
   /**
-   * Send text message
+   * Send a message to the chat API with streaming response
+   * @param message - The message content
+   * @param metadata - Additional metadata (user_id, session_id, etc.)
+   * @param token - Authentication token from Auth0
+   * @param callbacks - Event callbacks for handling streaming responses
    */
   async sendMessage(
-    content: string,
-    callbacks: ChatServiceCallbacks,
-    metadata: ChatMetadata = {}
+    message: string,
+    metadata: ChatMetadata = {},
+    token: string,
+    callbacks: SSEParserCallbacks
   ): Promise<void> {
-    await this.sendMultimodalMessage(content, [], callbacks, metadata);
+    const startTime = Date.now();
+    
+    try {
+      logger.info(LogCategory.CHAT_FLOW, 'Starting chat request', {
+        messageLength: message.length,
+        metadata: {
+          ...metadata,
+          // Don't log sensitive data
+          user_id: metadata.user_id ? '[REDACTED]' : undefined,
+          session_id: metadata.session_id ? '[REDACTED]' : undefined
+        }
+      });
+
+      // Prepare request body
+      const requestBody = JSON.stringify({
+        message,
+        user_id: metadata.user_id || 'anonymous',
+        session_id: metadata.session_id || 'default',
+        prompt_name: metadata.prompt_name || null,
+        prompt_args: metadata.prompt_args || {}
+      });
+
+      const url = `${config.api.baseUrl}/api/chat`;
+      
+      console.log('🌐 CHAT_SERVICE: Full request details:');
+      console.log('  URL:', url);
+      console.log('  Method: POST');
+      console.log('  Headers:', {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Authorization': `Bearer ${token.substring(0, 20)}...` // Log partial token for debugging
+      });
+      console.log('  Body:', requestBody);
+      console.log('  Body length:', requestBody.length);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Authorization': `Bearer ${token}`
+        },
+        body: requestBody
+      });
+
+      console.log('🌐 CHAT_SERVICE: Response status:', response.status);
+      console.log('🌐 CHAT_SERVICE: Response headers:', Object.fromEntries(response.headers.entries()));
+      console.log('🌐 CHAT_SERVICE: Response ok:', response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('🌐 CHAT_SERVICE: Error response body:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+
+      await this.processStreamingResponse(response, callbacks);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      callbacks.onError?.(new Error(`ChatService: ${errorMessage}`));
+    }
   }
 
   /**
@@ -58,8 +125,9 @@ export class ChatService {
   async sendMultimodalMessage(
     content: string,
     files: File[] = [],
-    callbacks: ChatServiceCallbacks,
-    metadata: ChatMetadata = {}
+    metadata: ChatMetadata = {},
+    token: string,
+    callbacks: SSEParserCallbacks
   ): Promise<void> {
     try {
       const endpoint = '/api/chat';
@@ -71,8 +139,8 @@ export class ChatService {
           message: content,
           session_id: metadata.session_id || 'test_session_fixed',
           user_id: metadata.auth0_id || metadata.user_id || 'test_user_fixed',
-          prompt_name: metadata.template_parameters?.template_id || null,
-          prompt_args: metadata.template_parameters?.prompt_args || {}
+          prompt_name: metadata.prompt_name || null,
+          prompt_args: metadata.prompt_args || {}
         };
         
         console.log('🌐 CHAT_SERVICE: Sending request payload:', JSON.stringify(requestPayload, null, 2));

@@ -1,231 +1,223 @@
 /**
  * ============================================================================
- * Widget Hook (useWidget.ts) - 小部件状态监听和管理钩子
+ * Widget Hook (useWidget.ts) - Widget状态监听和聚合
  * ============================================================================
  * 
  * 【核心职责】
- * - 监听和获取小部件相关的状态数据
- * - 提供小部件状态的响应式接口
- * - 连接业务逻辑模块和状态管理器
- * - 不包含业务逻辑，仅负责状态监听
+ * - 选择性订阅各个Widget Store的状态变化
+ * - 聚合Widget相关的状态数据
+ * - 提供统一的数据接口给Widget组件
  * 
- * 【关注点分离】
- * ✅ 负责：
- *   - 从stores获取小部件状态数据
- *   - 提供响应式的状态接口
- *   - 状态变化的监听和通知
- *   - 小部件配置的获取和管理
+ * 【架构原则】
+ * ✅ 只负责状态监听和数据聚合
+ * ✅ 使用选择性订阅优化性能
+ * ✅ 使用聚合选择器减少Hook调用
+ * ✅ 不包含业务逻辑和副作用
  * 
  * ❌ 不负责：
- *   - 小部件的业务逻辑（由WidgetModules处理）
- *   - UI组件的渲染（由Widget UI组件处理）
+ *   - Widget业务逻辑处理（由WidgetModules处理）
+ *   - Widget UI渲染（由Widget UI组件处理）
+ *   - API调用和副作用（由WidgetModules处理）
  *   - 数据持久化逻辑（由WidgetModules处理）
- *   - 网络请求和API调用（由WidgetModules处理）
  * 
  * 【数据流向】
  * WidgetModule → stores → useWidget → UI组件
  */
 
+import { useMemo } from 'react';
 import { AppId } from '../types/appTypes';
 import { WidgetConfig, WidgetState } from '../types/widgetTypes';
-import { 
-  useDreamState, 
-  useHuntState, 
-  useOmniState, 
-  useAssistantState,
-  useDataScientistState 
-} from '../stores/useWidgetStores';
+import { useAllWidgetStates, useAllWidgetActions } from '../stores/useWidgetStores';
 import { useCurrentApp, useShowRightSidebar, useTriggeredAppInput } from '../stores/useAppStore';
 
 /**
- * Hook to access current widget state
- * Pure state listener - no business logic
+ * Widget状态监听Hook - 纯数据聚合，无副作用
+ * 
+ * 使用选择性订阅监听所有Widget相关状态：
+ * 1. 应用导航状态 (useAppStore)
+ * 2. Widget状态聚合 (useWidgetStores)
+ * 
+ * @returns 聚合的Widget状态数据
  */
 export const useWidget = () => {
-  // Get main app state
+  // 1. 应用导航状态 - 选择性订阅
   const currentApp = useCurrentApp();
   const showRightSidebar = useShowRightSidebar();
   const triggeredAppInput = useTriggeredAppInput();
   
-  // Get widget-specific states
-  const dreamState = useDreamState();
-  const huntState = useHuntState();
-  const omniState = useOmniState();
-  const assistantState = useAssistantState();
-  const dataScientistState = useDataScientistState();
+  // 2. Widget状态聚合 - 选择性订阅（与useChat.ts一致）
+  const widgetStates = useAllWidgetStates();
   
-  // Widget configurations
-  const getWidgetConfig = (appId: AppId): WidgetConfig | null => {
-    const configs: Record<AppId, WidgetConfig> = {
-      dream: {
-        id: 'dream',
-        title: 'DreamForge AI',
-        icon: '🎨',
-        description: 'AI-powered image generation',
-        component: null as any // Will be set by the actual component
-      },
-      hunt: {
-        id: 'hunt',
-        title: 'HuntAI',
-        icon: '🔍',
-        description: 'Product search and comparison',
-        component: null as any
-      },
-      assistant: {
-        id: 'assistant',
-        title: 'AI Assistant',
-        icon: '🤖',
-        description: 'General AI assistance',
-        component: null as any
-      },
-      omni: {
-        id: 'omni',
-        title: 'Omni Content Generator',
-        icon: '⚡',
-        description: 'Multi-purpose content creation',
-        component: null as any
-      },
-      'data-scientist': {
-        id: 'data-scientist',
-        title: 'DataWise Analytics',
-        icon: '📊',
-        description: 'Data analysis and insights',
-        component: null as any
-      },
-      knowledge: {
-        id: 'knowledge',
-        title: 'Knowledge Hub',
-        icon: '🧠',
-        description: 'Advanced document analysis with vector and graph RAG',
-        component: null as any
-      },
-      digitalhub: {
-        id: 'digitalhub',
-        title: 'Digital Hub',
-        icon: '💻',
-        description: 'Digital tools and utilities',
-        component: null as any
-      },
-      doc: {
-        id: 'doc',
-        title: 'Document Processor',
-        icon: '📄',
-        description: 'Document processing and analysis',
-        component: null as any
-      }
-    };
-    
-    return configs[appId] || null;
-  };
+  // 3. Widget配置定义 - 使用useMemo优化性能
+  const widgetConfigs = useMemo((): Record<AppId, WidgetConfig> => ({
+    dream: {
+      id: 'dream',
+      title: 'DreamForge AI',
+      icon: '🎨',
+      description: 'AI-powered image generation',
+      component: null as any
+    },
+    hunt: {
+      id: 'hunt',
+      title: 'HuntAI',
+      icon: '🔍',
+      description: 'Product search and comparison',
+      component: null as any
+    },
+    omni: {
+      id: 'omni',
+      title: 'Omni Content Generator',
+      icon: '⚡',
+      description: 'Multi-purpose content creation',
+      component: null as any
+    },
+    'data_scientist': {
+      id: 'data_scientist',
+      title: 'DataWise Analytics',
+      icon: '📊',
+      description: 'Data analysis and insights',
+      component: null as any
+    },
+    knowledge: {
+      id: 'knowledge',
+      title: 'Knowledge Hub',
+      icon: '🧠',
+      description: 'Advanced document analysis with vector and graph RAG',
+      component: null as any
+    },
+    digitalhub: {
+      id: 'digitalhub',
+      title: 'Digital Hub',
+      icon: '💻',
+      description: 'Digital tools and utilities',
+      component: null as any
+    },
+    doc: {
+      id: 'doc',
+      title: 'Document Processor',
+      icon: '📄',
+      description: 'Document processing and analysis',
+      component: null as any
+    }
+  }), []);
   
-  // Get current widget state
-  const getCurrentWidgetState = (): WidgetState => {
+  // 4. 派生状态计算 - 使用useMemo优化性能
+  const currentWidgetConfig = useMemo((): WidgetConfig | null => 
+    currentApp ? widgetConfigs[currentApp] || null : null,
+    [currentApp, widgetConfigs]
+  );
+  
+  const currentWidgetState = useMemo((): WidgetState => {
     if (!currentApp) return 'idle';
     
     switch (currentApp) {
       case 'dream':
-        return dreamState.isGenerating ? 'generating' : 'idle';
+        return widgetStates.dream.isGenerating ? 'generating' : 'idle';
       case 'hunt':
-        return huntState.isSearching ? 'processing' : 'idle';
+        return widgetStates.hunt.isSearching ? 'processing' : 'idle';
       case 'omni':
-        return omniState.isGenerating ? 'generating' : 'idle';
-      case 'assistant':
-        return assistantState.isProcessing ? 'processing' : 'idle';
-      case 'data-scientist':
-        return dataScientistState.isAnalyzing ? 'processing' : 'idle';
+        return widgetStates.omni.isGenerating ? 'generating' : 'idle';
+      case 'data_scientist':
+        return widgetStates.dataScientist.isAnalyzing ? 'processing' : 'idle';
+      case 'knowledge':
+        return widgetStates.knowledge.isProcessing ? 'processing' : 'idle';
       default:
         return 'idle';
     }
-  };
+  }, [currentApp, widgetStates]);
   
-  // Get current widget data
-  const getCurrentWidgetData = () => {
+  const currentWidgetData = useMemo(() => {
     if (!currentApp) return null;
     
     switch (currentApp) {
       case 'dream':
         return {
-          generatedImage: dreamState.generatedImage,
-          params: dreamState.lastParams
+          generatedImage: widgetStates.dream.generatedImage,
+          params: widgetStates.dream.lastParams
         };
       case 'hunt':
         return {
-          searchResults: huntState.searchResults,
-          lastQuery: huntState.lastQuery,
-          currentStatus: huntState.currentStatus
+          searchResults: widgetStates.hunt.searchResults,
+          lastQuery: widgetStates.hunt.lastQuery,
+          currentStatus: widgetStates.hunt.currentStatus
         };
       case 'omni':
         return {
-          generatedContent: omniState.generatedContent,
-          params: omniState.lastParams
+          generatedContent: widgetStates.omni.generatedContent,
+          params: widgetStates.omni.lastParams
         };
-      case 'assistant':
+      case 'data_scientist':
         return {
-          context: assistantState.conversationContext
+          analysisResult: widgetStates.dataScientist.analysisResult,
+          params: widgetStates.dataScientist.lastParams
         };
-      case 'data-scientist':
+      case 'knowledge':
         return {
-          analysisResult: dataScientistState.analysisResult,
-          params: dataScientistState.lastParams
+          analysisResult: widgetStates.knowledge.analysisResult,
+          documents: widgetStates.knowledge.documents,
+          params: widgetStates.knowledge.lastParams
         };
       default:
         return null;
     }
-  };
+  }, [currentApp, widgetStates]);
   
+  const hasActiveWidget = useMemo((): boolean => 
+    !!(currentApp && showRightSidebar),
+    [currentApp, showRightSidebar]
+  );
+  
+  const isWidgetProcessing = useMemo((): boolean => 
+    currentWidgetState !== 'idle',
+    [currentWidgetState]
+  );
+  
+  // 5. 聚合所有状态并返回
   return {
-    // Current widget info
+    // 应用导航上下文
     currentApp,
     showRightSidebar,
     triggeredAppInput,
     
-    // Widget configuration
-    currentWidgetConfig: currentApp ? getWidgetConfig(currentApp) : null,
-    getWidgetConfig,
+    // Widget配置
+    currentWidgetConfig,
+    widgetConfigs,
+    getWidgetConfig: (appId: AppId) => widgetConfigs[appId] || null,
     
-    // Widget state
-    currentWidgetState: getCurrentWidgetState(),
-    currentWidgetData: getCurrentWidgetData(),
+    // Widget状态聚合
+    widgetStates,
+    currentWidgetState,
+    currentWidgetData,
     
-    // Widget-specific states
-    dreamState,
-    huntState,
-    omniState,
-    assistantState,
-    dataScientistState,
-    
-    // Computed values
-    hasActiveWidget: !!(currentApp && showRightSidebar),
-    isWidgetProcessing: getCurrentWidgetState() !== 'idle'
+    // 派生状态
+    hasActiveWidget,
+    isWidgetProcessing
   };
 };
 
 /**
- * Hook to access widget actions
- * These are bound to business logic in WidgetModules
+ * Widget操作Hook - 聚合所有Widget操作
+ * 
+ * 使用聚合选择器获取所有Widget操作方法
+ * 
+ * @returns 聚合的Widget操作方法
  */
 export const useWidgetActions = () => {
-  // Import actions from app store
-  const appActions = require('../stores/useAppStore').useAppActions();
+  // 使用聚合选择器获取所有操作 - 与useChat.ts架构一致
+  const widgetActions = useAllWidgetActions();
   
-  // Import widget-specific actions
-  const dreamActions = require('../stores/useWidgetStores').useDreamActions();
-  const huntActions = require('../stores/useWidgetStores').useHuntActions();
-  const omniActions = require('../stores/useWidgetStores').useOmniActions();
-  const assistantActions = require('../stores/useWidgetStores').useAssistantActions();
-  const dataScientistActions = require('../stores/useWidgetStores').useDataScientistActions();
+  // 应用级操作 - 选择性订阅
+  const appActions = {
+    openWidget: require('../stores/useAppStore').useAppActions().setCurrentApp,
+    closeWidget: require('../stores/useAppStore').useAppActions().closeApp,
+    setTriggeredInput: require('../stores/useAppStore').useAppActions().setTriggeredAppInput
+  };
   
   return {
-    // App-level widget actions
-    openWidget: appActions.setCurrentApp,
-    closeWidget: appActions.closeApp,
-    setTriggeredInput: appActions.setTriggeredAppInput,
+    // 应用级Widget操作
+    ...appActions,
     
-    // Widget-specific actions
-    dream: dreamActions,
-    hunt: huntActions,
-    omni: omniActions,
-    assistant: assistantActions,
-    dataScientist: dataScientistActions
+    // Widget特定操作（聚合）
+    ...widgetActions
   };
 };

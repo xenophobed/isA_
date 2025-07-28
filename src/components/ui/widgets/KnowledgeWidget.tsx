@@ -18,7 +18,7 @@
  */
 import React, { useState } from 'react';
 import { KnowledgeWidgetParams } from '../../../types/widgetTypes';
-import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction } from './BaseWidget';
+import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction, EmptyStateConfig } from './BaseWidget';
 
 // Knowledge processing modes
 interface KnowledgeMode {
@@ -91,6 +91,7 @@ interface KnowledgeWidgetProps {
   onClearResults: () => void;
   onSelectOutput?: (item: OutputHistoryItem) => void;
   onClearHistory?: () => void;
+  onBack?: () => void;
 }
 
 /**
@@ -160,8 +161,8 @@ const KnowledgeInputArea: React.FC<KnowledgeWidgetProps> = ({
         task: selectedMode.id,
         query: query,
         files: uploadedFiles.length > 0 ? uploadedFiles : undefined,
-        // Add mode-specific parameters
-        processing_depth: processingDepth
+        // Add mode-specific parameters if supported
+        ...(processingDepth && { processingDepth })
       };
       
       await onProcess(params);
@@ -176,11 +177,11 @@ const KnowledgeInputArea: React.FC<KnowledgeWidgetProps> = ({
   return (
     <div className="space-y-4 p-3">
       {/* Compact Mode Header - like other widgets */}
-      <div className="flex items-center gap-3 p-2 bg-purple-500/10 rounded border border-purple-500/20">
+      <div className="flex items-center gap-3 p-2 rounded border" style={{backgroundColor: 'var(--glass-secondary)', borderColor: 'var(--glass-border)'}}>
         <span className="text-lg">{selectedMode.icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-white truncate">{selectedMode.name}</div>
-          <div className="flex gap-3 text-xs text-white/50">
+          <div className="text-sm font-medium truncate" style={{color: 'var(--text-primary)'}}>{selectedMode.name}</div>
+          <div className="flex gap-3 text-xs" style={{color: 'var(--text-secondary)'}}>
             <span>{selectedMode.estimatedTime}</span>
             <span>Knowledge Management</span>
           </div>
@@ -200,12 +201,28 @@ const KnowledgeInputArea: React.FC<KnowledgeWidgetProps> = ({
               setQuery(newValue);
             }}
             placeholder={`Describe your ${selectedMode.name.toLowerCase()} request...`}
-            className="flex-1 p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
+            className="flex-1 p-2 rounded resize-none text-sm focus:outline-none"
+            style={{
+              backgroundColor: 'var(--glass-primary)',
+              borderColor: 'var(--glass-border)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--glass-border)'
+            }}
+            onFocus={(e) => (e.target as HTMLElement).style.borderColor = 'var(--accent-soft)'}
+            onBlur={(e) => (e.target as HTMLElement).style.borderColor = 'var(--glass-border)'}
             rows={2}
           />
           <button
             onClick={() => document.getElementById('knowledge-upload')?.click()}
-            className="px-3 py-2 bg-white/5 border border-white/10 rounded text-white/80 hover:bg-white/10 transition-all text-xs flex items-center gap-1"
+            className="px-3 py-2 rounded transition-all text-xs flex items-center gap-1"
+            style={{
+              backgroundColor: 'var(--glass-primary)',
+              borderColor: 'var(--glass-border)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--glass-border)'
+            }}
+            onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--glass-secondary)'}
+            onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--glass-primary)'}
           >
             📁 Upload
           </button>
@@ -224,14 +241,17 @@ const KnowledgeInputArea: React.FC<KnowledgeWidgetProps> = ({
         {/* Show uploaded files info */}
         {uploadedFiles.length > 0 && (
           <div className="space-y-1 max-h-32 overflow-y-auto">
-            <div className="text-xs text-white/60">{uploadedFiles.length} file(s) selected:</div>
+            <div className="text-xs" style={{color: 'var(--text-muted)'}}>{uploadedFiles.length} file(s) selected:</div>
             {uploadedFiles.map((file, index) => (
-              <div key={index} className="flex items-center gap-2 p-2 bg-white/5 border border-white/10 rounded">
+              <div key={index} className="flex items-center gap-2 p-2 rounded border" style={{backgroundColor: 'var(--glass-primary)', borderColor: 'var(--glass-border)'}}>
                 <span className="text-sm">📁</span>
-                <span className="text-white/70 text-xs">{file.name}</span>
+                <span className="text-xs" style={{color: 'var(--text-secondary)'}}>{file.name}</span>
                 <button 
                   onClick={() => setUploadedFiles(prev => prev.filter((_, i) => i !== index))}
-                  className="ml-auto text-white/40 hover:text-white/70 text-xs"
+                  className="ml-auto text-xs"
+                  style={{color: 'var(--text-muted)'}}
+                  onMouseEnter={(e) => (e.target as HTMLElement).style.color = 'var(--text-secondary)'}
+                  onMouseLeave={(e) => (e.target as HTMLElement).style.color = 'var(--text-muted)'}
                 >
                   ✕
                 </button>
@@ -243,7 +263,7 @@ const KnowledgeInputArea: React.FC<KnowledgeWidgetProps> = ({
 
       {/* Compact Mode Selector */}
       <div>
-        <div className="text-xs text-white/60 mb-2">🎯 Select Mode</div>
+        <div className="text-xs mb-2" style={{color: 'var(--text-muted)'}}>🎯 Select Mode</div>
         <div className="grid grid-cols-3 gap-1">
           {knowledgeModes.map((mode) => (
             <button
@@ -257,18 +277,28 @@ const KnowledgeInputArea: React.FC<KnowledgeWidgetProps> = ({
                 }
               }}
               disabled={!mode.isActive}
-              className={`p-1.5 rounded border transition-all text-center ${
-                selectedMode.id === mode.id
-                  ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
-                  : mode.isActive 
-                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white cursor-pointer'
-                    : 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
-              }`}
+              className="p-1.5 rounded border transition-all text-center"
+              style={{
+                backgroundColor: selectedMode.id === mode.id ? 'var(--accent-soft)' : 'var(--glass-primary)',
+                borderColor: selectedMode.id === mode.id ? 'var(--accent-muted)' : 'var(--glass-border)',
+                color: selectedMode.id === mode.id ? 'var(--text-primary)' : (mode.isActive ? 'var(--text-primary)' : 'var(--text-muted)'),
+                cursor: mode.isActive ? 'pointer' : 'not-allowed'
+              }}
+              onMouseEnter={(e) => {
+                if (mode.isActive && selectedMode.id !== mode.id) {
+                  (e.target as HTMLElement).style.backgroundColor = 'var(--glass-secondary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (mode.isActive && selectedMode.id !== mode.id) {
+                  (e.target as HTMLElement).style.backgroundColor = 'var(--glass-primary)';
+                }
+              }}
               title={`${mode.name} - ${mode.description}${!mode.isActive ? ' (Coming Soon)' : ''}`}
             >
               <div className="text-xs mb-0.5">{mode.icon}</div>
               <div className="text-xs font-medium truncate leading-tight">{mode.name}</div>
-              {!mode.isActive && <div className="text-xs text-white/30">Soon</div>}
+              {!mode.isActive && <div className="text-xs" style={{color: 'var(--text-muted)'}}>Soon</div>}
             </button>
           ))}
         </div>
@@ -277,12 +307,18 @@ const KnowledgeInputArea: React.FC<KnowledgeWidgetProps> = ({
       {/* Advanced Options - Only Processing Depth */}
       {selectedMode && (
         <div className="space-y-2">
-          <div className="text-xs text-white/60">⚙️ Advanced Options</div>
+          <div className="text-xs" style={{color: 'var(--text-muted)'}}>⚙️ Advanced Options</div>
           
           <div>
-            <label className="block text-xs text-white/60 mb-1">Processing Depth</label>
+            <label className="block text-xs mb-1" style={{color: 'var(--text-muted)'}}>Processing Depth</label>
             <select 
-              className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" 
+              className="w-full p-1.5 rounded text-xs"
+              style={{
+                backgroundColor: 'var(--glass-primary)',
+                borderColor: 'var(--glass-border)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--glass-border)'
+              }} 
               value={processingDepth} 
               onChange={(e) => setProcessingDepth(e.target.value)}
             >
@@ -298,7 +334,7 @@ const KnowledgeInputArea: React.FC<KnowledgeWidgetProps> = ({
       <button
         onClick={handleKnowledgeProcessing}
         disabled={isProcessing || !query.trim()}
-        className={`w-full p-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded text-white font-medium transition-all hover:from-purple-600 hover:to-blue-600 flex items-center justify-center gap-2 text-sm ${
+        className={`w-full p-3 bg-gradient-to-r from-green-500 to-blue-500 rounded text-white font-medium transition-all hover:from-green-600 hover:to-blue-600 flex items-center justify-center gap-2 text-sm ${
           isProcessing ? 'animate-pulse' : ''
         } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
@@ -332,7 +368,8 @@ export const KnowledgeWidget: React.FC<KnowledgeWidgetProps> = ({
   onProcess,
   onClearResults,
   onSelectOutput,
-  onClearHistory
+  onClearHistory,
+  onBack
 }) => {
   
   // Custom edit actions for knowledge results
@@ -386,6 +423,7 @@ export const KnowledgeWidget: React.FC<KnowledgeWidgetProps> = ({
         task: 'analyze',
         query: 'Analyze documents for insights and patterns'
       }),
+      variant: 'primary' as const,
       disabled: false
     },
     {
@@ -411,8 +449,21 @@ export const KnowledgeWidget: React.FC<KnowledgeWidgetProps> = ({
     }
   ];
 
+  // Custom empty state for Knowledge Widget
+  const knowledgeEmptyState: EmptyStateConfig = {
+    icon: '🧠',
+    title: 'Ready to Build Knowledge',
+    description: 'Upload documents, ask questions, and build your AI-powered knowledge base. Analyze documents, extract insights, and get instant answers.',
+    actionText: 'Upload Document',
+    onAction: () => {
+      document.getElementById('file-upload')?.click();
+    }
+  };
+
   return (
     <BaseWidget
+      title="Knowledge Hub"
+      icon="🧠"
       isProcessing={isProcessing}
       outputHistory={outputHistory}
       currentOutput={currentOutput}
@@ -422,6 +473,9 @@ export const KnowledgeWidget: React.FC<KnowledgeWidgetProps> = ({
       managementActions={managementActions}
       onSelectOutput={onSelectOutput}
       onClearHistory={onClearHistory}
+      onBack={onBack}
+      showBackButton={true}
+      emptyStateConfig={knowledgeEmptyState}
     >
       <KnowledgeInputArea
         isProcessing={isProcessing}

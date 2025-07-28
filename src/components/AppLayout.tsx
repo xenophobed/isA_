@@ -38,6 +38,7 @@ export interface AppLayoutProps {
     chatModule: React.ReactNode;
     sessionModule: React.ReactNode;
     userModule: React.ReactNode;
+    userPortal: React.ReactNode;
     appData: {
       currentApp: string | null;
       showRightSidebar: boolean;
@@ -77,12 +78,12 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ className = '', children }
     );
   }
   
-  const { chatModule, appData } = moduleData;
+  const { chatModule, appData, userPortal } = moduleData;
 
   return (
-    <div className={`h-screen w-full flex flex-col bg-gray-900 text-white ${className}`}>
+    <div className={`h-screen w-full flex flex-col text-white ${className}`} style={{ background: 'var(--gradient-primary)' }}>
       {/* Application Header */}
-      <div className="h-16 px-6 py-3 border-b border-white/10 flex-shrink-0">
+      <div className="h-16 px-6 py-3 flex-shrink-0" style={{ background: 'var(--glass-primary)', backdropFilter: 'blur(20px)' }}>
         <AppHeader 
           currentApp={appData.currentApp}
           availableApps={appData.availableApps}
@@ -96,6 +97,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ className = '', children }
         {/* Render Chat Module with integrated input handling and sidebars */}
         {chatModule}
       </div>
+      
+      {/* User Portal - 独立渲染在最上层 */}
+      {userPortal}
     </div>
   );
 };

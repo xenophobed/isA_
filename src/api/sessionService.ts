@@ -32,11 +32,12 @@ export class SessionService {
   private apiService: BaseApiService;
   private readonly sessionBaseUrl: string;
 
-  constructor() {
+  constructor(getAuthHeaders?: () => Promise<Record<string, string>>) {
     // 从配置中获取 Session API 的基础 URL
     // Session API 运行在主 API 服务的 /api/sessions 路径下
     this.sessionBaseUrl = config.api.baseUrl;
-    this.apiService = new BaseApiService(this.sessionBaseUrl);
+    // 传递认证头获取函数到BaseApiService
+    this.apiService = new BaseApiService(this.sessionBaseUrl, undefined, getAuthHeaders);
   }
 
   /**
@@ -60,7 +61,9 @@ export class SessionService {
     title?: string, 
     metadata?: SessionMetadata
   ): Promise<ApiResponse<SessionResponse>> {
-    const params = new URLSearchParams({ user_id: userId });
+    const params = new URLSearchParams();
+    // 确保user_id正确编码，特别是包含管道符号(|)的Auth0 user ID
+    params.append('user_id', encodeURIComponent(userId));
     if (title) params.append('title', title);
     if (metadata) params.append('metadata', JSON.stringify(metadata));
 
@@ -96,7 +99,9 @@ export class SessionService {
     if (options?.offset) params.append('offset', options.offset.toString());
 
     const queryString = params.toString();
-    const endpoint = this.buildSessionEndpoint(`/user/${userId}${queryString ? `?${queryString}` : ''}`);
+    // 确保user_id正确编码，特别是包含管道符号(|)的Auth0 user ID
+    const encodedUserId = encodeURIComponent(userId);
+    const endpoint = this.buildSessionEndpoint(`/user/${encodedUserId}${queryString ? `?${queryString}` : ''}`);
     return this.apiService.get<SessionListResponse>(endpoint);
   }
 
@@ -158,18 +163,22 @@ export class SessionService {
 
   /**
    * 获取会话消息
+   * 注意：根据Session API文档，user_id参数是必需的
    */
   async getSessionMessages(
     sessionId: string,
+    userId: string, // 必需参数，用于User Service API查找
     options?: GetSessionMessagesOptions
   ): Promise<ApiResponse<SessionMessagesResponse>> {
     const params = new URLSearchParams();
+    // user_id是必需参数
+    params.append('user_id', encodeURIComponent(userId));
     if (options?.limit) params.append('limit', options.limit.toString());
     if (options?.offset) params.append('offset', options.offset.toString());
     if (options?.role) params.append('role', options.role);
 
     const queryString = params.toString();
-    const endpoint = this.buildSessionEndpoint(`/${sessionId}/messages${queryString ? `?${queryString}` : ''}`);
+    const endpoint = this.buildSessionEndpoint(`/${sessionId}/messages?${queryString}`);
     return this.apiService.get<SessionMessagesResponse>(endpoint);
   }
 
@@ -252,16 +261,24 @@ export class SessionService {
    * 健康检查
    */
   async healthCheck(): Promise<ApiResponse<any>> {
-    // 健康检查通常在根路径下，不在 /api/sessions 下
-    return this.apiService.get('/health');
+    // 根据Session API文档，健康检查在 /api/sessions/health
+    const endpoint = this.buildSessionEndpoint('/health');
+    return this.apiService.get(endpoint);
   }
 }
 
 // ================================================================================
-// 单例实例和便捷导出
+// 创建具有认证的Session Service实例
 // ================================================================================
 
-// 创建单例实例
+/**
+ * 创建带有认证的Session Service实例
+ */
+export const createAuthenticatedSessionService = (getAuthHeaders: () => Promise<Record<string, string>>) => {
+  return new SessionService(getAuthHeaders);
+};
+
+// 创建默认实例（不带认证，用于向后兼容）
 export const sessionService = new SessionService();
 
 // 导出便捷方法
