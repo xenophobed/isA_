@@ -186,11 +186,11 @@ const HuntInputArea: React.FC<{
   return (
     <div className="space-y-4 p-3">
       {/* Compact Mode Header */}
-      <div className="flex items-center gap-3 p-2 rounded border" style={{backgroundColor: 'var(--glass-secondary)', borderColor: 'var(--glass-border)'}}>
+      <div className="flex items-center gap-3 p-2 bg-green-500/10 rounded border border-green-500/20">
         <span className="text-lg">{selectedMode.icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate" style={{color: 'var(--text-primary)'}}>{selectedMode.name}</div>
-          <div className="flex gap-3 text-xs" style={{color: 'var(--text-secondary)'}}>
+          <div className="text-sm font-medium text-white truncate">{selectedMode.name}</div>
+          <div className="flex gap-3 text-xs text-white/50">
             <span>{selectedMode.estimatedTime}</span>
             <span>{selectedMode.isActive ? 'Active' : 'Coming Soon'}</span>
           </div>
@@ -211,24 +211,16 @@ const HuntInputArea: React.FC<{
           placeholder={selectedMode.isActive 
             ? `Search for ${selectedMode.name.toLowerCase()}...`
             : "Enter your search query..."}
-          className="w-full p-2 rounded resize-none text-sm focus:outline-none"
-          style={{
-            backgroundColor: 'var(--glass-primary)',
-            borderColor: 'var(--glass-border)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--glass-border)'
-          }}
-          onFocus={(e) => (e.target as HTMLElement).style.borderColor = 'var(--accent-soft)'}
-          onBlur={(e) => (e.target as HTMLElement).style.borderColor = 'var(--glass-border)'}
+          className="w-full p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
           rows={2}
         />
       </div>
 
       {/* Mode Recommendation Alert */}
       {recommendedMode && (
-        <div className="flex items-center gap-2 p-2 rounded border" style={{backgroundColor: 'var(--accent-soft)', borderColor: 'var(--accent-muted)'}}>
+        <div className="flex items-center gap-2 p-2 bg-blue-500/10 rounded border border-blue-500/20">
           <span className="text-sm">💡</span>
-          <div className="flex-1 text-xs" style={{color: 'var(--text-primary)'}}>
+          <div className="flex-1 text-xs text-white">
             Suggested: <span className="font-medium">{recommendedMode.name}</span> mode for better results
           </div>
           <button
@@ -237,22 +229,13 @@ const HuntInputArea: React.FC<{
               setRecommendedMode(null);
               console.log('🔍 Accepted recommendation:', recommendedMode.name);
             }}
-            className="px-2 py-1 rounded text-xs"
-            style={{
-              backgroundColor: 'var(--accent-muted)',
-              color: 'var(--text-primary)'
-            }}
-            onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--accent-soft)'}
-            onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--accent-muted)'}
+            className="px-2 py-1 bg-blue-500/20 text-white rounded text-xs hover:bg-blue-500/30"
           >
             Use
           </button>
           <button
             onClick={() => setRecommendedMode(null)}
-            className="px-1 py-1 rounded text-xs"
-            style={{color: 'var(--text-secondary)'}}
-            onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--glass-secondary)'}
-            onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
+            className="px-1 py-1 text-white/60 rounded text-xs hover:bg-white/10"
           >
             ✕
           </button>
@@ -261,7 +244,7 @@ const HuntInputArea: React.FC<{
 
       {/* Compact Mode Selector */}
       <div>
-        <div className="text-xs mb-2" style={{color: 'var(--text-muted)'}}>🎯 Select Search Mode ({searchModes.length} modes)</div>
+        <div className="text-xs text-white/60 mb-2">🎯 Select Search Mode ({searchModes.length} modes)</div>
         <div className="grid grid-cols-2 gap-1">
           {searchModes.filter(mode => mode.isActive).map((mode) => (
             <button
@@ -270,29 +253,17 @@ const HuntInputArea: React.FC<{
                 setSelectedMode(mode);
                 console.log('🔍 Mode selected:', mode.name);
               }}
-              className="p-1.5 rounded border transition-all text-center cursor-pointer"
-              style={{
-                backgroundColor: selectedMode.id === mode.id ? 'var(--accent-soft)' : 'var(--glass-primary)',
-                borderColor: selectedMode.id === mode.id ? 'var(--accent-muted)' : 'var(--glass-border)',
-                color: selectedMode.id === mode.id ? 'var(--text-primary)' : (mode.isActive ? 'var(--text-primary)' : 'var(--text-muted)'),
-                cursor: mode.isActive ? 'pointer' : 'not-allowed'
-              }}
-              onMouseEnter={(e) => {
-                if (mode.isActive && selectedMode.id !== mode.id) {
-                  (e.target as HTMLElement).style.backgroundColor = 'var(--glass-secondary)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (mode.isActive && selectedMode.id !== mode.id) {
-                  (e.target as HTMLElement).style.backgroundColor = 'var(--glass-primary)';
-                }
-              }}
+              className={`p-1.5 rounded border transition-all text-center cursor-pointer ${
+                selectedMode.id === mode.id
+                  ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+                  : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
+              }`}
               title={`${mode.name} - ${mode.description}${!mode.isActive ? ' (Coming Soon)' : ''}`}
               disabled={!mode.isActive}
             >
               <div className="text-xs mb-0.5">{mode.icon}</div>
               <div className="text-xs font-medium truncate leading-tight">{mode.name}</div>
-              {!mode.isActive && <div className="text-xs" style={{color: 'var(--text-muted)'}}>Soon</div>}
+              {!mode.isActive && <div className="text-xs text-white/60">Soon</div>}
             </button>
           ))}
         </div>
@@ -301,11 +272,11 @@ const HuntInputArea: React.FC<{
       {/* Advanced Search Options - Simplified */}
       {selectedMode && selectedMode.isActive && (
         <div className="space-y-2">
-          <div className="text-xs" style={{color: 'var(--text-muted)'}}>⚙️ Advanced Options</div>
+          <div className="text-xs text-white/60">⚙️ Advanced Options</div>
           
           <div>
-            <label className="block text-xs mb-1" style={{color: 'var(--text-muted)'}}>Search Depth</label>
-            <select className="w-full p-1.5 rounded text-xs" value={searchDepth} onChange={(e) => setSearchDepth(e.target.value)} style={{backgroundColor: 'var(--glass-primary)', borderColor: 'var(--glass-border)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)'}}>
+            <label className="block text-xs text-white/60 mb-1">Search Depth</label>
+            <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={searchDepth} onChange={(e) => setSearchDepth(e.target.value)}>
               <option value="standard">Standard</option>
               <option value="comprehensive">Comprehensive</option>
               <option value="deep_analysis">Deep Analysis</option>
@@ -313,8 +284,8 @@ const HuntInputArea: React.FC<{
           </div>
           
           <div>
-            <label className="block text-xs mb-1" style={{color: 'var(--text-muted)'}}>Result Format</label>
-            <select className="w-full p-1.5 rounded text-xs" value={resultFormat} onChange={(e) => setResultFormat(e.target.value)} style={{backgroundColor: 'var(--glass-primary)', borderColor: 'var(--glass-border)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)'}}>
+            <label className="block text-xs text-white/60 mb-1">Result Format</label>
+            <select className="w-full p-1.5 bg-white/5 border border-white/10 rounded text-white text-xs" value={resultFormat} onChange={(e) => setResultFormat(e.target.value)}>
               <option value="summary">Summary</option>
               <option value="detailed">Detailed</option>
               <option value="comparison">Comparison Table</option>

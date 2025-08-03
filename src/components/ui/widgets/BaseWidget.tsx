@@ -262,7 +262,7 @@ interface AIActionHandlers {
 interface OutputHistoryItem {
   id: string;
   timestamp: Date;
-  type: 'text' | 'image' | 'data' | 'error';
+  type: 'text' | 'image' | 'data' | 'error' | 'analysis';
   title: string;
   content: any;
   params?: any;

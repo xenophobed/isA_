@@ -280,7 +280,7 @@ export class ChatService {
    */
   private async processStreamingResponse(
     response: Response,
-    callbacks: ChatServiceCallbacks
+    callbacks: SSEParserCallbacks
   ): Promise<void> {
     if (!response.body) {
       callbacks.onError?.(new Error('No response body'));
@@ -289,9 +289,6 @@ export class ChatService {
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    
-    // Accumulate complete message content for onMessageComplete callback
-    let accumulatedContent = '';
 
     try {
       while (true) {
@@ -307,8 +304,8 @@ export class ChatService {
             
             // Handle [DONE] marker
             if (dataContent === '[DONE]') {
-              // Pass accumulated content to onMessageComplete
-              callbacks.onMessageComplete?.(accumulatedContent);
+              // Pass accumulated content to onStreamComplete
+              callbacks.onStreamComplete?.();
               continue;
             }
             
@@ -327,10 +324,9 @@ export class ChatService {
                   console.log('📨 CHAT_SERVICE: Extracted content from raw_message:', messageContent.substring(0, 100) + '...');
                 }
                 
-                // Only update if we have actual content (skip empty or tool calls)
+                // Only process if we have actual content (skip empty or tool calls)
                 if (messageContent && messageContent.trim() && !messageContent.includes('tool_calls')) {
-                  accumulatedContent = messageContent; // Use extracted content
-                  console.log('📨 CHAT_SERVICE: Updated accumulated content:', messageContent.substring(0, 100) + '...');
+                  console.log('📨 CHAT_SERVICE: Processing message content:', messageContent.substring(0, 100) + '...');
                 }
               }
             } catch (parseError) {
@@ -338,7 +334,7 @@ export class ChatService {
             }
             
             // Parse and handle SSE event using SSEParser
-            SSEParser.parseForChatService(dataContent, callbacks);
+            SSEParser.parseSSEEvent(dataContent, callbacks);
           }
         }
       }

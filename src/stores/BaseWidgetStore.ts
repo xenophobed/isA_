@@ -21,6 +21,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { logger, LogCategory } from '../utils/logger';
 import { chatService } from '../api/chatService';
 import { useAppStore } from './useAppStore';
+import { useSessionStore } from './useSessionStore';
 import {
   BaseWidgetConfig,
   BaseWidgetState,
@@ -266,7 +267,10 @@ export function createBaseWidgetStore<TSpecificState, TSpecificActions>(
               'chatOptions.template_parameters': chatOptions.template_parameters,
               'chatOptions完整': chatOptions
             });
-            await chatService.sendMessage(prompt, callbacks as any, chatOptions);
+            // chatService.sendMessage expects: (message, metadata, token, callbacks)
+            // Use default token like in useChatStore.ts - real token should come from UserModule
+            const token = 'dev_key_test';
+            await chatService.sendMessage(prompt, chatOptions, token, callbacks);
             
           } catch (error) {
             setProcessing(false);

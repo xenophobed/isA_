@@ -295,12 +295,7 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
           placeholder={selectedMode.requiresImage 
             ? `Describe changes for ${selectedMode.name.toLowerCase()}...`
             : "Describe what you want to create..."}
-          className="w-full p-2 rounded resize-none text-sm focus:outline-none"
-          style={{
-            background: 'var(--glass-primary)',
-            border: '1px solid var(--glass-border)',
-            color: 'var(--text-primary)'
-          }}
+          className="w-full p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
           rows={2}
         />
 
@@ -313,16 +308,12 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
           id="image-upload"
         />
         {uploadedImage && (
-          <div className="flex items-center gap-2 p-2 rounded" style={{
-            background: 'var(--glass-primary)',
-            border: '1px solid var(--glass-border)'
-          }}>
+          <div className="flex items-center gap-2 p-2 bg-white/5 border border-white/10 rounded">
             <img src={uploadedImage} alt="Uploaded" className="w-6 h-6 object-cover rounded" />
-            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Image uploaded</span>
+            <span className="text-xs text-white/60">Image uploaded</span>
             <button 
               onClick={() => setUploadedImage(null)}
-              className="ml-auto text-xs"
-              style={{ color: 'var(--text-muted)' }}
+              className="ml-auto text-xs text-white/60 hover:text-white"
             >
               ✕
             </button>
@@ -332,7 +323,7 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
 
       {/* Compact Mode Selector */}
       <div>
-        <div className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>🎯 Select Mode</div>
+        <div className="text-xs text-white/60 mb-2">🎯 Select Mode</div>
         <div className="grid grid-cols-3 gap-1">
           {imageModes.map((mode) => (
             <button
@@ -345,13 +336,11 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
                 setSelectedMode(mode);
                 console.log('🎨 Mode selected:', mode.name);
               }}
-              className="p-1.5 rounded transition-all text-center cursor-pointer"
-              style={{
-                background: selectedMode.id === mode.id ? 'var(--glass-secondary)' : 'var(--glass-primary)',
-                border: '1px solid var(--glass-border)',
-                color: selectedMode.id === mode.id ? 'var(--accent-soft)' : 'var(--text-primary)',
-                boxShadow: selectedMode.id === mode.id ? '0 0 15px var(--accent-soft)30' : 'none'
-              }}
+              className={`p-1.5 rounded border transition-all text-center cursor-pointer ${
+                selectedMode.id === mode.id
+                  ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+                  : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
+              }`}
               title={`${mode.name} - ${mode.description}`}
             >
               <div className="text-xs mb-0.5">{mode.icon}</div>
@@ -364,7 +353,7 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
       {/* Advanced Options based on MCP prompts */}
       {selectedMode && (
         <div className="space-y-2">
-          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>⚙️ Options</div>
+          <div className="text-xs text-white/60">⚙️ Options</div>
           
           {/* text_to_image_prompt: style_preset, quality */}
           {selectedMode.id === 'text_to_image' && (

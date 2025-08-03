@@ -69,7 +69,7 @@ interface ChatActions {
   loadMessagesFromSession: (sessionId?: string) => void;
   
   // 消息发送
-  sendMessage: (content: string, metadata?: ChatMetadata) => Promise<void>;
+  sendMessage: (content: string, metadata?: ChatMetadata, token?: string) => Promise<void>;
   sendMultimodalMessage: (content: string, files: File[], metadata?: ChatMetadata) => Promise<void>;
   
   // 聊天状态
@@ -227,39 +227,20 @@ export const useChatStore = create<ChatStore>()(
         const authToken = token || 'dev_key_test'; // 如果没有提供token，使用默认值作为fallback
         
         await chatService.sendMessage(content, metadata, authToken, {
-          onMessageStart: (messageId: string, status?: string) => {
+          onStreamStart: (messageId: string, status?: string) => {
             startStreamingMessage(messageId, status);
           },
-          onMessageContent: (contentChunk: string) => {
+          onStreamContent: (contentChunk: string) => {
             appendToStreamingMessage(contentChunk);
           },
-          onMessageStatus: (status: string) => {
+          onStreamStatus: (status: string) => {
             updateStreamingStatus(status);
           },
-          onMessageComplete: () => {
+          onStreamComplete: () => {
             finishStreamingMessage();
             setChatLoading(false);
             setIsTyping(false);
             logger.info(LogCategory.CHAT_FLOW, 'Message sending completed successfully');
-          },
-          onMessageExtracted: (extractedContent: string) => {
-            // 当从message_stream事件提取到完整消息时，更新当前流式消息的内容
-            const state = get();
-            const streamingMessage = state.messages.find(m => m.isStreaming);
-            if (streamingMessage) {
-              // 更新流式消息的内容为完整的提取内容
-              set(state => ({
-                messages: state.messages.map(msg => 
-                  msg.id === streamingMessage.id 
-                    ? { ...msg, content: extractedContent }
-                    : msg
-                )
-              }));
-              logger.info(LogCategory.CHAT_FLOW, 'Updated streaming message with extracted content', {
-                messageId: streamingMessage.id,
-                contentLength: extractedContent.length
-              });
-            }
           },
           onBillingUpdate: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => {
             // 更新用户credit余额
@@ -336,39 +317,20 @@ export const useChatStore = create<ChatStore>()(
         
         // 使用 chatService 实例
         await chatService.sendMultimodalMessage(content, files, metadata, authToken, {
-          onMessageStart: (messageId: string, status?: string) => {
+          onStreamStart: (messageId: string, status?: string) => {
             startStreamingMessage(messageId, status);
           },
-          onMessageContent: (contentChunk: string) => {
+          onStreamContent: (contentChunk: string) => {
             appendToStreamingMessage(contentChunk);
           },
-          onMessageStatus: (status: string) => {
+          onStreamStatus: (status: string) => {
             updateStreamingStatus(status);
           },
-          onMessageComplete: () => {
+          onStreamComplete: () => {
             finishStreamingMessage();
             setChatLoading(false);
             setIsTyping(false);
             logger.info(LogCategory.CHAT_FLOW, 'Multimodal message sending completed successfully');
-          },
-          onMessageExtracted: (extractedContent: string) => {
-            // 当从message_stream事件提取到完整消息时，更新当前流式消息的内容
-            const state = get();
-            const streamingMessage = state.messages.find(m => m.isStreaming);
-            if (streamingMessage) {
-              // 更新流式消息的内容为完整的提取内容
-              set(state => ({
-                messages: state.messages.map(msg => 
-                  msg.id === streamingMessage.id 
-                    ? { ...msg, content: extractedContent }
-                    : msg
-                )
-              }));
-              logger.info(LogCategory.CHAT_FLOW, 'Updated streaming message with extracted content', {
-                messageId: streamingMessage.id,
-                contentLength: extractedContent.length
-              });
-            }
           },
           onBillingUpdate: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => {
             // 更新用户credit余额
@@ -381,7 +343,7 @@ export const useChatStore = create<ChatStore>()(
             setChatLoading(false);
             setIsTyping(false);
           }
-        }, metadata);
+        });
       } catch (error) {
         logger.error(LogCategory.CHAT_FLOW, 'Failed to send multimodal message', { error });
         setChatLoading(false);

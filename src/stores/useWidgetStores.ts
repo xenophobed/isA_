@@ -396,9 +396,9 @@ export type KnowledgeWidgetStore = KnowledgeSpecificState & KnowledgeSpecificAct
 // ============================================================================
 
 // Dream Widget - 选择性订阅，每个字段单独订阅避免重渲染
-export const useDreamGeneratedImage = () => useDreamWidgetStore(state => state.generatedImage);
-export const useDreamIsGenerating = () => useDreamWidgetStore(state => state.isProcessing);
-export const useDreamLastParams = () => useDreamWidgetStore(state => state.lastParams);
+export const useDreamGeneratedImage = () => useDreamWidgetStore((state: any) => state.generatedImage);
+export const useDreamIsGenerating = () => useDreamWidgetStore((state: any) => state.isProcessing);
+export const useDreamLastParams = () => useDreamWidgetStore((state: any) => state.lastParams);
 
 // Dream Widget - 组合状态（仅在必要时使用）
 export const useDreamState = () => {
@@ -422,10 +422,10 @@ export const useDreamActions = () => useDreamWidgetStore((state: any) => ({
 }));
 
 // Hunt Widget - 选择性订阅，每个字段单独订阅避免重渲染
-export const useHuntSearchResults = () => useHuntWidgetStore(state => state.searchResults);
-export const useHuntIsSearching = () => useHuntWidgetStore(state => state.isProcessing);
-export const useHuntLastQuery = () => useHuntWidgetStore(state => state.lastQuery);
-export const useHuntCurrentStatus = () => useHuntWidgetStore(state => state.currentStatus);
+export const useHuntSearchResults = () => useHuntWidgetStore((state: any) => state.searchResults);
+export const useHuntIsSearching = () => useHuntWidgetStore((state: any) => state.isProcessing);
+export const useHuntLastQuery = () => useHuntWidgetStore((state: any) => state.lastQuery);
+export const useHuntCurrentStatus = () => useHuntWidgetStore((state: any) => state.currentStatus);
 
 // Hunt Widget - 组合状态（仅在必要时使用）
 export const useHuntState = () => {

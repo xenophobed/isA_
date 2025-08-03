@@ -24,10 +24,10 @@
  */
 
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useSessionStore, ChatSession } from '../stores/useSessionStore';
+import { useSessionStore, ChatSession, SessionStore } from '../stores/useSessionStore';
 
 // Re-export ChatSession type for consistency
-export { ChatSession } from '../stores/useSessionStore';
+export type { ChatSession } from '../stores/useSessionStore';
 
 // ================================================================================
 // Context Creation
@@ -35,21 +35,21 @@ export { ChatSession } from '../stores/useSessionStore';
 
 interface SessionContextValue {
   // Session state - direct store selectors
-  sessions: ReturnType<typeof useSessionStore>['sessions'];
-  currentSessionId: ReturnType<typeof useSessionStore>['currentSessionId'];
-  currentSession: ReturnType<typeof useSessionStore>['currentSession'];
-  isLoading: ReturnType<typeof useSessionStore>['isLoading'];
-  error: ReturnType<typeof useSessionStore>['error'];
+  sessions: SessionStore['sessions'];
+  currentSessionId: SessionStore['currentSessionId'];
+  currentSession: ReturnType<SessionStore['getCurrentSession']>;
+  isLoading: SessionStore['isLoading'];
+  error: SessionStore['error'];
   
   // Session operations - direct store actions
-  createSession: ReturnType<typeof useSessionStore>['createSession'];
-  selectSession: ReturnType<typeof useSessionStore>['selectSession'];
-  deleteSession: ReturnType<typeof useSessionStore>['deleteSession'];
-  updateSession: ReturnType<typeof useSessionStore>['updateSession'];
-  addMessage: ReturnType<typeof useSessionStore>['addMessage'];
-  clearMessages: ReturnType<typeof useSessionStore>['clearMessages'];
-  saveToStorage: ReturnType<typeof useSessionStore>['saveToStorage'];
-  loadFromStorage: ReturnType<typeof useSessionStore>['loadFromStorage'];
+  createSession: SessionStore['createSession'];
+  selectSession: SessionStore['selectSession'];
+  deleteSession: SessionStore['deleteSession'];
+  updateSession: SessionStore['updateSession'];
+  addMessage: SessionStore['addMessage'];
+  clearMessages: SessionStore['clearMessages'];
+  saveToStorage: SessionStore['saveToStorage'];
+  loadFromStorage: SessionStore['loadFromStorage'];
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -67,7 +67,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) =>
   const {
     sessions,
     currentSessionId,
-    currentSession,
     isLoading,
     error,
     createSession,
@@ -77,8 +76,12 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) =>
     addMessage,
     clearMessages,
     saveToStorage,
-    loadFromStorage
+    loadFromStorage,
+    getCurrentSession
   } = useSessionStore();
+  
+  // Get current session using the getter
+  const currentSession = getCurrentSession();
 
   // Simple context value - just pass through store state and actions
   const contextValue: SessionContextValue = {

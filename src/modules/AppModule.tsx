@@ -50,12 +50,54 @@ import { AppId } from '../types/appTypes';
 
 // Available apps configuration - managed by AppModule but business logic in respective modules
 const AVAILABLE_APPS = [
-  { id: 'dream', name: 'DreamForge AI', icon: '🎨' },
-  { id: 'hunt', name: 'HuntAI', icon: '🔍' },
-  { id: 'omni', name: 'Omni Content', icon: '✨' },
-  { id: 'data-scientist', name: 'DataWise Analytics', icon: '📊' },
-  { id: 'knowledge', name: 'Knowledge Hub', icon: '📚' },
-  { id: 'assistant', name: 'AI Assistant', icon: '🤖' }
+  { 
+    id: 'dream', 
+    name: 'DreamForge AI', 
+    icon: '🎨', 
+    description: 'AI-powered image generation and creative design',
+    triggers: ['画', '生成图片', 'draw', 'create image', 'generate'],
+    category: 'creative'
+  },
+  { 
+    id: 'hunt', 
+    name: 'HuntAI', 
+    icon: '🔍', 
+    description: 'Search and discover information',
+    triggers: ['搜索', 'search', 'find', 'look up'],
+    category: 'search'
+  },
+  { 
+    id: 'omni', 
+    name: 'Omni Content', 
+    icon: '✨', 
+    description: 'Multi-purpose content generation',
+    triggers: ['内容', 'content', 'generate', 'create'],
+    category: 'content'
+  },
+  { 
+    id: 'data-scientist', 
+    name: 'DataWise Analytics', 
+    icon: '📊', 
+    description: 'Data analysis and visualization',
+    triggers: ['分析', 'analyze', 'data', 'chart', 'graph'],
+    category: 'analytics'
+  },
+  { 
+    id: 'knowledge', 
+    name: 'Knowledge Hub', 
+    icon: '📚', 
+    description: 'Knowledge management and research',
+    triggers: ['知识', 'knowledge', 'research', 'learn'],
+    category: 'research'
+  },
+  { 
+    id: 'assistant', 
+    name: 'AI Assistant', 
+    icon: '🤖', 
+    description: 'General AI assistance and conversation',
+    triggers: ['助手', 'assistant', 'help', 'ai'],
+    category: 'general'
+  }
 ];
 
 interface AppModuleProps extends Omit<AppLayoutProps, 'children'> {

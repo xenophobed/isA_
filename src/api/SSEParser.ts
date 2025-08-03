@@ -50,8 +50,7 @@ export interface SSEParserCallbacks {
   onStreamComplete?: () => void;
   onError?: (error: Error) => void;
   onArtifactCreated?: (artifact: { id?: string; type: string; content: string }) => void;
-  onMessageExtracted?: (extractedContent: string) => void; // 新增：用于传递提取的纯净内容
-  onBillingUpdate?: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => void; // 新增：计费更新回调
+  onBillingUpdate?: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => void;
 }
 
 // ================================================================================
@@ -294,10 +293,9 @@ export class SSEParser {
         extractedContent = extractedContent.replace(/\\"/g, '"').replace(/\\'/g, "'");
         console.log(`📨 SSE_PARSER: Extracted pure content: ${extractedContent.substring(0, 100)}...`);
         
-        // 通知chatService使用提取的纯净内容
+        // 日志记录提取的内容
         if (extractedContent && extractedContent.trim() && !extractedContent.includes('tool_calls')) {
-          console.log(`📨 SSE_PARSER: Calling onMessageExtracted with content: ${extractedContent}`);
-          callbacks.onMessageExtracted?.(extractedContent);
+          console.log(`📨 SSE_PARSER: Extracted pure content: ${extractedContent.substring(0, 100)}...`);
         }
       } else {
         console.log(`⚠️ SSE_PARSER: Could not extract content from raw_message: ${content.raw_message}`);

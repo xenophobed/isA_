@@ -36,7 +36,7 @@ import {
 } from '../providers/SessionProvider';
 
 // Re-export types for compatibility
-export { ChatSession } from '../providers/SessionProvider';
+export type { ChatSession } from '../providers/SessionProvider';
 
 /**
  * Hook to access session state from SessionProvider
@@ -97,7 +97,7 @@ export const useSessionById = (sessionId: string) => {
   const { sessions } = useSession();
   
   return useMemo(() => 
-    sessions.find(session => session.id === sessionId) || null,
+    sessions.find((session: ChatSession) => session.id === sessionId) || null,
     [sessions, sessionId]
   );
 };

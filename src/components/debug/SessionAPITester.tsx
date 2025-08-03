@@ -50,7 +50,6 @@ export const SessionAPITester: React.FC = () => {
     try {
       // 步骤1: 初始化认证的Session Service
       console.log('🔧 初始化认证的Session Service...');
-      sessionActions.initializeWithAuth(getAuthHeaders);
       const authenticatedService = createAuthenticatedSessionService(getAuthHeaders);
       addResult('初始化认证服务', true, { userId: auth0User.sub });
 
@@ -165,8 +164,8 @@ export const SessionAPITester: React.FC = () => {
       // 步骤9: 测试store集成
       console.log('🏪 测试Store集成...');
       try {
-        await sessionActions.loadSessionsFromAPI(auth0User.sub);
-        addResult('Store API集成', true, { message: 'Store成功加载API数据' });
+        await sessionActions.saveToAPI(auth0User.sub, getAuthHeaders());
+        addResult('Store API集成', true, { message: 'Store成功保存API数据' });
       } catch (error) {
         addResult('Store API集成', false, null, error instanceof Error ? error.message : String(error));
       }

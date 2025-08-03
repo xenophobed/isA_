@@ -138,8 +138,8 @@ export class SessionHandler {
       }
     };
 
-    this.sessionActions.createSession(newSession);
-    this.sessionActions.selectSession(newSession.id);
+    const createdSession = this.sessionActions.createSession(newSession.title);
+    this.sessionActions.selectSession(createdSession.id);
   }
 
   /**
@@ -170,8 +170,8 @@ export class SessionHandler {
       return;
     }
 
-    // 直接转发给 Store
-    this.sessionActions.renameSession(event.sessionId, newTitle);
+    // Note: Actual rename logic is handled by SessionModule using updateSession
+    // This handler is just for event logging and potential future extensions
   }
 
   // ================================================================================
@@ -267,7 +267,7 @@ export class SessionHandler {
     });
 
     // 直接转发给 Store
-    this.sessionActions.setLoadingSession(loading);
+    this.sessionActions.setLoading(loading);
   }
 
   /**
