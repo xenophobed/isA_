@@ -46,9 +46,11 @@ export const ChatInputHandler: React.FC<ChatInputHandlerProps> = ({
     // The reactive system in useChatStore will handle widget triggering and API calls
     const userMessage = {
       id: `user-${Date.now()}`,
+      type: 'regular' as const,
       role: 'user' as const,
       content: message,
       timestamp: new Date().toISOString(),
+      sessionId: 'default',
       metadata: {},
       processed: false // Mark as unprocessed for reactive system
     };
@@ -75,9 +77,11 @@ export const ChatInputHandler: React.FC<ChatInputHandlerProps> = ({
       const fileMessage = `Analyze ${files.length} document${files.length > 1 ? 's' : ''}: ${Array.from(files).map(f => f.name).join(', ')}`;
       const userMessage = {
         id: `user-${Date.now()}`,
+        type: 'regular' as const,
         role: 'user' as const,
         content: fileMessage,
         timestamp: new Date().toISOString(),
+        sessionId: 'default',
         metadata: {},
         processed: false,
         files: Array.from(files) // Add files to trigger knowledge widget

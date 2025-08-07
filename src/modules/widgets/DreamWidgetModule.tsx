@@ -336,7 +336,6 @@ export const DreamWidgetModule: React.FC<DreamWidgetModuleProps> = ({
 }) => {
   // Read state from store directly (like HuntWidgetModule)
   const generatedImage = useDreamGeneratedImage();
-  const isGenerating = useDreamIsGenerating();
   const lastParams = useDreamLastParams();
   
   console.log('🎨 DREAM_MODULE: Initializing with BaseWidgetModule architecture', {
@@ -386,7 +385,7 @@ export const DreamWidgetModule: React.FC<DreamWidgetModuleProps> = ({
         });
         
         const legacyProps = {
-          isGenerating: isGenerating, // Use store state instead of moduleProps
+          isGenerating: moduleProps.isProcessing, // Use BaseWidgetModule's processing state
           generatedImage: generatedImage, // Use store state directly
           lastParams: lastParams, // Use store state directly
           onGenerateImage: async (params: DreamWidgetParams) => {
@@ -407,7 +406,7 @@ export const DreamWidgetModule: React.FC<DreamWidgetModuleProps> = ({
           },
           // Use converted data instead of moduleProps (like HuntWidgetModule)
           outputHistory: outputHistory, // Use converted data
-          currentOutput: outputHistory[0] || null, // Show latest image as current
+          currentOutput: moduleProps.currentOutput, // Use BaseWidgetModule's currentOutput // Show latest image as current
           isStreaming: moduleProps.isStreaming,
           streamingContent: moduleProps.streamingContent,
           onSelectOutput: moduleProps.onSelectOutput,

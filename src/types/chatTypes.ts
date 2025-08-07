@@ -22,14 +22,21 @@
  *   - 用户认证类型（由auth_types.ts处理）
  */
 
-// 聊天消息接口 (包含流式消息功能)
-export interface ChatMessage {
+// 基础消息接口
+export interface BaseMessage {
   id: string;
   role: 'user' | 'assistant';
-  content: string;
   timestamp: string;
+  sessionId: string;
+  // Streaming properties that all messages can have
   isStreaming?: boolean;
   streamingStatus?: string;
+}
+
+// 常规聊天消息接口 (包含流式消息功能)
+export interface RegularMessage extends BaseMessage {
+  type: 'regular';
+  content: string;
   metadata?: {
     sender?: string;
     app?: string;
@@ -46,6 +53,31 @@ export interface ChatMessage {
   processed?: boolean; // 标记用户消息是否已发送到API
   files?: File[]; // 用户上传的文件
 }
+
+// 工件消息接口 - 用于显示小部件生成的工件
+export interface ArtifactMessage extends BaseMessage {
+  type: 'artifact';
+  userPrompt: string; // 触发此工件生成的原始用户输入
+  artifact: {
+    id: string;
+    widgetType: string; // 'dream', 'hunt', 'omni', etc.
+    widgetName?: string; // 显示名称
+    version: number;
+    contentType: 'image' | 'text' | 'data' | 'analysis' | 'knowledge';
+    content: any; // 工件的实际内容 - can be 'Loading...' during streaming
+    metadata?: {
+      originalInput?: string;
+      parameters?: Record<string, any>;
+      processingTime?: number;
+      [key: string]: any;
+    };
+  };
+  // Note: isStreaming and streamingStatus are inherited from BaseMessage
+  // This allows artifact messages to show streaming status during generation
+}
+
+// 联合类型 - 所有消息类型
+export type ChatMessage = RegularMessage | ArtifactMessage;
 
 // 聊天会话接口
 export interface ChatSession {

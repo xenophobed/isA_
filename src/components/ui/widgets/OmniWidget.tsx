@@ -21,16 +21,19 @@ import { OmniWidgetParams } from '../../../types/widgetTypes';
 import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction, EmptyStateConfig } from './BaseWidget';
 
 interface OmniWidgetProps {
-  isGenerating: boolean;
-  generatedContent: string | null;
-  lastParams: OmniWidgetParams | null;
+  // Props provided by OmniWidgetModule via React.cloneElement (optional for typing)
+  isGenerating?: boolean;
+  generatedContent?: string | null;
+  lastParams?: OmniWidgetParams | null;
+  onGenerateContent?: (params: OmniWidgetParams) => Promise<void>;
+  onClearContent?: () => void;
+  
+  // Base UI props that can be passed directly
   triggeredInput?: string;
   outputHistory?: OutputHistoryItem[];
   currentOutput?: OutputHistoryItem | null;
   isStreaming?: boolean;
   streamingContent?: string;
-  onGenerateContent: (params: OmniWidgetParams) => Promise<void>;
-  onClearContent: () => void;
   onSelectOutput?: (item: OutputHistoryItem) => void;
   onClearHistory?: () => void;
   onBack?: () => void;
@@ -868,16 +871,16 @@ Begin your scientific analysis now.`
  * Omni Widget with BaseWidget - New standardized layout
  */
 export const OmniWidget: React.FC<OmniWidgetProps> = ({
-  isGenerating,
-  generatedContent,
-  lastParams,
+  isGenerating = false,
+  generatedContent = null,
+  lastParams = null,
   triggeredInput,
   outputHistory = [],
   currentOutput = null,
   isStreaming = false,
   streamingContent = '',
-  onGenerateContent,
-  onClearContent,
+  onGenerateContent = async () => {},
+  onClearContent = () => {},
   onSelectOutput,
   onClearHistory,
   onBack

@@ -112,8 +112,8 @@ export const APIDataFlowTester: React.FC = () => {
       if (lastMessage.role === 'assistant' && !lastMessage.isStreaming) {
         addDataFlowStep('final_message', '最终消息存储', {
           id: lastMessage.id,
-          content: lastMessage.content,
-          metadata: lastMessage.metadata
+          content: 'content' in lastMessage ? lastMessage.content : 'No content',
+          metadata: 'metadata' in lastMessage ? lastMessage.metadata : undefined
         });
       }
     }

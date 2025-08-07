@@ -15,12 +15,11 @@
  * 3. Input Area: Main operation interface
  * 4. Management Area: Quick action menu (optional)
  */
-import React, { useState, ReactNode, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import React, { useState, ReactNode, useRef } from 'react';
 import { ScrollFollowUpActions } from '../../shared/widgets/ScrollFollowUpActions';
 import { Button } from '../../shared/ui/Button';
 import { Dropdown } from '../../shared/widgets/Dropdown';
+import { ContentRenderer, ContentType } from '../../shared/content/ContentRenderer';
 
 // Compact Dropdown components for title bar
 const CompactArtifactDropdown: React.FC<{
@@ -302,8 +301,32 @@ export interface EmptyStateConfig {
   customContent?: ReactNode;
 }
 
-// BaseWidget props interface (updated for new design)
+// Widget运行模式
+type WidgetMode = 'independent' | 'plugin';
+
+// Chat集成配置（Plugin模式）
+interface ChatIntegration {
+  enabled: boolean;
+  sessionId?: string;
+  onMessageCreate?: (message: any) => void;
+  onUserAction?: (action: string, params: any) => void;
+}
+
+// Widget独立会话（Independent模式）
+interface WidgetSession {
+  id: string;
+  title: string;
+  messages: any[];
+  createdAt: Date;
+}
+
+// BaseWidget props interface (updated for dual-mode design)
 interface BaseWidgetProps {
+  // 🆕 双模式支持
+  mode?: WidgetMode;
+  chatIntegration?: ChatIntegration;
+  widgetSession?: WidgetSession;
+  
   // New artifact-based props
   artifactSessions?: ArtifactSession[];
   currentSessionId?: string;
@@ -352,17 +375,18 @@ interface BaseWidgetProps {
  * BaseWidget - New Compact Layout Component
  */
 export const BaseWidget: React.FC<BaseWidgetProps> = ({
+  // 🆕 双模式支持
+  mode = 'independent',
+  chatIntegration,
+  widgetSession,
+  
   // New artifact props
   artifactSessions = [],
   currentSessionId,
   currentVersionId,
-  onSessionChange,
-  onVersionChange,
   aiActions = {},
-  enableFloatingActions = true,
   enableScrollActions = true,
   useCompactLayout = true,
-  className = '',
   
   // Legacy props (for backward compatibility)
   outputHistory = [],
@@ -389,13 +413,28 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
   const [showScrollActions, setShowScrollActions] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  // Legacy state for backward compatibility
-  const [selectedOutputId, setSelectedOutputId] = useState<string>();
-  const [showHistory, setShowHistory] = useState(false);
+  // 🆕 模式检测和行为调整
+  const isPluginMode = mode === 'plugin' && chatIntegration?.enabled;
+  const isIndependentMode = mode === 'independent';
+  
+  // 根据模式显示不同的session信息
+  const displaySessionTitle = isPluginMode 
+    ? `Chat Session (Plugin Mode)`
+    : isIndependentMode && widgetSession
+    ? widgetSession.title
+    : 'Widget Session';
+    
+  console.log('🔧 BASEWIDGET: Mode detection:', {
+    mode,
+    isPluginMode,
+    isIndependentMode,
+    hasChatIntegration: !!chatIntegration,
+    hasWidgetSession: !!widgetSession,
+    displaySessionTitle
+  });
   
   // Handle legacy output selection
   const handleSelectOutput = (item: OutputHistoryItem) => {
-    setSelectedOutputId(item.id);
     onSelectOutput?.(item);
   };
   
@@ -403,259 +442,15 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
   const currentSession = artifactSessions.find(session => session.id === currentSessionId) || artifactSessions[0];
   const currentVersion = currentSession?.versions.find(version => version.id === currentVersionId) || currentSession?.versions[currentSession.versions.length - 1];
 
-  // Render output content
-  const renderOutputContent = (content: any, type: string) => {
-    console.log('🖼️ BASEWIDGET: Rendering content:', { type, content, hasContent: !!content });
-    
+  // 映射 Widget 内容类型到 ContentRenderer 类型
+  const mapWidgetTypeToContentType = (type: string): ContentType => {
     switch (type) {
-      case 'image':
-        return (
-          <img 
-            src={content} 
-            alt="Output" 
-            className="max-w-full h-auto rounded border border-white/10"
-            onLoad={() => console.log('🖼️ BASEWIDGET: Image loaded successfully:', content)}
-            onError={(e) => console.error('🖼️ BASEWIDGET: Image load error:', e, content)}
-          />
-        );
-      case 'search_results':
-        // Perplexity-style search results display
-        return (
-          <div className="space-y-3">
-            {Array.isArray(content) ? content.map((result, index) => (
-              <div key={index} className="bg-white/5 rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors">
-                {/* Result Title */}
-                {result.title && (
-                  <h3 className="text-sm font-medium text-white mb-2 line-clamp-2">
-                    {result.title}
-                  </h3>
-                )}
-                
-                {/* Result URL */}
-                {result.url && (
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs text-blue-400">🔗</span>
-                    <a 
-                      href={result.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-400 hover:text-blue-300 truncate"
-                    >
-                      {result.url}
-                    </a>
-                  </div>
-                )}
-                
-                {/* Result Description/Content with Markdown */}
-                {result.description && (
-                  <div className="prose prose-invert prose-sm max-w-none">
-                    <ReactMarkdown 
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        h1: ({children}) => <h1 className="text-xs font-bold text-white mb-1">{children}</h1>,
-                        h2: ({children}) => <h2 className="text-xs font-semibold text-white mb-1">{children}</h2>,
-                        h3: ({children}) => <h3 className="text-xs font-medium text-white mb-1">{children}</h3>,
-                        p: ({children}) => <p className="text-xs text-white/70 leading-relaxed mb-1 line-clamp-3">{children}</p>,
-                        ul: ({children}) => <ul className="list-disc list-inside text-white/70 text-xs space-y-0.5 mb-1 ml-1">{children}</ul>,
-                        ol: ({children}) => <ol className="list-decimal list-inside text-white/70 text-xs space-y-0.5 mb-1 ml-1">{children}</ol>,
-                        li: ({children}) => <li className="text-white/70 text-xs">{children}</li>,
-                        a: ({href, children}) => (
-                          <a 
-                            href={href} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-blue-400 hover:text-blue-300 underline text-xs"
-                          >
-                            {children}
-                          </a>
-                        ),
-                        code: ({children}) => (
-                          <code className="bg-gray-700 text-green-300 px-1 py-0.5 rounded text-xs">
-                            {children}
-                          </code>
-                        ),
-                        pre: ({children}) => (
-                          <pre className="bg-gray-800 p-1 rounded text-xs overflow-x-auto mb-1">
-                            {children}
-                          </pre>
-                        ),
-                        blockquote: ({children}) => (
-                          <blockquote className="border-l-2 border-blue-500 pl-1 text-white/60 italic text-xs mb-1">
-                            {children}
-                          </blockquote>
-                        ),
-                        strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
-                        em: ({children}) => <em className="italic text-white/90">{children}</em>
-                      }}
-                    >
-                      {result.description}
-                    </ReactMarkdown>
-                  </div>
-                )}
-                
-                {/* Full content with markdown if available */}
-                {result.content && result.content !== result.description && (
-                  <div className="prose prose-invert prose-sm max-w-none mt-2">
-                    <ReactMarkdown 
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        h1: ({children}) => <h1 className="text-xs font-bold text-white mb-1">{children}</h1>,
-                        h2: ({children}) => <h2 className="text-xs font-semibold text-white mb-1">{children}</h2>,
-                        h3: ({children}) => <h3 className="text-xs font-medium text-white mb-1">{children}</h3>,
-                        p: ({children}) => <p className="text-xs text-white/70 leading-relaxed mb-1 line-clamp-3">{children}</p>,
-                        ul: ({children}) => <ul className="list-disc list-inside text-white/70 text-xs space-y-0.5 mb-1 ml-1">{children}</ul>,
-                        ol: ({children}) => <ol className="list-decimal list-inside text-white/70 text-xs space-y-0.5 mb-1 ml-1">{children}</ol>,
-                        li: ({children}) => <li className="text-white/70 text-xs">{children}</li>,
-                        a: ({href, children}) => (
-                          <a 
-                            href={href} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-blue-400 hover:text-blue-300 underline text-xs"
-                          >
-                            {children}
-                          </a>
-                        ),
-                        code: ({children}) => (
-                          <code className="bg-gray-700 text-green-300 px-1 py-0.5 rounded text-xs">
-                            {children}
-                          </code>
-                        ),
-                        pre: ({children}) => (
-                          <pre className="bg-gray-800 p-1 rounded text-xs overflow-x-auto mb-1">
-                            {children}
-                          </pre>
-                        ),
-                        blockquote: ({children}) => (
-                          <blockquote className="border-l-2 border-blue-500 pl-1 text-white/60 italic text-xs mb-1">
-                            {children}
-                          </blockquote>
-                        ),
-                        strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
-                        em: ({children}) => <em className="italic text-white/90">{children}</em>
-                      }}
-                    >
-                      {result.content.length > 200 ? result.content.substring(0, 200) + '...' : result.content}
-                    </ReactMarkdown>
-                  </div>
-                )}
-                
-                {/* Additional metadata */}
-                {(result.source || result.date) && (
-                  <div className="flex items-center gap-3 text-xs text-white/50">
-                    {result.source && (
-                      <span className="flex items-center gap-1">
-                        <span>📰</span>
-                        {result.source}
-                      </span>
-                    )}
-                    {result.date && (
-                      <span className="flex items-center gap-1">
-                        <span>📅</span>
-                        {result.date}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )) : (
-              <div className="text-sm text-white/80">
-                {typeof content === 'string' ? content : JSON.stringify(content)}
-              </div>
-            )}
-          </div>
-        );
-      case 'data':
-        return (
-          <div className="bg-black/20 rounded p-2 max-h-32 overflow-y-auto">
-            <pre className="text-xs text-gray-300 whitespace-pre-wrap">
-              {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
-            </pre>
-          </div>
-        );
-      case 'error':
-        return (
-          <div className="bg-red-500/10 border border-red-500/20 rounded p-2">
-            <div className="text-xs text-red-300">{content}</div>
-          </div>
-        );
+      case 'image': return 'image';
+      case 'search_results': return 'search_results';
+      case 'data': return 'json';
+      case 'error': return 'text'; // 错误作为文本显示
       case 'text':
-      default:
-        return (
-          <div className="prose prose-invert prose-sm max-w-none overflow-auto max-h-96">
-            <ReactMarkdown 
-              remarkPlugins={[remarkGfm]}
-              components={{
-                h1: ({children}) => <h1 className="text-lg font-bold text-white mb-3">{children}</h1>,
-                h2: ({children}) => <h2 className="text-base font-semibold text-white mb-2">{children}</h2>,
-                h3: ({children}) => <h3 className="text-sm font-medium text-white mb-2">{children}</h3>,
-                p: ({children}) => <p className="text-sm text-white/80 leading-relaxed mb-2">{children}</p>,
-                ul: ({children}) => <ul className="list-disc list-inside text-white/80 text-sm space-y-1 mb-2 ml-2">{children}</ul>,
-                ol: ({children}) => <ol className="list-decimal list-inside text-white/80 text-sm space-y-1 mb-2 ml-2">{children}</ol>,
-                li: ({children}) => <li className="text-white/80 text-sm">{children}</li>,
-                a: ({href, children}) => (
-                  <a 
-                    href={href} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="text-blue-400 hover:text-blue-300 underline text-sm"
-                  >
-                    {children}
-                  </a>
-                ),
-                code: ({children}) => (
-                  <code className="bg-gray-700 text-green-300 px-1 py-0.5 rounded text-sm">
-                    {children}
-                  </code>
-                ),
-                pre: ({children}) => (
-                  <pre className="bg-gray-800 p-3 rounded text-sm overflow-x-auto mb-2">
-                    {children}
-                  </pre>
-                ),
-                blockquote: ({children}) => (
-                  <blockquote className="border-l-2 border-blue-500 pl-3 text-white/70 italic text-sm mb-2">
-                    {children}
-                  </blockquote>
-                ),
-                strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
-                em: ({children}) => <em className="italic text-white/90">{children}</em>,
-                table: ({children}) => (
-                  <table className="min-w-full text-sm border-collapse border border-white/20 mb-2">
-                    {children}
-                  </table>
-                ),
-                thead: ({children}) => (
-                  <thead className="bg-white/10">
-                    {children}
-                  </thead>
-                ),
-                tbody: ({children}) => (
-                  <tbody>
-                    {children}
-                  </tbody>
-                ),
-                tr: ({children}) => (
-                  <tr className="border-b border-white/10">
-                    {children}
-                  </tr>
-                ),
-                th: ({children}) => (
-                  <th className="border border-white/20 px-2 py-1 text-left font-medium text-white">
-                    {children}
-                  </th>
-                ),
-                td: ({children}) => (
-                  <td className="border border-white/20 px-2 py-1 text-white/80">
-                    {children}
-                  </td>
-                )
-              }}
-            >
-              {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
-            </ReactMarkdown>
-          </div>
-        );
+      default: return 'markdown'; // 默认使用 markdown 渲染
     }
   };
 
@@ -791,21 +586,68 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          {/* Content based on data */}
-          {/* Legacy compatibility: Show current output if no artifact data */}
-          {!useCompactLayout && currentOutput ? (
+          {/* 统一内容显示 - 优先显示 currentOutput */}
+          {currentOutput ? (
             <div className="p-3">
-              {renderOutputContent(currentOutput.content, currentOutput.type)}
+              <ContentRenderer
+                content={currentOutput.content}
+                type={mapWidgetTypeToContentType(currentOutput.type)}
+                variant="widget"
+                size="sm"
+                features={{
+                  markdown: true,
+                  imagePreview: true,
+                  copyButton: true,
+                  saveButton: true,
+                  wordBreak: true
+                }}
+                maxHeight={400}
+                onAction={(action, data) => {
+                  console.log('🎬 BASEWIDGET: Content action:', action, data);
+                }}
+              />
             </div>
           ) : currentVersion ? (
-            /* New Artifact Content Display */
+            /* Artifact 数据显示 */
             <div className="p-3">
-              {renderOutputContent(currentVersion.content, currentVersion.type)}
+              <ContentRenderer
+                content={currentVersion.content}
+                type={mapWidgetTypeToContentType(currentVersion.type)}
+                variant="widget"
+                size="sm"
+                features={{
+                  markdown: true,
+                  imagePreview: true,
+                  copyButton: true,
+                  saveButton: true,
+                  wordBreak: true
+                }}
+                maxHeight={400}
+                onAction={(action, data) => {
+                  console.log('🎬 BASEWIDGET: Content action:', action, data);
+                }}
+              />
             </div>
           ) : outputHistory?.length > 0 ? (
-            /* Fallback to legacy output if available */
+            /* 历史记录回退 */
             <div className="p-3">
-              {renderOutputContent(outputHistory[0].content, outputHistory[0].type)}
+              <ContentRenderer
+                content={outputHistory[0].content}
+                type={mapWidgetTypeToContentType(outputHistory[0].type)}
+                variant="widget"
+                size="sm"
+                features={{
+                  markdown: true,
+                  imagePreview: true,
+                  copyButton: true,
+                  saveButton: true,
+                  wordBreak: true
+                }}
+                maxHeight={400}
+                onAction={(action, data) => {
+                  console.log('🎬 BASEWIDGET: Content action:', action, data);
+                }}
+              />
             </div>
           ) : (
             /* Customizable Empty State - Fixed Centering */
@@ -866,7 +708,7 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
             </div>
           )}
           
-          {/* Streaming Status Display */}
+          {/* Streaming Status Display - 使用 ContentRenderer */}
           {isStreaming && streamingContent && (
             <div className="absolute bottom-4 left-4 right-4">
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 backdrop-blur-sm">
@@ -874,32 +716,18 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
                   <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
                   <span className="text-xs text-blue-300 font-medium">Live Output</span>
                 </div>
-                <div className="prose prose-invert prose-sm max-w-none">
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      h1: ({children}) => <h1 className="text-sm font-bold text-white mb-1">{children}</h1>,
-                      h2: ({children}) => <h2 className="text-xs font-semibold text-white mb-1">{children}</h2>,
-                      h3: ({children}) => <h3 className="text-xs font-medium text-white mb-1">{children}</h3>,
-                      p: ({children}) => <p className="text-xs text-gray-300 leading-relaxed mb-1">{children}</p>,
-                      code: ({children}) => (
-                        <code className="bg-gray-700 text-green-300 px-1 py-0.5 rounded text-xs">
-                          {children}
-                        </code>
-                      ),
-                      pre: ({children}) => (
-                        <pre className="bg-gray-800 p-2 rounded text-xs overflow-x-auto mb-1">
-                          {children}
-                        </pre>
-                      ),
-                      strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
-                      em: ({children}) => <em className="italic text-white/90">{children}</em>
-                    }}
-                  >
-                    {streamingContent}
-                  </ReactMarkdown>
-                  <span className="inline-block w-1 h-3 bg-blue-400 ml-1 animate-pulse"></span>
-                </div>
+                <ContentRenderer
+                  content={streamingContent}
+                  type="markdown"
+                  variant="chat"
+                  size="xs"
+                  features={{
+                    markdown: true,
+                    wordBreak: true
+                  }}
+                  className="text-gray-300"
+                />
+                <span className="inline-block w-1 h-3 bg-blue-400 ml-1 animate-pulse"></span>
               </div>
             </div>
           )}

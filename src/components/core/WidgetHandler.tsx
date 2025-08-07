@@ -43,22 +43,96 @@ export interface WidgetHistoryRequest {
   offset?: number;
 }
 
+// Widget运行模式检测
+type WidgetMode = 'independent' | 'plugin';
+
+// Plugin模式事件发射器
+interface PluginEventEmitter {
+  emit: (event: string, data: any) => void;
+  on: (event: string, handler: (data: any) => void) => void;
+}
+
 /**
  * Unified Widget Handler Class
- * Routes widget requests to appropriate stores
+ * Routes widget requests to appropriate stores or emits events for Plugin mode
  */
 export class WidgetHandler {
+  private eventEmitter: PluginEventEmitter | null = null;
+  private mode: WidgetMode = 'independent'; // 默认独立模式
+
+  /**
+   * 设置Plugin模式和事件发射器
+   */
+  setPluginMode(eventEmitter: PluginEventEmitter) {
+    this.mode = 'plugin';
+    this.eventEmitter = eventEmitter;
+    console.log('🔌 WIDGET_HANDLER: Switched to Plugin mode');
+  }
+
+  /**
+   * 设置Independent模式
+   */
+  setIndependentMode() {
+    this.mode = 'independent';
+    this.eventEmitter = null;
+    console.log('🔧 WIDGET_HANDLER: Switched to Independent mode');
+  }
+
   /**
    * Process widget request based on type
-   * Routes to appropriate store without handling chat service directly
+   * In Plugin mode: emits events for ChatModule to handle and waits for result
+   * In Independent mode: routes to appropriate store directly
    */
-  async processRequest(request: WidgetRequest): Promise<void> {
+  async processRequest(request: WidgetRequest): Promise<any> {
     logger.debug(LogCategory.ARTIFACT_CREATION, 'Processing widget request', { 
       type: request.type, 
-      params: request.params 
+      params: request.params,
+      mode: this.mode
     });
 
     try {
+      if (this.mode === 'plugin' && this.eventEmitter) {
+        // 🔌 Plugin模式：发出事件给ChatModule处理并等待结果
+        console.log('🔌 WIDGET_HANDLER: Emitting plugin event for ChatModule:', request);
+        
+        const requestId = `${request.type}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        
+        // 创建Promise来等待ChatModule的结果
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Plugin request timeout'));
+          }, 60000); // 60秒超时
+          
+          // 监听结果事件
+          const resultHandler = (eventData: any) => {
+            if (eventData.requestId === requestId) {
+              clearTimeout(timeout);
+              if (eventData.success) {
+                resolve(eventData.result);
+              } else {
+                reject(new Error(eventData.error || 'Plugin execution failed'));
+              }
+            }
+          };
+          
+          this.eventEmitter!.on('widget:result', resultHandler);
+          
+          // 发出请求事件
+          this.eventEmitter!.emit('widget:request', {
+            widgetType: request.type,
+            action: 'process',
+            params: request.params,
+            requestId: requestId,
+            sessionId: request.sessionId,
+            userId: request.userId,
+            timestamp: new Date()
+          });
+        });
+      }
+
+      // 🔧 Independent模式：直接路由到store
+      console.log('🔧 WIDGET_HANDLER: Processing in Independent mode');
+      
       switch (request.type) {
         case 'dream':
           await this.processDreamRequest(request.params, request.sessionId, request.userId);

@@ -819,6 +819,82 @@ const ChatApp: React.FC = () => {
 **预期响应流:**
 - `start` → `message_stream` (工具调用) → `custom_stream` (执行) → `message_stream` (搜索结果) → `custom_stream` (token流) → `memory_update` → `end`
 
+### 5. 🆕 任务规划对话 - 已验证 ✅ (2025-08-03)
+**请求:**
+```json
+{
+  "message": "Create a 3-step plan to research electric vehicles: search trends, analyze data, write summary",
+  "user_id": "test_api_user_001",
+  "session_id": "test_api_session_001"
+}
+```
+
+**实际响应流 (真实测试结果):**
+```json
+{"type": "start", "content": "Starting chat processing", "timestamp": "2025-08-03T23:24:51.864999", "session_id": "test_api_session_001"}
+
+{"type": "message_stream", "content": {"raw_message": "content=\"Certainly! Here's a concise 3-step plan to research electric vehicles:\\n\\nStep 1: Search Trends\\n- Gather current information on electric vehicles...\\n\\nStep 2: Analyze Data\\n- Collect relevant data such as sales figures...\\n\\nStep 3: Write Summary\\n- Compile the insights from the trend search...\" additional_kwargs={} response_metadata={} id='5d86a742-88af-4575-80fa-e5f284f17b58'"}, "timestamp": "2025-08-03T23:25:01.155544", "session_id": "test_api_session_001", "stream_mode": "messages"}
+
+{"type": "custom_stream", "content": {"custom_llm_chunk": "Certainly"}, "timestamp": "2025-08-03T23:25:03.057666", "session_id": "test_api_session_001", "stream_mode": "custom"}
+{"type": "custom_stream", "content": {"custom_llm_chunk": "!"}, "timestamp": "2025-08-03T23:25:03.057788", "session_id": "test_api_session_001", "stream_mode": "custom"}
+{"type": "custom_stream", "content": {"custom_llm_chunk": " Here"}, "timestamp": "2025-08-03T23:25:03.098687", "session_id": "test_api_session_001", "stream_mode": "custom"}
+
+{"type": "end", "content": "Chat processing completed", "timestamp": "2025-08-03T23:25:03.200000", "session_id": "test_api_session_001"}
+```
+
+**完整响应提取示例:**
+从 `message_stream` 事件中成功提取的完整响应：
+```
+"Certainly! Here's a concise 3-step plan to research electric vehicles:
+
+Step 1: Search Trends
+- Gather current information on electric vehicles by searching the web for recent news, trends, technological advancements, market developments, and consumer sentiments.
+
+Step 2: Analyze Data  
+- Collect relevant data such as sales figures, market share, consumer surveys, and technological performance metrics.
+- Analyze the data to identify patterns, growth areas, key players, and regional differences.
+
+Step 3: Write Summary
+- Compile the insights from the trend search and data analysis.
+- Write a clear and concise summary highlighting key findings, market outlook, and potential challenges or opportunities in the electric vehicle sector.
+
+Would you like me to assist you with any of these steps?"
+```
+
+### 6. 🆕 多工具执行 - 已验证 ✅ (2025-08-03)
+**请求:**
+```json
+{
+  "message": "Please create and execute a 4-step research plan: 1) Search for AI trends, 2) Analyze market data, 3) Compare technologies, 4) Generate final report",
+  "user_id": "test_api_user_003",
+  "session_id": "test_api_session_003"
+}
+```
+
+**实际响应流 (真实测试结果):**
+```json
+{"type": "start", "content": "Starting chat processing", "timestamp": "2025-08-03T23:25:09.465841", "session_id": "test_api_session_003"}
+
+{"type": "message_stream", "content": {"raw_message": "content='' additional_kwargs={} response_metadata={} id='5b48cb8d-0f63-41b8-8b00-f13b82322964' tool_calls=[{'name': 'web_search', 'args': {'query': 'current AI trends 2024', 'count': 5}, 'id': 'call_gOZRoA17EC0uUKAqQQgJkBqF', 'type': 'tool_call'}, {'name': 'web_search', 'args': {'query': 'AI market data 2024', 'count': 5}, 'id': 'call_0JkYdHgM5cvG0dXlxVD1ZkOp', 'type': 'tool_call'}, {'name': 'web_search', 'args': {'query': 'compare AI technologies 2024', 'count': 5}, 'id': 'call_WQVzIZPe7T6MAXg9yGXvF3fN', 'type': 'tool_call'}]"}, "timestamp": "2025-08-03T23:25:12.583468", "session_id": "test_api_session_003", "stream_mode": "messages"}
+
+{"type": "custom_stream", "content": {"data": "[web_search] Starting execution (1/3)", "type": "progress"}, "timestamp": "2025-08-03T23:25:12.585567", "session_id": "test_api_session_003", "stream_mode": "custom"}
+
+{"type": "custom_stream", "content": {"data": "[web_search] Completed - 2738 chars result", "type": "progress"}, "timestamp": "2025-08-03T23:25:13.789281", "session_id": "test_api_session_003", "stream_mode": "custom"}
+
+{"type": "custom_stream", "content": {"data": "[web_search] Starting execution (2/3)", "type": "progress"}, "timestamp": "2025-08-03T23:25:13.789326", "session_id": "test_api_session_003", "stream_mode": "custom"}
+
+{"type": "custom_stream", "content": {"data": "[web_search] Completed - 2836 chars result", "type": "progress"}, "timestamp": "2025-08-03T23:25:15.139051", "session_id": "test_api_session_003", "stream_mode": "custom"}
+```
+
+**响应流模式:**
+- `start` → `message_stream` (多个工具调用) → `custom_stream` (执行进度) → 重复执行 → 最终响应
+
+**工具执行进度追踪:**
+系统自动将复杂请求拆分为多个 `web_search` 工具调用，并提供实时执行进度：
+- 第1步: 搜索"current AI trends 2024" - 2738字符结果
+- 第2步: 搜索"AI market data 2024" - 2836字符结果  
+- 第3步: 搜索"compare AI technologies 2024" - 继续执行...
+
 ## 提示词模板系统
 
 ### 概述
@@ -897,6 +973,32 @@ curl -X POST "http://localhost:8080/api/chat" \
     "message": "Hi, how are you?",
     "user_id": "test_user_456",
     "session_id": "test_session_456"
+  }' \
+  --no-buffer -s
+```
+
+### 🆕 任务规划测试 - 已验证 ✅ (2025-08-03)
+```bash
+curl -X POST "http://localhost:8080/api/chat" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dev_key_test" \
+  -d '{
+    "message": "Create a 3-step plan to research electric vehicles: search trends, analyze data, write summary",
+    "user_id": "test_api_user_001",
+    "session_id": "test_api_session_001"
+  }' \
+  --no-buffer -s
+```
+
+### 🆕 多工具执行测试 - 已验证 ✅ (2025-08-03)
+```bash
+curl -X POST "http://localhost:8080/api/chat" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dev_key_test" \
+  -d '{
+    "message": "Please create and execute a 4-step research plan: 1) Search for AI trends, 2) Analyze market data, 3) Compare technologies, 4) Generate final report",
+    "user_id": "test_api_user_003",
+    "session_id": "test_api_session_003"
   }' \
   --no-buffer -s
 ```

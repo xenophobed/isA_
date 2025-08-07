@@ -6,14 +6,12 @@
  * 【核心职责】
  * - 处理聊天相关的所有业务逻辑和副作用
  * - 管理AI客户端交互和消息发送
- * - 监听Widget状态变化并创建相应的聊天消息
  * - 封装用户认证和会话管理逻辑
  * - 向纯UI组件提供数据和事件回调
  * 
  * 【关注点分离】
  * ✅ 负责：
  *   - 聊天业务逻辑的统一管理
- *   - Widget状态监听和消息创建
  *   - AI客户端和状态管理的集成
  *   - 消息发送和接收的协调
  *   - 用户认证和权限管理
@@ -25,6 +23,7 @@
  *   - 底层数据存储（由stores处理）
  *   - 网络通信（由api处理）
  *   - 数据解析（由services处理）
+ *   - Widget状态监听和消息创建（由各Widget模块自己处理）
  * 
  * 【数据流向】
  * main_app → ChatModule → ChatLayout
@@ -43,6 +42,9 @@ import { ChatSession } from '../stores/useSessionStore';
 import { logger, LogCategory } from '../utils/logger';
 import { useUserModule } from './UserModule';
 import { UpgradeModal } from '../components/ui/UpgradeModal';
+import { useAppActions } from '../stores/useAppStore';
+import { ArtifactMessage } from '../types/chatTypes';
+import { detectPluginTrigger, executePlugin } from '../plugins';
 
 interface ChatModuleProps extends Omit<ChatLayoutProps, 'messages' | 'isLoading' | 'isTyping' | 'onSendMessage' | 'onSendMultimodal'> {
   // All ChatLayout props except the data and callback props that we'll provide from business logic
@@ -55,7 +57,6 @@ interface ChatModuleProps extends Omit<ChatLayoutProps, 'messages' | 'isLoading'
  * - Uses hooks to get chat state and AI client
  * - Handles all message sending business logic
  * - Manages user authentication and session data
- * - Monitors Widget states and creates chat messages
  * - Passes pure data and callbacks to ChatLayout
  * - Keeps ChatLayout as pure UI component
  */
@@ -78,576 +79,251 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   
   // Get user module for credit validation
   const userModule = useUserModule();
-
-  // 使用ref跟踪已处理的Widget状态，避免重复处理
-  const processedStatesRef = useRef<{
-    hunt: { lastQuery: string; timestamp: number } | null;
-    omni: { lastPrompt: string; timestamp: number } | null;
-    dataScientist: { lastQuery: string; timestamp: number } | null;
-    knowledge: { lastQuery: string; timestamp: number } | null;
+  
+  // Get app actions for navigation
+  const { setCurrentApp } = useAppActions();
+  
+  // 🆕 Widget事件监听系统
+  const eventEmitterRef = useRef<{
+    listeners: { [event: string]: ((data: any) => void)[] };
+    emit: (event: string, data: any) => void;
+    on: (event: string, handler: (data: any) => void) => void;
   }>({
-    hunt: null,
-    omni: null,
-    dataScientist: null,
-    knowledge: null
+    listeners: {},
+    emit: function(event: string, data: any) {
+      if (this.listeners[event]) {
+        this.listeners[event].forEach(handler => handler(data));
+      }
+    },
+    on: function(event: string, handler: (data: any) => void) {
+      if (!this.listeners[event]) {
+        this.listeners[event] = [];
+      }
+      this.listeners[event].push(handler);
+    }
   });
-  
-  // ================================================================================
-  // 防止无限渲染循环的优化措施
-  // ================================================================================
-  
-  // 稳定的chatActions回调，避免依赖项变化
-  const stableChatActions = useMemo(() => ({
-    addMessage: chatActions.addMessage,
-    sendMessage: chatActions.sendMessage
-  }), [chatActions.addMessage, chatActions.sendMessage]);
-  
-  // 完全禁用日志以解决无限循环问题
-  // useEffect(() => {
-  //   if (process.env.NODE_ENV === 'development') {
-  //     const interval = setInterval(() => {
-  //       console.log('📦 CHAT_MODULE: Status check:', {
-  //         messagesCount: chatInterface.messages.length,
-  //         isLoading: chatInterface.isLoading,
-  //         isTyping: chatInterface.isTyping,
-  //         artifactsCount: artifactLogic.artifacts.length
-  //       });
-  //     }, 5000);
-  //     
-  //     return () => clearInterval(interval);
-  //   }
-  // }, [chatInterface.messages.length, chatInterface.isLoading, chatInterface.isTyping, artifactLogic.artifacts.length]);
 
-  // ================================================================================
-  // Widget状态监听和聊天消息创建 - 优化版本，防止无限渲染
-  // ================================================================================
-
-  // 监听Hunt Widget状态变化 - 创建搜索消息
+  // 🆕 初始化Plugin模式监听
   useEffect(() => {
-    const huntState = chatInterface.widgetStates.hunt;
-    const currentQuery = huntState.lastQuery;
-    const isSearching = huntState.isSearching;
-    
-    // 检查是否已处理过这个查询
-    const lastProcessed = processedStatesRef.current.hunt;
-    const stateKey = `${currentQuery}-${isSearching}`;
-    
-    if (!currentQuery) return;
-    
-    // 避免重复处理相同状态
-    if (lastProcessed?.lastQuery === stateKey) return;
-    
-    // 开始搜索时创建消息
-    if (isSearching && currentQuery) {
-      const artifactId = `hunt-${currentQuery}-searching`;
-      const userMessageId = `hunt-user-${currentQuery}-${Date.now()}`;
-      
-      // 检查消息是否已存在（从当前messages中检查）
-      const messages = chatInterface.messages;
-      const hasArtifact = messages.some(m => m.id === artifactId);
-      const hasUserMessage = messages.some(m => 
-        m.metadata?.appId === 'hunt' && m.metadata?.userInput === currentQuery
-      );
-      
-      if (!hasArtifact && !hasUserMessage) {
-        // Create user message
-        const userMessage: ChatMessage = {
-          id: userMessageId,
-          role: 'user',
-          content: currentQuery,
-          timestamp: new Date().toISOString(),
-          processed: true,
-          metadata: {
-            type: 'user_input',
-            appId: 'hunt',
-            appName: 'Hunt',
-            appIcon: '🔍'
-          }
-        };
-        stableChatActions.addMessage(userMessage);
+    // 动态导入WidgetHandler避免循环依赖
+    const initializePluginMode = async () => {
+      try {
+        const { widgetHandler } = await import('../components/core/WidgetHandler');
         
-        // Create artifact message
-        const artifactMessage: ChatMessage = {
-          id: artifactId,
-          role: 'assistant',
-          content: '',
-          timestamp: new Date().toISOString(),
-          metadata: {
-            type: 'artifact',
-            appId: 'hunt',
-            appName: 'Hunt',
-            appIcon: '🔍',
-            title: 'Searching...',
-            userInput: currentQuery,
-            artifactData: {
-              type: 'search_results',
-              content: [],
-              metadata: { 
-                query: currentQuery, 
-                isSearching: true,
-                resultCount: 0
-              }
-            }
-          },
-          isStreaming: true,
-          streamingStatus: 'Searching...'
-        };
-        stableChatActions.addMessage(artifactMessage);
+        // 设置WidgetHandler为Plugin模式
+        widgetHandler.setPluginMode(eventEmitterRef.current);
         
-        logger.info(LogCategory.CHAT_FLOW, 'Hunt search messages created', {
-          query: currentQuery,
-          userMessageId,
-          artifactMessageId: artifactId
-        });
+        // 🆕 设置全局Plugin模式标志，防止BaseWidgetStore重复创建artifact
+        if (typeof window !== 'undefined') {
+          (window as any).__CHAT_MODULE_PLUGIN_MODE__ = true;
+        }
+        
+        // 监听Widget请求事件
+        eventEmitterRef.current.on('widget:request', handleWidgetRequest);
+        
+        console.log('🔌 CHAT_MODULE: Plugin mode initialized, Widget events will be handled by ChatModule');
+        
+      } catch (error) {
+        console.error('❌ CHAT_MODULE: Failed to initialize Plugin mode:', error);
       }
-      
-      // 更新已处理状态
-      processedStatesRef.current.hunt = {
-        lastQuery: stateKey,
-        timestamp: Date.now()
-      };
-    }
-  }, [
-    chatInterface.widgetStates.hunt.isSearching,
-    chatInterface.widgetStates.hunt.lastQuery,
-    stableChatActions
-  ]);
-
-  // 监听Hunt搜索完成 - 更新搜索结果
-  useEffect(() => {
-    const huntState = chatInterface.widgetStates.hunt;
-    const currentQuery = huntState.lastQuery;
-    const isSearching = huntState.isSearching;
-    const searchResults = huntState.searchResults;
+    };
     
-    // 搜索完成时更新结果
-    if (!isSearching && currentQuery && searchResults.length > 0) {
-      const messageId = `hunt-${currentQuery}-searching`;
-      const messages = chatInterface.messages;
-      const existingMessage = messages.find(m => m.id === messageId);
+    initializePluginMode();
+    
+    // 清理函数
+    return () => {
+      // 重置为Independent模式
+      import('../components/core/WidgetHandler').then(({ widgetHandler }) => {
+        widgetHandler.setIndependentMode();
+      });
       
-      if (existingMessage && existingMessage.isStreaming) {
-        const updatedMessage: ChatMessage = {
-          ...existingMessage,
-          content: `Found ${searchResults.length} search results for "${currentQuery}"`,
-          isStreaming: false,
-          streamingStatus: undefined,
-          metadata: {
-            ...existingMessage.metadata,
-            title: `Search Results: ${currentQuery}`,
-            artifactData: {
-              type: 'search_results',
-              content: searchResults,
-              metadata: { 
-                query: currentQuery, 
-                isSearching: false,
-                resultCount: searchResults.length
-              }
-            }
-          }
-        };
-        stableChatActions.addMessage(updatedMessage);
-        
-        logger.info(LogCategory.CHAT_FLOW, 'Hunt search results updated', {
-          query: currentQuery,
-          resultCount: searchResults.length,
-          messageId
-        });
+      // 🆕 清理全局Plugin模式标志
+      if (typeof window !== 'undefined') {
+        (window as any).__CHAT_MODULE_PLUGIN_MODE__ = false;
       }
-    }
-  }, [
-    chatInterface.widgetStates.hunt.isSearching,
-    chatInterface.widgetStates.hunt.lastQuery,
-    chatInterface.widgetStates.hunt.searchResults.length, // 只监听长度变化
-    stableChatActions
-  ]);
+    };
+  }, []);
 
-  // 监听Omni Widget状态变化 - 创建内容生成消息
-  useEffect(() => {
-    const omniState = chatInterface.widgetStates.omni;
-    const currentPrompt = omniState.lastParams?.prompt;
-    const isGenerating = omniState.isGenerating;
+  // 🆕 Helper方法：映射Plugin输出类型到Artifact内容类型
+  const mapPluginTypeToContentType = useCallback((pluginType: string): 'image' | 'text' | 'data' | 'analysis' | 'knowledge' => {
+    switch (pluginType) {
+      case 'image': return 'image';
+      case 'data': return 'data';
+      case 'search_results': return 'analysis';
+      case 'search': return 'analysis';
+      case 'knowledge': return 'knowledge';
+      case 'text':
+      default: return 'text';
+    }
+  }, []);
+
+  // 🆕 处理Widget请求事件
+  const handleWidgetRequest = useCallback(async (eventData: any) => {
+    console.log('🔌 CHAT_MODULE: Received widget request event:', eventData);
     
-    if (!currentPrompt) return;
+    const { widgetType, params, requestId } = eventData;
     
-    const stateKey = `${currentPrompt}-${isGenerating}`;
-    const lastProcessed = processedStatesRef.current.omni;
+    // 🆕 设置Chat loading状态
+    chatActions.setChatLoading(true);
     
-    if (lastProcessed?.lastPrompt === stateKey) return;
+    // CRITICAL: Check user credits before processing widget request
+    console.log('💳 CHAT_MODULE: Credit check details:', {
+      hasCredits: userModule.hasCredits,
+      credits: userModule.credits,
+      totalCredits: userModule.totalCredits,
+      currentPlan: userModule.currentPlan
+    });
     
-    if (isGenerating) {
-      const artifactId = `omni-${currentPrompt}-generating`;
-      const userMessageId = `omni-user-${currentPrompt}-${Date.now()}`;
+    // 🆕 在开发环境下跳过信用检查
+    const shouldSkipCreditCheck = process.env.NODE_ENV === 'development';
+    
+    if (!userModule.hasCredits && !shouldSkipCreditCheck) {
+      console.warn('💳 CHAT_MODULE: User has no credits, blocking widget request');
       
-      const messages = chatInterface.messages;
-      const hasMessages = messages.some(m => 
-        m.id === artifactId || (m.metadata?.appId === 'omni' && m.metadata?.userInput === currentPrompt)
-      );
+      // 🆕 发出错误事件给Widget
+      eventEmitterRef.current.emit('widget:result', {
+        widgetType,
+        requestId,
+        error: 'Insufficient credits',
+        success: false
+      });
       
-      if (!hasMessages) {
-        // Create user message
-        const userMessage: ChatMessage = {
-          id: userMessageId,
-          role: 'user',
-          content: currentPrompt,
-          timestamp: new Date().toISOString(),
-          processed: true,
-          metadata: {
-            type: 'user_input',
-            appId: 'omni',
-            appName: 'Omni Content',
-            appIcon: '⚡'
-          }
-        };
-        stableChatActions.addMessage(userMessage);
-        
-        // Create artifact message
-        const artifactMessage: ChatMessage = {
-          id: artifactId,
-          role: 'assistant',
-          content: '',
-          timestamp: new Date().toISOString(),
-          metadata: {
-            type: 'artifact',
-            appId: 'omni',
-            appName: 'Omni Content',
-            appIcon: '⚡',
-            title: 'Generating Content...',
-            userInput: currentPrompt,
-            artifactData: {
-              type: 'text',
-              content: 'Loading...',
-              metadata: omniState.lastParams
-            }
-          },
-          isStreaming: true,
-          streamingStatus: 'Generating content...'
-        };
-        stableChatActions.addMessage(artifactMessage);
-        
-        logger.info(LogCategory.CHAT_FLOW, 'Omni generation messages created', {
-          prompt: currentPrompt,
-          userMessageId,
-          artifactMessageId: artifactId
-        });
+      setShowUpgradeModal(true);
+      return;
+    }
+    
+    if (shouldSkipCreditCheck) {
+      console.log('🔓 CHAT_MODULE: Development mode - skipping credit check');
+    }
+    
+    // 确保有valid session
+    let activeSessionId = currentSession?.id;
+    if (!currentSession || !activeSessionId) {
+      const newSessionTitle = `${widgetType.toUpperCase()} Widget - ${new Date().toLocaleTimeString()}`;
+      const newSession = sessionActions.createSession(newSessionTitle);
+      sessionActions.selectSession(newSession.id);
+      activeSessionId = newSession.id;
+      
+      console.log('📝 CHAT_MODULE: Auto-created session for widget request:', {
+        sessionId: newSession.id,
+        widgetType
+      });
+    }
+    
+    // 创建用户消息 (显示用户的Widget操作)
+    const userMessage = {
+      id: `user-widget-${requestId}`,
+      type: 'regular' as const,
+      role: 'user' as const,
+      content: params.prompt || `Generate ${widgetType} content`,
+      timestamp: new Date().toISOString(),
+      sessionId: activeSessionId,
+      metadata: {
+        widgetType,
+        widgetRequest: true,
+        originalParams: params
       }
-      
-      processedStatesRef.current.omni = {
-        lastPrompt: stateKey,
-        timestamp: Date.now()
-      };
-    }
-  }, [
-    chatInterface.widgetStates.omni.isGenerating,
-    chatInterface.widgetStates.omni.lastParams?.prompt,
-    stableChatActions
-  ]);
-
-  // 监听Omni生成完成 - 更新生成内容
-  useEffect(() => {
-    const omniState = chatInterface.widgetStates.omni;
-    const currentPrompt = omniState.lastParams?.prompt;
-    const isGenerating = omniState.isGenerating;
-    const generatedContent = omniState.generatedContent;
+    };
     
-    if (!isGenerating && currentPrompt && generatedContent) {
-      const messageId = `omni-${currentPrompt}-generating`;
-      const messages = chatInterface.messages;
-      const existingMessage = messages.find(m => m.id === messageId);
+    console.log('📨 CHAT_MODULE: Adding widget user message to chat');
+    chatActions.addMessage(userMessage);
+    
+    // 通过PluginManager处理Widget请求
+    try {
+      const pluginResult = await executePlugin(widgetType, {
+        prompt: params.prompt || `Generate ${widgetType} content`,
+        options: params,
+        context: {
+          sessionId: activeSessionId,
+          userId: auth0User?.sub || 'anonymous',
+          messageId: userMessage.id,
+          requestId
+        }
+      });
       
-      if (existingMessage && existingMessage.isStreaming) {
-        const updatedMessage: ChatMessage = {
-          ...existingMessage,
-          content: generatedContent,
-          isStreaming: false,
-          streamingStatus: undefined,
-          metadata: {
-            ...existingMessage.metadata,
-            title: 'Generated Content',
-            artifactData: {
-              type: 'text',
-              content: generatedContent,
-              metadata: omniState.lastParams
+      if (pluginResult.success && pluginResult.output) {
+        // 🆕 创建Artifact消息而不是普通消息
+        const artifactMessage = {
+          id: `assistant-widget-${requestId}`,
+          type: 'artifact' as const,
+          role: 'assistant' as const,
+          content: typeof pluginResult.output.content === 'string' 
+            ? pluginResult.output.content 
+            : JSON.stringify(pluginResult.output.content),
+          timestamp: new Date().toISOString(),
+          sessionId: activeSessionId,
+          userPrompt: params.prompt || `${widgetType} request`,
+          artifact: {
+            id: pluginResult.output.id || `${widgetType}_${Date.now()}`,
+            widgetType: widgetType,
+            widgetName: widgetType.charAt(0).toUpperCase() + widgetType.slice(1),
+            version: 1,
+            contentType: mapPluginTypeToContentType(pluginResult.output.type || 'text'),
+            content: typeof pluginResult.output.content === 'string' 
+              ? pluginResult.output.content 
+              : JSON.stringify(pluginResult.output.content),
+            thumbnail: (pluginResult.output as any).thumbnail,
+            metadata: {
+              processingTime: pluginResult.executionTime,
+              createdBy: 'plugin',
+              pluginResult: pluginResult.output
             }
           }
         };
-        stableChatActions.addMessage(updatedMessage);
         
-        logger.info(LogCategory.CHAT_FLOW, 'Omni content generation completed', {
-          prompt: currentPrompt,
-          contentLength: generatedContent.length,
-          messageId
+        chatActions.addMessage(artifactMessage);
+        
+        // 🆕 清除Chat loading状态
+        chatActions.setChatLoading(false);
+        
+        // 🆕 将结果通过事件系统返回给Widget UI
+        console.log('🔌 CHAT_MODULE: Emitting widget:result event:', {
+          widgetType,
+          requestId,
+          result: pluginResult.output,
+          success: true
         });
-      }
-    }
-  }, [
-    chatInterface.widgetStates.omni.isGenerating,
-    chatInterface.widgetStates.omni.lastParams?.prompt,
-    chatInterface.widgetStates.omni.generatedContent,
-    stableChatActions
-  ]);
-
-  // 监听DataScientist Widget状态变化 - 创建数据分析消息
-  useEffect(() => {
-    const dataScientistState = chatInterface.widgetStates.dataScientist;
-    const currentQuery = dataScientistState.lastParams?.query;
-    const isAnalyzing = dataScientistState.isAnalyzing;
-    
-    if (!currentQuery) return;
-    
-    const stateKey = `${currentQuery}-${isAnalyzing}`;
-    const lastProcessed = processedStatesRef.current.dataScientist;
-    
-    if (lastProcessed?.lastQuery === stateKey) return;
-    
-    if (isAnalyzing) {
-      const artifactId = `data-scientist-${currentQuery}-analyzing`;
-      const userMessageId = `data-scientist-user-${currentQuery}-${Date.now()}`;
-      
-      const messages = chatInterface.messages;
-      const hasMessages = messages.some(m => 
-        m.id === artifactId || (m.metadata?.appId === 'data_scientist' && m.metadata?.userInput === currentQuery)
-      );
-      
-      if (!hasMessages) {
-        // Create user message
-        const userMessage: ChatMessage = {
-          id: userMessageId,
-          role: 'user',
-          content: currentQuery,
-          timestamp: new Date().toISOString(),
-          processed: true,
-          metadata: {
-            type: 'user_input',
-            appId: 'data_scientist',
-            appName: 'DataWise Analytics',
-            appIcon: '📊'
-          }
-        };
-        stableChatActions.addMessage(userMessage);
         
-        // Create artifact message
-        const artifactMessage: ChatMessage = {
-          id: artifactId,
-          role: 'assistant',
-          content: '',
-          timestamp: new Date().toISOString(),
-          metadata: {
-            type: 'artifact',
-            appId: 'data_scientist',
-            appName: 'DataWise Analytics',
-            appIcon: '📊',
-            title: 'Analyzing Data...',
-            userInput: currentQuery,
-            artifactData: {
-              type: 'data_analysis',
-              content: { 
-                analysis: { summary: 'Loading...', insights: [], recommendations: [] }, 
-                visualizations: [], 
-                statistics: {} 
-              },
-              metadata: dataScientistState.lastParams
-            }
-          },
-          isStreaming: true,
-          streamingStatus: 'Analyzing data...'
-        };
-        stableChatActions.addMessage(artifactMessage);
+        eventEmitterRef.current.emit('widget:result', {
+          widgetType,
+          requestId,
+          result: pluginResult.output,
+          success: true
+        });
         
-        logger.info(LogCategory.CHAT_FLOW, 'DataScientist analysis messages created', {
-          query: currentQuery,
-          userMessageId,
-          artifactMessageId: artifactId
+        console.log('✅ CHAT_MODULE: Widget request processed successfully via Plugin system, artifact created');
+        
+      } else {
+        console.error('❌ CHAT_MODULE: Widget plugin execution failed:', pluginResult.error);
+        
+        // 🆕 清除Chat loading状态
+        chatActions.setChatLoading(false);
+        
+        // 🆕 发出错误事件
+        eventEmitterRef.current.emit('widget:result', {
+          widgetType,
+          requestId,
+          error: pluginResult.error,
+          success: false
         });
       }
       
-      processedStatesRef.current.dataScientist = {
-        lastQuery: stateKey,
-        timestamp: Date.now()
-      };
+    } catch (error) {
+      console.error('❌ CHAT_MODULE: Widget request processing failed:', error);
+      
+      // 🆕 清除Chat loading状态
+      chatActions.setChatLoading(false);
+      
+      // 🆕 发出错误事件
+      eventEmitterRef.current.emit('widget:result', {
+        widgetType,
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+        success: false
+      });
     }
-  }, [
-    chatInterface.widgetStates.dataScientist.isAnalyzing,
-    chatInterface.widgetStates.dataScientist.lastParams?.query,
-    stableChatActions
-  ]);
-
-  // 监听DataScientist分析完成 - 更新分析结果
-  useEffect(() => {
-    const dataScientistState = chatInterface.widgetStates.dataScientist;
-    const currentQuery = dataScientistState.lastParams?.query;
-    const isAnalyzing = dataScientistState.isAnalyzing;
-    const analysisResult = dataScientistState.analysisResult;
     
-    if (!isAnalyzing && currentQuery && analysisResult) {
-      const messageId = `data-scientist-${currentQuery}-analyzing`;
-      const messages = chatInterface.messages;
-      const existingMessage = messages.find(m => m.id === messageId);
-      
-      if (existingMessage && existingMessage.isStreaming) {
-        const updatedMessage: ChatMessage = {
-          ...existingMessage,
-          content: analysisResult.analysis?.summary || 'Analysis completed',
-          isStreaming: false,
-          streamingStatus: undefined,
-          metadata: {
-            ...existingMessage.metadata,
-            title: 'Data Analysis Results',
-            artifactData: {
-              type: 'data_analysis',
-              content: analysisResult,
-              metadata: dataScientistState.lastParams
-            }
-          }
-        };
-        stableChatActions.addMessage(updatedMessage);
-        
-        logger.info(LogCategory.CHAT_FLOW, 'DataScientist analysis completed', {
-          query: currentQuery,
-          messageId
-        });
-      }
-    }
-  }, [
-    chatInterface.widgetStates.dataScientist.isAnalyzing,
-    chatInterface.widgetStates.dataScientist.lastParams?.query,
-    chatInterface.widgetStates.dataScientist.analysisResult,
-    stableChatActions
-  ]);
-
-  // 监听Knowledge Widget状态变化 - 创建文档分析消息
-  useEffect(() => {
-    const knowledgeState = chatInterface.widgetStates.knowledge;
-    const currentQuery = knowledgeState.lastParams?.query;
-    const isProcessing = knowledgeState.isProcessing;
-    
-    if (!currentQuery) return;
-    
-    const stateKey = `${currentQuery}-${isProcessing}`;
-    const lastProcessed = processedStatesRef.current.knowledge;
-    
-    if (lastProcessed?.lastQuery === stateKey) return;
-    
-    if (isProcessing) {
-      const artifactId = `knowledge-${currentQuery}-processing`;
-      const userMessageId = `knowledge-user-${currentQuery}-${Date.now()}`;
-      
-      const messages = chatInterface.messages;
-      const hasMessages = messages.some(m => 
-        m.id === artifactId || (m.metadata?.appId === 'knowledge' && m.metadata?.userInput === currentQuery)
-      );
-      
-      if (!hasMessages) {
-        // Create user message
-        const userMessage: ChatMessage = {
-          id: userMessageId,
-          role: 'user',
-          content: currentQuery,
-          timestamp: new Date().toISOString(),
-          processed: true,
-          metadata: {
-            type: 'user_input',
-            appId: 'knowledge',
-            appName: 'Knowledge Hub',
-            appIcon: '📚'
-          }
-        };
-        stableChatActions.addMessage(userMessage);
-        
-        // Create artifact message
-        const artifactMessage: ChatMessage = {
-          id: artifactId,
-          role: 'assistant',
-          content: '',
-          timestamp: new Date().toISOString(),
-          metadata: {
-            type: 'artifact',
-            appId: 'knowledge',
-            appName: 'Knowledge Hub',
-            appIcon: '📚',
-            title: 'Analyzing Documents...',
-            userInput: currentQuery,
-            artifactData: {
-              type: 'document_analysis',
-              content: 'Loading...',
-              metadata: { 
-                ...knowledgeState.lastParams,
-                documentCount: knowledgeState.documents.length
-              }
-            }
-          },
-          isStreaming: true,
-          streamingStatus: 'Analyzing documents...'
-        };
-        stableChatActions.addMessage(artifactMessage);
-        
-        logger.info(LogCategory.CHAT_FLOW, 'Knowledge analysis messages created', {
-          query: currentQuery,
-          documentCount: knowledgeState.documents.length,
-          userMessageId,
-          artifactMessageId: artifactId
-        });
-      }
-      
-      processedStatesRef.current.knowledge = {
-        lastQuery: stateKey,
-        timestamp: Date.now()
-      };
-    }
-  }, [
-    chatInterface.widgetStates.knowledge.isProcessing,
-    chatInterface.widgetStates.knowledge.lastParams?.query,
-    chatInterface.widgetStates.knowledge.documents.length, // 只监听长度变化
-    stableChatActions
-  ]);
-
-  // 监听Knowledge分析完成 - 更新分析结果
-  useEffect(() => {
-    const knowledgeState = chatInterface.widgetStates.knowledge;
-    const currentQuery = knowledgeState.lastParams?.query;
-    const isProcessing = knowledgeState.isProcessing;
-    const analysisResult = knowledgeState.analysisResult;
-    
-    if (!isProcessing && currentQuery && analysisResult) {
-      const messageId = `knowledge-${currentQuery}-processing`;
-      const messages = chatInterface.messages;
-      const existingMessage = messages.find(m => m.id === messageId);
-      
-      if (existingMessage && existingMessage.isStreaming) {
-        const updatedMessage: ChatMessage = {
-          ...existingMessage,
-          content: analysisResult,
-          isStreaming: false,
-          streamingStatus: undefined,
-          metadata: {
-            ...existingMessage.metadata,
-            title: 'Document Analysis Results',
-            artifactData: {
-              type: 'document_analysis',
-              content: analysisResult,
-              metadata: { 
-                ...knowledgeState.lastParams,
-                documentCount: knowledgeState.documents.length
-              }
-            }
-          }
-        };
-        stableChatActions.addMessage(updatedMessage);
-        
-        logger.info(LogCategory.CHAT_FLOW, 'Knowledge analysis completed', {
-          query: currentQuery,
-          documentCount: knowledgeState.documents.length,
-          messageId
-        });
-      }
-    }
-  }, [
-    chatInterface.widgetStates.knowledge.isProcessing,
-    chatInterface.widgetStates.knowledge.lastParams?.query,
-    chatInterface.widgetStates.knowledge.analysisResult,
-    chatInterface.widgetStates.knowledge.documents.length, // 只监听长度变化
-    stableChatActions
-  ]);
+  }, [chatActions, auth0User, currentSession, sessionActions, userModule, setShowUpgradeModal, mapPluginTypeToContentType]);
 
   // ================================================================================
   // 消息发送业务逻辑 - 原有的消息发送处理
@@ -657,17 +333,11 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   const handleSendMessage = useCallback(async (content: string, metadata?: Record<string, any>) => {
     
     // CRITICAL: Check user credits before sending message
-    
     if (!userModule.hasCredits) {
       console.warn('💳 CHAT_MODULE: User has no credits, blocking message send');
-      
-      // Show elegant upgrade modal instead of window.confirm
       setShowUpgradeModal(true);
-      
-      // Prevent message from being sent
       return;
     }
-    
     
     // Ensure we have a valid session before sending message
     let sessionId = currentSession?.id;
@@ -683,11 +353,6 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
         sessionId: newSession.id,
         messagePreview: content.substring(0, 50)
       });
-      
-      console.log('📝 CHAT_MODULE: Auto-created new session for message:', {
-        sessionId: newSession.id,
-        title: newSession.title
-      });
     }
     
     // Business logic: Enrich metadata with user and session info
@@ -697,34 +362,117 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       session_id: sessionId
     };
     
-    // Create user message and add to store
+    // ✅ STEP 1: Create user message (ChatModule responsible for ALL message creation)
     const userMessage = {
-      id: `user-${Date.now()}`,
+      id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+      type: 'regular' as const,
       role: 'user' as const,
       content: content,
       timestamp: new Date().toISOString(),
+      sessionId: sessionId,
       metadata: enrichedMetadata,
-      processed: true // Mark as processed since we're handling it directly
+      processed: true
     };
     
     console.log('📨 CHAT_MODULE: Adding user message to store');
     chatActions.addMessage(userMessage);
     
-    // 直接调用 sendMessage API，不再依赖 reactive subscriber
-    console.log('📨 CHAT_MODULE: Calling sendMessage API directly');
+    // ✅ STEP 2: Check if message triggers a plugin
+    const pluginTrigger = detectPluginTrigger(content);
     
-    try {
-      // 获取用户token用于API认证
-      const token = await userModule.getAccessToken();
-      console.log('🔑 CHAT_MODULE: Retrieved access token for API call');
+    if (pluginTrigger.triggered && pluginTrigger.pluginId) {
+      // 🔌 PLUGIN ROUTE: Handle via Plugin System
+      console.log('🔌 CHAT_MODULE: Plugin detected, routing to PluginManager:', pluginTrigger);
       
-      await chatActions.sendMessage(content, enrichedMetadata, token);
-      console.log('✅ CHAT_MODULE: Message sent successfully');
-    } catch (error) {
-      console.error('❌ CHAT_MODULE: Failed to send message:', error);
-      throw error; // Re-throw to let the UI handle the error
+      try {
+        // Create processing message for plugin
+        const processingMessage = {
+          id: `assistant-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+          type: 'regular' as const,
+          role: 'assistant' as const,
+          content: '',
+          timestamp: new Date().toISOString(),
+          sessionId: sessionId,
+          isStreaming: true,
+          streamingStatus: `Processing with ${pluginTrigger.pluginId} plugin...`,
+          metadata: {
+            ...enrichedMetadata,
+            pluginId: pluginTrigger.pluginId,
+            trigger: pluginTrigger.trigger
+          }
+        };
+        
+        chatActions.addMessage(processingMessage);
+        
+        // Execute plugin
+        const pluginInput = {
+          prompt: pluginTrigger.extractedParams?.prompt || content,
+          options: pluginTrigger.extractedParams || {},
+          context: {
+            sessionId,
+            userId: auth0User?.sub || 'anonymous',
+            messageId: userMessage.id
+          }
+        };
+        
+        const pluginResult = await executePlugin(pluginTrigger.pluginId as any, pluginInput);
+        
+        if (pluginResult.success && pluginResult.output) {
+          // Update processing message with plugin result
+          const completedMessage = {
+            ...processingMessage,
+            content: typeof pluginResult.output.content === 'string' 
+              ? pluginResult.output.content 
+              : JSON.stringify(pluginResult.output.content),
+            isStreaming: false,
+            streamingStatus: undefined,
+            metadata: {
+              ...processingMessage.metadata,
+              pluginResult: pluginResult.output,
+              executionTime: pluginResult.executionTime
+            }
+          };
+          
+          chatActions.addMessage(completedMessage);
+          console.log('✅ CHAT_MODULE: Plugin execution completed successfully');
+          
+        } else {
+          // Handle plugin error
+          const errorMessage = {
+            ...processingMessage,
+            content: `Plugin execution failed: ${pluginResult.error}`,
+            isStreaming: false,
+            streamingStatus: undefined,
+            metadata: {
+              ...processingMessage.metadata,
+              error: pluginResult.error
+            }
+          };
+          
+          chatActions.addMessage(errorMessage);
+          console.error('❌ CHAT_MODULE: Plugin execution failed:', pluginResult.error);
+        }
+        
+      } catch (error) {
+        console.error('❌ CHAT_MODULE: Plugin system error:', error);
+        // Handle plugin system error - could still fall back to regular chat
+      }
+      
+    } else {
+      // 💬 REGULAR CHAT ROUTE: Handle via ChatService API
+      console.log('💬 CHAT_MODULE: No plugin detected, using ChatService API');
+      
+      try {
+        const token = await userModule.getAccessToken();
+        await chatActions.sendMessage(content, enrichedMetadata, token);
+        console.log('✅ CHAT_MODULE: Regular chat message sent successfully');
+      } catch (error) {
+        console.error('❌ CHAT_MODULE: Failed to send regular chat message:', error);
+        throw error;
+      }
     }
-  }, [stableChatActions, auth0User, currentSession, sessionActions, userModule]);
+    
+  }, [chatActions, auth0User, currentSession, sessionActions, userModule]);
 
   // Business logic: Handle multimodal message sending
   const handleSendMultimodal = useCallback(async (content: string, files: File[], metadata?: Record<string, any>) => {
@@ -772,9 +520,11 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     // Create user message and add to store
     const userMessage = {
       id: `user-${Date.now()}`,
+      type: 'regular' as const,
       role: 'user' as const,
       content: content,
       timestamp: new Date().toISOString(),
+      sessionId: metadata?.session_id || 'default',
       metadata: enrichedMetadata,
       processed: true // Mark as processed since we're handling it directly
     };
@@ -797,6 +547,34 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       throw error;
     }
   }, [chatActions, auth0User, userModule]);
+
+  // Handle message click for artifact navigation
+  const handleMessageClick = useCallback((message: ChatMessage) => {
+    console.log('💬 CHAT_MODULE: Message clicked:', message);
+    
+    // Check if this is an artifact message and navigate to the corresponding widget
+    if (message.type === 'artifact') {
+      const artifactMessage = message as ArtifactMessage;
+      const widgetType = artifactMessage.artifact.widgetType;
+      
+      // Map widget types to app IDs
+      const widgetToAppMap = {
+        'dream': 'dream',
+        'hunt': 'hunt', 
+        'omni': 'omni',
+        'data_scientist': 'data-scientist',
+        'knowledge': 'knowledge'
+      };
+      
+      const appId = widgetToAppMap[widgetType as keyof typeof widgetToAppMap];
+      if (appId) {
+        console.log(`🔄 CHAT_MODULE: Navigating to ${appId} widget for artifact:`, artifactMessage.artifact.id);
+        setCurrentApp(appId);
+      } else {
+        console.warn('💬 CHAT_MODULE: Unknown widget type for navigation:', widgetType);
+      }
+    }
+  }, [setCurrentApp]);
 
   // Handle upgrade modal actions
   const handleUpgrade = useCallback(async (planType: 'pro' | 'enterprise') => {
@@ -827,6 +605,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
         isTyping={chatInterface.isTyping}
         onSendMessage={handleSendMessage}
         onSendMultimodal={handleSendMultimodal}
+        onMessageClick={handleMessageClick}
       />
       
       {/* Upgrade Modal */}

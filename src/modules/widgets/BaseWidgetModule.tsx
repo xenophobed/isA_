@@ -162,16 +162,38 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
   
   // Update current output item
   const updateCurrentOutput = useCallback((updates: Partial<OutputHistoryItem>) => {
-    if (!currentOutput) return;
+    console.log(`🔍 ${config.type.toUpperCase()}_MODULE: updateCurrentOutput called:`, {
+      hasCurrentOutput: !!currentOutput,
+      currentOutput: currentOutput,
+      updates: updates
+    });
+    
+    if (!currentOutput) {
+      console.warn(`⚠️ ${config.type.toUpperCase()}_MODULE: No currentOutput to update, creating new one`);
+      // 创建新的output如果不存在
+      const newOutput = {
+        id: `output_${Date.now()}`,
+        timestamp: new Date(),
+        type: 'text' as const,
+        title: 'Processing...',
+        content: '',
+        ...updates
+      };
+      setCurrentOutput(newOutput);
+      console.log(`📋 ${config.type.toUpperCase()}_MODULE: Created new currentOutput:`, newOutput);
+      return;
+    }
     
     const updatedOutput = { ...currentOutput, ...updates };
     setCurrentOutput(updatedOutput);
+    
+    console.log(`📋 ${config.type.toUpperCase()}_MODULE: Updated currentOutput:`, updatedOutput);
     
     // Update in history as well
     setOutputHistory(prev =>
       prev.map(item => item.id === currentOutput.id ? updatedOutput : item)
     );
-  }, [currentOutput]);
+  }, [currentOutput, config.type]);
   
   // Start processing with streaming support
   const startProcessing = useCallback(async (params: TParams): Promise<void> => {
@@ -180,6 +202,14 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
     setIsProcessing(true);
     setIsStreaming(true);
     setStreamingContent('');
+    
+    // Create unique message IDs to prevent duplicates
+    const timestamp = Date.now();
+    const uniqueId = `${config.type}_${timestamp}_${Math.random().toString(36).substring(2, 11)}`;
+    
+    // ❌ REMOVED: Message creation logic moved to ChatModule
+    // Widget modules should NOT create messages directly
+    // All message creation is now handled by ChatModule via PluginManager
     
     // Add initial output item
     const outputItem = addToHistory({
@@ -202,14 +232,45 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
       });
       logger.info(LogCategory.ARTIFACT_CREATION, `${config.type} module routing request via WidgetHandler`, { params });
       
-      await widgetHandler.processRequest({
+      // 🆕 等待Plugin结果时显示loading状态
+      setIsStreaming(true);
+      setStreamingContent('Processing request...');
+      
+      const pluginResult = await widgetHandler.processRequest({
         type: config.type,
         params,
         sessionId: `${config.sessionIdPrefix}_${Date.now()}`,
         userId: 'widget_user'
       });
       
-      console.log(`✅ ${config.type.toUpperCase()}_MODULE: Request successfully routed to store`);
+      console.log(`🔌 ${config.type.toUpperCase()}_MODULE: WidgetHandler returned:`, pluginResult);
+      
+      // 🆕 如果是Plugin模式，处理返回的结果
+      if (pluginResult && pluginResult.content) {
+        console.log(`🔌 ${config.type.toUpperCase()}_MODULE: Received Plugin result:`, pluginResult);
+        
+        // 更新Widget的output显示
+        const outputUpdate = {
+          type: pluginResult.type || 'text', // 使用Plugin返回的实际类型
+          title: `${config.type} completed`,
+          content: pluginResult.content,
+          timestamp: new Date()
+        };
+        
+        console.log(`🔌 ${config.type.toUpperCase()}_MODULE: Updating currentOutput with:`, outputUpdate);
+        updateCurrentOutput(outputUpdate);
+        
+        // 🆕 清除所有loading状态
+        setIsStreaming(false);
+        setStreamingContent('');
+        setIsProcessing(false); // 🚀 设置处理完成
+        
+        // 调用完成回调
+        config.onProcessComplete?.(pluginResult);
+        
+      } else {
+        console.log(`✅ ${config.type.toUpperCase()}_MODULE: Request successfully routed to store (Independent mode)`);
+      }
       
     } catch (error) {
       console.error(`❌ ${config.type.toUpperCase()}_MODULE: WidgetHandler request failed:`, error);
@@ -223,10 +284,13 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
         isStreaming: false
       });
       
+      // 🆕 清除loading状态 
+      setIsStreaming(false);
+      setStreamingContent('');
+      
       config.onProcessError?.(error instanceof Error ? error : new Error('Unknown error'));
       
       setIsProcessing(false);
-      setIsStreaming(false);
     }
   }, [config, addToHistory, updateCurrentOutput, onResultGenerated]);
   
@@ -331,6 +395,10 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
             outputContent = typeof widgetData.analysisResult === 'string' ? widgetData.analysisResult : JSON.stringify(widgetData.analysisResult);
           }
         }
+        
+        // ❌ REMOVED: Chat message updates moved to ChatModule
+        // Widget modules should only manage their internal state
+        // All chat message updates are now handled by ChatModule via PluginManager callbacks
         
         // Update output with actual results (create new output if none exists)
         const updatedOutput = {

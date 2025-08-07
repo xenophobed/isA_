@@ -23,7 +23,8 @@ export enum LogCategory {
   COMPONENT_ERROR = 'COMPONENT_ERROR',
   SIDEBAR_INTERACTION = 'SIDEBAR_INTERACTION',
   EVENT_EMISSION = 'EVENT_EMISSION',
-  CHAT_FLOW = 'CHAT_FLOW'
+  CHAT_FLOW = 'CHAT_FLOW',
+  SYSTEM = 'SYSTEM'
 }
 
 export interface LogEntry {
@@ -136,7 +137,8 @@ class MainAppLogger {
       [LogCategory.COMPONENT_ERROR]: '💥',
       [LogCategory.SIDEBAR_INTERACTION]: '📋',
       [LogCategory.EVENT_EMISSION]: '📡',
-      [LogCategory.CHAT_FLOW]: '💬'
+      [LogCategory.CHAT_FLOW]: '💬',
+      [LogCategory.SYSTEM]: '⚙️'
     };
 
     const timestamp = new Date(entry.timestamp).toISOString().split('T')[1].slice(0, -1);

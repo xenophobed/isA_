@@ -48,6 +48,10 @@ import { widgetHandler } from '../components/core/WidgetHandler';
 import { logger, LogCategory } from '../utils/logger';
 import { AppId } from '../types/appTypes';
 
+// 🆕 Plugin System Integration
+import { initializePluginSystem } from '../plugins';
+import SessionArtifactTester from '../components/debug/SessionArtifactTester';
+
 // Available apps configuration - managed by AppModule but business logic in respective modules
 const AVAILABLE_APPS = [
   { 
@@ -118,10 +122,19 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
   // User Portal state
   const [showUserPortal, setShowUserPortal] = useState(false);
   
+  // 🆕 Initialize Plugin System
+  React.useEffect(() => {
+    try {
+      initializePluginSystem();
+      logger.info(LogCategory.SYSTEM, '🔌 Plugin System initialized in AppModule');
+    } catch (error) {
+      logger.error(LogCategory.SYSTEM, '🔌 Failed to initialize Plugin System', { error });
+    }
+  }, []);
+  
   // Business logic hooks
   const chatInterface = useChat();
   const artifactLogic = useArtifactLogic();
-  const chatActions = useChatActions();
   
   // App state management
   const {
@@ -218,7 +231,11 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
 
   // Render children as render props pattern with business logic data
   return (
-    <AppLayout {...props}>
+    <>
+      {/* 🆕 Session Artifact Tester - Development Only */}
+      <SessionArtifactTester />
+      
+      <AppLayout {...props}>
       {() => ({
         // Simplified Chat with pure module integration
         chatModule: (
@@ -278,6 +295,7 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
           />
         )
       })}
-    </AppLayout>
+      </AppLayout>
+    </>
   );
 };

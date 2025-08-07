@@ -21,49 +21,81 @@
 import { useCallback, useEffect } from 'react';
 import { useChat } from '../hooks/useChat';
 import { useAppStore } from '../stores/useAppStore';
-import { ChatMessage } from '../types/chatTypes';
+import { useSessionStore } from '../stores/useSessionStore';
+import { ChatMessage, ArtifactMessage } from '../types/chatTypes';
+import { AppArtifact } from '../types/appTypes';
 
 /**
- * Artifact Business Logic Hook
+ * Modern Artifact Business Logic Hook
  * 
- * Provides business logic for handling artifacts in the chat interface
+ * Provides unified business logic for handling both legacy AppArtifacts and new ArtifactMessages
  * Used by UI components to get artifact data and handle artifact actions
  */
 export const useArtifactLogic = () => {
-  const { artifacts, latestWidgetArtifact, isAnyWidgetGenerating } = useChat();
+  // Legacy artifact system
+  const { artifacts: legacyArtifacts, latestWidgetArtifact, isAnyWidgetGenerating } = useChat();
   const { setCurrentApp, setShowRightSidebar } = useAppStore();
+  
+  // New artifact message system
+  const { getCurrentSession, getArtifactMessages } = useSessionStore();
+  
+  // Get current session's artifact messages
+  const currentSession = getCurrentSession();
+  const artifactMessages = currentSession ? getArtifactMessages(currentSession.id) : [];
+  
+  console.log('🎨 ARTIFACT_MODULE: Combined artifact state:', {
+    legacyArtifacts: legacyArtifacts?.length || 0,
+    artifactMessages: artifactMessages.length,
+    currentSessionId: currentSession?.id
+  });
 
-  // Business logic: Handle artifact reopening
+  // Business logic: Handle artifact reopening - supports both legacy and new system
   const handleReopenArtifact = useCallback((artifactId: string) => {
-    const artifact = artifacts?.find(a => a.id === artifactId);
-    if (artifact) {
-      console.log('📱 ARTIFACT_MODULE: Reopening artifact app:', artifact.appId);
-      setCurrentApp(artifact.appId);
+    // First try legacy system
+    const legacyArtifact = legacyArtifacts?.find(a => a.id === artifactId);
+    if (legacyArtifact) {
+      console.log('📱 ARTIFACT_MODULE: Reopening legacy artifact app:', legacyArtifact.appId);
+      setCurrentApp(legacyArtifact.appId);
+      setShowRightSidebar(true);
+      return;
+    }
+    
+    // Then try artifact message system
+    const artifactMessage = artifactMessages.find(am => am.artifact.id === artifactId);
+    if (artifactMessage) {
+      console.log('📱 ARTIFACT_MODULE: Reopening artifact from message:', artifactMessage.artifact.widgetType);
+      // Map widget type to app ID
+      const appId = artifactMessage.artifact.widgetType; // 'dream', 'hunt', etc.
+      setCurrentApp(appId);
       setShowRightSidebar(true);
     }
-  }, [artifacts, setCurrentApp, setShowRightSidebar]);
+  }, [legacyArtifacts, artifactMessages, setCurrentApp, setShowRightSidebar]);
 
-  // Business logic: Check if message should show artifacts
+  // Business logic: Get artifacts for message - includes both legacy and new system
   const getArtifactsForMessage = useCallback((index: number, allMessages: ChatMessage[]) => {
     // Show artifacts after the last message to avoid duplication
     const isLastMessage = index === allMessages.length - 1;
     
-    if (!isLastMessage || !artifacts || artifacts.length === 0) {
-      return [];
+    if (!isLastMessage) {
+      return { legacy: [], messages: [] };
     }
 
-    // Return all artifacts for now - you can customize this logic
-    return artifacts;
-  }, [artifacts]);
+    return {
+      legacy: legacyArtifacts || [],
+      messages: artifactMessages
+    };
+  }, [legacyArtifacts, artifactMessages]);
 
   // Business logic: Get artifact generation status
   const getGenerationStatus = useCallback(() => {
     return {
       isGenerating: isAnyWidgetGenerating,
       latestArtifact: latestWidgetArtifact,
-      totalArtifacts: artifacts?.length || 0
+      totalLegacyArtifacts: legacyArtifacts?.length || 0,
+      totalArtifactMessages: artifactMessages.length,
+      totalArtifacts: (legacyArtifacts?.length || 0) + artifactMessages.length
     };
-  }, [isAnyWidgetGenerating, latestWidgetArtifact, artifacts?.length]);
+  }, [isAnyWidgetGenerating, latestWidgetArtifact, legacyArtifacts?.length, artifactMessages.length]);
 
   // 移除这个导致无限循环的 console.log
   // console.log('🎨 ARTIFACT_MODULE: Business logic state:', {
@@ -84,14 +116,43 @@ export const useArtifactLogic = () => {
   // }, [artifacts?.length, latestWidgetArtifact?.appName, isAnyWidgetGenerating]);
 
   return {
-    // Data
-    artifacts: artifacts || [],
+    // Legacy data (for backward compatibility)
+    artifacts: legacyArtifacts || [],
     latestWidgetArtifact,
     isAnyWidgetGenerating,
+    
+    // New artifact message data
+    artifactMessages,
+    currentSession,
     
     // Business logic functions
     handleReopenArtifact,
     getArtifactsForMessage,
+    getGenerationStatus
+  };
+};
+
+/**
+ * Legacy Artifact Business Logic Hook (Deprecated)
+ * 
+ * Maintains the original interface for backward compatibility
+ * New code should use useArtifactLogic() instead
+ */
+export const useArtifactLogicLegacy = () => {
+  const { artifacts, latestWidgetArtifact, isAnyWidgetGenerating, handleReopenArtifact, getArtifactsForMessage, getGenerationStatus } = useArtifactLogic();
+  
+  return {
+    // Legacy data format
+    artifacts,
+    latestWidgetArtifact,
+    isAnyWidgetGenerating,
+    
+    // Legacy business logic functions
+    handleReopenArtifact,
+    getArtifactsForMessage: (index: number, allMessages: ChatMessage[]) => {
+      const result = getArtifactsForMessage(index, allMessages);
+      return result.legacy; // Return only legacy artifacts for backward compatibility
+    },
     getGenerationStatus
   };
 };
@@ -102,4 +163,4 @@ export interface ArtifactModuleProps {
 }
 
 // This module is now purely business logic - no React components
-// UI rendering is handled by MessageList + ArtifactComponent
+// UI rendering is handled by MessageList + ArtifactComponent + ArtifactMessageComponent

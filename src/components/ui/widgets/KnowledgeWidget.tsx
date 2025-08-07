@@ -80,15 +80,18 @@ const detectBestMode = (input: string): KnowledgeMode => {
 };
 
 interface KnowledgeWidgetProps {
-  isProcessing: boolean;
-  result: any;
+  // Props provided by KnowledgeWidgetModule via React.cloneElement (optional for typing)
+  isProcessing?: boolean;
+  result?: any;
+  onProcess?: (params: any) => Promise<void>;
+  onClearResults?: () => void;
+  
+  // Base UI props that can be passed directly
   triggeredInput?: string;
   outputHistory?: OutputHistoryItem[];
   currentOutput?: OutputHistoryItem | null;
   isStreaming?: boolean;
   streamingContent?: string;
-  onProcess: (params: any) => Promise<void>;
-  onClearResults: () => void;
   onSelectOutput?: (item: OutputHistoryItem) => void;
   onClearHistory?: () => void;
   onBack?: () => void;
@@ -323,15 +326,15 @@ const KnowledgeInputArea: React.FC<KnowledgeWidgetProps> = ({
  * Knowledge Widget with BaseWidget - New standardized layout
  */
 export const KnowledgeWidget: React.FC<KnowledgeWidgetProps> = ({
-  isProcessing,
-  result,
+  isProcessing = false,
+  result = null,
   triggeredInput,
   outputHistory = [],
   currentOutput = null,
   isStreaming = false,
   streamingContent = '',
-  onProcess,
-  onClearResults,
+  onProcess = async () => {},
+  onClearResults = () => {},
   onSelectOutput,
   onClearHistory,
   onBack

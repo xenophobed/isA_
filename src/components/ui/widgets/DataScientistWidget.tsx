@@ -106,15 +106,18 @@ interface DataScientistWidgetResult {
 }
 
 interface DataScientistWidgetProps {
-  isAnalyzing: boolean;
-  analysisResult: DataScientistWidgetResult | null;
+  // Props provided by DataScientistWidgetModule via React.cloneElement (optional for typing)
+  isAnalyzing?: boolean;
+  analysisResult?: DataScientistWidgetResult | null;
+  onAnalyzeData?: (params: DataScientistWidgetParams) => Promise<void>;
+  onClearAnalysis?: () => void;
+  
+  // Base UI props that can be passed directly
   triggeredInput?: string;
   outputHistory?: OutputHistoryItem[];
   currentOutput?: OutputHistoryItem | null;
   isStreaming?: boolean;
   streamingContent?: string;
-  onAnalyzeData: (params: DataScientistWidgetParams) => Promise<void>;
-  onClearAnalysis: () => void;
   onSelectOutput?: (item: OutputHistoryItem) => void;
   onClearHistory?: () => void;
   onBack?: () => void;
@@ -321,15 +324,15 @@ const DataScientistInputArea: React.FC<DataScientistWidgetProps> = ({
  * Data Scientist Widget with BaseWidget - New standardized layout
  */
 export const DataScientistWidget: React.FC<DataScientistWidgetProps> = ({
-  isAnalyzing,
-  analysisResult,
+  isAnalyzing = false,
+  analysisResult = null,
   triggeredInput,
   outputHistory = [],
   currentOutput = null,
   isStreaming = false,
   streamingContent = '',
-  onAnalyzeData,
-  onClearAnalysis,
+  onAnalyzeData = async () => {},
+  onClearAnalysis = () => {},
   onSelectOutput,
   onClearHistory,
   onBack

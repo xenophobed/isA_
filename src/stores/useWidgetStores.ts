@@ -93,17 +93,50 @@ export const useDreamWidgetStore = createBaseWidgetStore(
       console.log('🚨DEBUG_DREAM🚨 onArtifactCreated called:', {
         artifactType: artifact.type,
         hasContent: !!artifact.content,
-        contentUrl: artifact.content?.substring(0, 80),
-        currentGeneratedImage: store.generatedImage?.substring(0, 80),
-        shouldUpdate: artifact.type === 'image' && artifact.content && !store.generatedImage
+        contentPreview: artifact.content?.substring(0, 80),
+        currentGeneratedImage: store.generatedImage?.substring(0, 80)
       });
       
-      if (artifact.type === 'image' && artifact.content && !store.generatedImage) {
-        console.log('🚨DEBUG_DREAM🚨 Setting dream generated image:', artifact.content);
-        setDreamGeneratedImage(artifact.content);
+      let imageUrl = null;
+      
+      // Handle direct image URL (type: 'image')
+      if (artifact.type === 'image' && artifact.content) {
+        imageUrl = artifact.content;
+        console.log('🚨DEBUG_DREAM🚨 Direct image URL:', imageUrl);
+      }
+      // Handle JSON data with image URLs (type: 'data')
+      else if (artifact.type === 'data' && artifact.content) {
+        try {
+          const data = JSON.parse(artifact.content);
+          console.log('🚨DEBUG_DREAM🚨 Parsed data artifact:', data);
+          
+          // Extract image URL from different possible structures
+          if (data.data?.image_urls && Array.isArray(data.data.image_urls) && data.data.image_urls.length > 0) {
+            imageUrl = data.data.image_urls[0];
+            console.log('🚨DEBUG_DREAM🚨 Extracted from image_urls array:', imageUrl);
+          } else if (data.image_urls && Array.isArray(data.image_urls) && data.image_urls.length > 0) {
+            imageUrl = data.image_urls[0];
+            console.log('🚨DEBUG_DREAM🚨 Extracted from top-level image_urls:', imageUrl);
+          } else if (data.url) {
+            imageUrl = data.url;
+            console.log('🚨DEBUG_DREAM🚨 Extracted from url field:', imageUrl);
+          }
+        } catch (parseError) {
+          console.error('🚨DEBUG_DREAM🚨 Failed to parse data artifact:', parseError);
+        }
+      }
+      
+      // Set the image if we found a valid URL and don't already have an image
+      if (imageUrl && !store.generatedImage) {
+        console.log('🚨DEBUG_DREAM🚨 Setting dream generated image:', imageUrl);
+        setDreamGeneratedImage(imageUrl);
         helpers.markWithArtifacts();
       } else {
-        console.log('🚨DEBUG_DREAM🚨 NOT setting dream image - conditions not met');
+        console.log('🚨DEBUG_DREAM🚨 NOT setting dream image - conditions not met:', {
+          hasImageUrl: !!imageUrl,
+          hasExistingImage: !!store.generatedImage,
+          imageUrl: imageUrl?.substring(0, 50)
+        });
       }
     }
   }

@@ -42,20 +42,55 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { logger, LogCategory } from '../utils/logger';
 import { createAuthenticatedSessionService } from '../api/sessionService';
 
+// 基础消息接口
+export interface BaseMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+// 普通消息
+export interface RegularMessage extends BaseMessage {
+  type: 'regular';
+  metadata?: {
+    sender?: string;
+    [key: string]: any;
+  };
+}
+
+// Artifact 消息 (Widget 产出)
+export interface ArtifactMessage extends BaseMessage {
+  type: 'artifact';
+  userPrompt: string; // 用户的原始请求
+  artifact: {
+    id: string;
+    widgetType: string; // 'dream' | 'hunt' | etc.
+    widgetName: string; // 'Dream Image Generator'
+    version: number;
+    contentType: 'image' | 'text' | 'data' | 'analysis' | 'knowledge';
+    content: any; // URL, text, or data
+    thumbnail?: string;
+    metadata?: {
+      processingTime?: number;
+      tokenUsage?: number;
+      [key: string]: any;
+    };
+  };
+}
+
+// 统一消息类型
+export type ChatMessage = RegularMessage | ArtifactMessage;
+
 export interface ChatSession {
   id: string;
   title: string;
   lastMessage: string;
   timestamp: string;
   messageCount: number;
-  artifacts: string[];
-  messages: Array<{
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: string;
-    metadata?: any;
-  }>;
+  artifacts: string[]; // 保持兼容性，后续可能移除
+  // 🆕 支持新的消息类型
+  messages: ChatMessage[];
   metadata?: {
     apps_used?: string[];
     total_messages?: number;
@@ -84,8 +119,14 @@ interface SessionActions {
   updateSession: (session: ChatSession) => void;
   
   // Session message operations
-  addMessage: (sessionId: string, message: any) => void;
+  addMessage: (sessionId: string, message: ChatMessage) => void;
   clearMessages: (sessionId: string) => void;
+  
+  // 🆕 Artifact message operations
+  addArtifactMessage: (sessionId: string, artifactMessage: ArtifactMessage) => void;
+  getArtifactMessages: (sessionId?: string) => ArtifactMessage[];
+  getArtifactById: (artifactId: string, sessionId?: string) => ArtifactMessage | null;
+  getArtifactVersions: (artifactId: string, sessionId?: string) => ArtifactMessage[];
   
   // Session state management
   setLoading: (loading: boolean) => void;
@@ -250,6 +291,48 @@ export const useSessionStore = create<SessionStore>()(
       }));
       
       get().saveToStorage();
+    },
+    
+    // 🆕 Artifact message operations
+    addArtifactMessage: (sessionId, artifactMessage) => {
+      // 复用现有的 addMessage 逻辑
+      get().addMessage(sessionId, artifactMessage);
+      
+      logger.info(LogCategory.ARTIFACT_CREATION, 'Artifact message added to session', {
+        sessionId,
+        artifactId: artifactMessage.artifact.id,
+        widgetType: artifactMessage.artifact.widgetType,
+        version: artifactMessage.artifact.version
+      });
+    },
+    
+    getArtifactMessages: (sessionId) => {
+      const { getCurrentSession, getSessionById } = get();
+      const session = sessionId ? getSessionById(sessionId) : getCurrentSession();
+      
+      if (!session) return [];
+      
+      return session.messages
+        .filter((msg): msg is ArtifactMessage => msg.type === 'artifact');
+    },
+    
+    getArtifactById: (artifactId, sessionId) => {
+      const artifactMessages = get().getArtifactMessages(sessionId);
+      
+      // 返回最新版本的 artifact
+      const artifacts = artifactMessages.filter(msg => msg.artifact.id === artifactId);
+      if (artifacts.length === 0) return null;
+      
+      // 按版本号排序，返回最新的
+      return artifacts.sort((a, b) => b.artifact.version - a.artifact.version)[0];
+    },
+    
+    getArtifactVersions: (artifactId, sessionId) => {
+      const artifactMessages = get().getArtifactMessages(sessionId);
+      
+      return artifactMessages
+        .filter(msg => msg.artifact.id === artifactId)
+        .sort((a, b) => a.artifact.version - b.artifact.version); // 按版本升序
     },
     
     // Session state management

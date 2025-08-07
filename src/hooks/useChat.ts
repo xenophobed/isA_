@@ -22,7 +22,7 @@
 
 import { useMemo } from 'react';
 import { useChatMessages, useChatLoading, useChatTyping } from '../stores/useChatStore';
-import { useCurrentSession } from '../stores/useSessionStore'; // 从session获取历史messages
+import { useCurrentSession, useSessionStore } from '../stores/useSessionStore'; // 从session获取历史messages
 import { useArtifactStore } from '../stores/useArtifactStore';
 import { useCurrentApp, useShowRightSidebar } from '../stores/useAppStore';
 import { useAllWidgetStates, useIsAnyWidgetGenerating } from '../stores/useWidgetStores';
@@ -45,24 +45,28 @@ export const useChat = (): ChatHookState => {
   const chatStoreMessages = useChatMessages(); // 实时消息，包括流式
   const currentSession = useCurrentSession(); // 历史消息
   
-  // 2. 合并消息：优先显示chatStore中的实时消息，补充session中的历史消息
+  // 2. 合并消息：将 chatStore 实时消息和 session artifact 消息合并
   const messages = useMemo((): ChatMessage[] => {
-    // 如果chatStore有消息（包括流式消息），优先使用
-    if (chatStoreMessages.length > 0) {
-      return chatStoreMessages;
+    const allMessages: ChatMessage[] = [];
+    
+    // 从 chatStore 获取实时消息 (包括流式消息)
+    allMessages.push(...chatStoreMessages);
+    
+    // 从 session 获取 artifact 消息，添加 sessionId 属性
+    if (currentSession?.messages) {
+      const sessionArtifactMessages = currentSession.messages
+        .filter(msg => msg.type === 'artifact' && !chatStoreMessages.some(chatMsg => chatMsg.id === msg.id))
+        .map(msg => ({
+          ...msg,
+          sessionId: currentSession.id
+        }));
+      allMessages.push(...sessionArtifactMessages);
     }
     
-    // 否则使用session中的历史消息
-    if (!currentSession?.messages) return [];
-    
-    return currentSession.messages.map(msg => ({
-      id: msg.id,
-      role: msg.role,
-      content: msg.content,
-      timestamp: msg.timestamp,
-      metadata: msg.metadata,
-      processed: true // session中的消息都是已处理的
-    }));
+    // 按时间戳排序
+    return allMessages.sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
   }, [chatStoreMessages, currentSession?.messages]);
   
   // 2. 聊天状态 - 从useChatStore获取（这些状态是实时的）

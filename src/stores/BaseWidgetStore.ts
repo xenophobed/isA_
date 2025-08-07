@@ -66,13 +66,18 @@ function createChatServiceCallbacks(
       });
     },
 
-    onMessageComplete: (completeMessage) => {
+    onMessageComplete: (completeMessage?: string) => {
       helpers.setProcessing(false);
       
       if (completeMessage && completeMessage.trim()) {
         if (customHandlers.onMessageComplete) {
           customHandlers.onMessageComplete(completeMessage, params, helpers, get);
         }
+        
+        // ✅ Widget在Independent模式下运行时，不需要更新Chat消息
+        // 只有在Plugin模式下，才需要更新Chat消息
+        // 当前Widget是独立运行的，所以跳过Chat消息更新
+        logger.debug(LogCategory.CHAT_FLOW, `${config.logEmoji} Widget running in independent mode, skipping chat message update`);
         
         logger.info(LogCategory.ARTIFACT_CREATION, `${config.logEmoji} ${config.widgetType} message completed`, {
           contentLength: completeMessage.length,
@@ -84,8 +89,115 @@ function createChatServiceCallbacks(
     },
 
     onArtifactCreated: (artifact) => {
+      // 只处理特定类型的 artifacts，避免重复
+      const shouldProcess = config.widgetType === 'dream' 
+        ? (artifact.type === 'image' || artifact.type === 'data') // Dream 处理 image 和 data 类型
+        : true; // 其他 Widget 处理所有类型
+      
+      if (!shouldProcess) {
+        logger.debug(LogCategory.ARTIFACT_CREATION, `${config.logEmoji} Skipping artifact type: ${artifact.type}`);
+        return;
+      }
+
+      // 简化重复检测逻辑 - 基于内容和类型
+      const state = get();
+      const artifactKey = `${artifact.type}_${artifact.content}`;
+      if (state._lastProcessedArtifact === artifactKey) {
+        logger.debug(LogCategory.ARTIFACT_CREATION, `${config.logEmoji} Duplicate artifact detected, skipping`);
+        return;
+      }
+
+      // 记录已处理的 artifact - 使用更安全的方式
+      try {
+        const currentState = get();
+        if (currentState && typeof currentState === 'object') {
+          (currentState as any)._lastProcessedArtifact = artifactKey;
+        }
+      } catch (error) {
+        console.warn('Failed to update _lastProcessedArtifact:', error);
+      }
+
       if (customHandlers.onArtifactCreated) {
         customHandlers.onArtifactCreated(artifact, params, helpers, get);
+      }
+      
+      // 🆕 在Plugin模式下跳过artifact同步，因为ChatModule已经负责创建artifact
+      // 检测是否在Plugin模式下运行（简单方法：检查当前是否有ChatModule在运行）
+      const isPluginMode = typeof window !== 'undefined' && 
+        (window as any).__CHAT_MODULE_PLUGIN_MODE__ === true;
+      
+      if (isPluginMode) {
+        logger.debug(LogCategory.ARTIFACT_CREATION, `${config.logEmoji} Plugin mode detected, skipping artifact sync (ChatModule handles this)`);
+        return;
+      }
+      
+      // 🆕 同步 Artifact 到 Session (只同步一次)
+      try {
+        const { useSessionStore } = require('./useSessionStore');
+        const { getCurrentSession, addArtifactMessage, getArtifactMessages } = useSessionStore.getState();
+        
+        const currentSession = getCurrentSession();
+        if (currentSession && params) {
+          // 检查是否已经有相同内容的 artifact message
+          const existingArtifacts = getArtifactMessages(currentSession.id);
+          const duplicateExists = existingArtifacts.some((existing: any) => 
+            existing.artifact.content === artifact.content &&
+            existing.artifact.widgetType === config.widgetType
+          );
+          
+          if (duplicateExists) {
+            logger.debug(LogCategory.ARTIFACT_CREATION, `${config.logEmoji} Duplicate artifact message detected, skipping sync`);
+            return;
+          }
+
+          // Map artifact types to consistent contentType values
+          const mapContentType = (artifactType: string): 'image' | 'text' | 'data' | 'analysis' | 'knowledge' => {
+            switch (artifactType) {
+              case 'search_results': return 'analysis';
+              case 'search': return 'analysis';
+              case 'data': return 'data';
+              case 'image': return 'image';
+              case 'knowledge': return 'knowledge';
+              default: return 'text';
+            }
+          };
+
+          // 创建 Artifact Message
+          const artifactMessage = {
+            id: `msg_${Date.now()}`,
+            type: 'artifact' as const,
+            role: 'assistant' as const,
+            content: `Generated ${config.widgetType} artifact`,
+            timestamp: new Date().toISOString(),
+            userPrompt: params.prompt || params.query || 'Generated artifact',
+            artifact: {
+              id: artifact.id || `${config.widgetType}_${Date.now()}`,
+              widgetType: config.widgetType,
+              widgetName: config.widgetType.charAt(0).toUpperCase() + config.widgetType.slice(1),
+              version: 1,
+              contentType: mapContentType(artifact.type || 'text'),
+              content: artifact.content,
+              thumbnail: artifact.thumbnail,
+              metadata: {
+                processingTime: Date.now(),
+                createdBy: 'widget'
+              }
+            }
+          };
+          
+          addArtifactMessage(currentSession.id, artifactMessage);
+          
+          logger.info(LogCategory.ARTIFACT_CREATION, `${config.logEmoji} Artifact synced to session`, {
+            sessionId: currentSession.id,
+            artifactId: artifactMessage.artifact.id,
+            widgetType: config.widgetType,
+            contentType: artifact.type
+          });
+        }
+      } catch (error) {
+        logger.error(LogCategory.ARTIFACT_CREATION, `${config.logEmoji} Failed to sync artifact to session`, {
+          error: error instanceof Error ? error.message : String(error)
+        });
       }
       
       logger.info(LogCategory.ARTIFACT_CREATION, `${config.logEmoji} ${config.widgetType} artifact created`, {
@@ -226,6 +338,10 @@ export function createBaseWidgetStore<TSpecificState, TSpecificActions>(
           setProcessing(true);
           console.log('🚨DEBUG_DUPLICATE🚨 BaseWidgetStore setParams:', params);
           setParams(params);
+          
+          // ❌ REMOVED: Message creation logic moved to Widget Modules
+          // Widget stores should only manage state, not create chat messages
+          // Message creation is now handled by individual widget modules
           
           try {
             // 检查是否有来自Module的模板参数

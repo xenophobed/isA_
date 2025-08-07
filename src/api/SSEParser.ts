@@ -43,14 +43,40 @@ export interface SSEEventData {
   [key: string]: any;
 }
 
+// Task management types
+export interface TaskProgress {
+  toolName: string;
+  description: string;
+  currentStep?: number;
+  totalSteps?: number;
+  status: 'starting' | 'running' | 'completed' | 'failed';
+}
+
+export interface TaskItem {
+  id: string;
+  title: string;
+  description?: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress?: number; // 0-100
+  result?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SSEParserCallbacks {
   onStreamStart?: (messageId: string, status?: string) => void;
   onStreamContent?: (content: string) => void;
   onStreamStatus?: (status: string) => void;
   onStreamComplete?: () => void;
+  onMessageComplete?: (completeMessage?: string) => void; // Add missing callback for message completion
   onError?: (error: Error) => void;
   onArtifactCreated?: (artifact: { id?: string; type: string; content: string }) => void;
   onBillingUpdate?: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => void;
+  
+  // Task management callbacks
+  onTaskProgress?: (progress: TaskProgress) => void;
+  onTaskListUpdate?: (tasks: TaskItem[]) => void;
+  onTaskStatusUpdate?: (taskId: string, status: string, result?: any) => void;
 }
 
 // ================================================================================
@@ -262,14 +288,58 @@ export class SSEParser {
       return;
     }
 
-    // 处理工具执行进度
+    // 处理工具执行进度和任务管理
     if (content.data && content.type === 'progress') {
       console.log(`🔧 SSE_PARSER: Tool progress: ${content.data}`);
+      
+      // 解析任务进度信息
+      const progressData = this.parseTaskProgress(content.data);
+      if (progressData) {
+        console.log(`📋 SSE_PARSER: Parsed task progress:`, progressData);
+        // 调用任务进度回调（如果存在）
+        callbacks.onTaskProgress?.(progressData);
+      }
+      
       callbacks.onStreamStatus?.(content.data);
       return;
     }
 
+    // 处理任务列表更新
+    if (content.type === 'task_list' && content.tasks) {
+      console.log(`📝 SSE_PARSER: Task list update:`, content.tasks);
+      callbacks.onTaskListUpdate?.(content.tasks);
+      return;
+    }
+
+    // 处理任务状态更新
+    if (content.type === 'task_status' && content.task_id) {
+      console.log(`🔄 SSE_PARSER: Task status update:`, content);
+      callbacks.onTaskStatusUpdate?.(content.task_id, content.status, content.result);
+      return;
+    }
+
     console.log('🔄 SSE_PARSER: Unknown custom_stream content:', content);
+  }
+
+  /**
+   * 解析任务进度信息
+   */
+  private static parseTaskProgress(progressText: string): TaskProgress | null {
+    // 解析格式如: "[web_search] Starting execution (1/3)"
+    const match = progressText.match(/\[([^\]]+)\]\s+(.+?)\s*(?:\((\d+)\/(\d+)\))?/);
+    if (match) {
+      const [, toolName, description, current, total] = match;
+      return {
+        toolName,
+        description,
+        currentStep: current ? parseInt(current) : undefined,
+        totalSteps: total ? parseInt(total) : undefined,
+        status: description.toLowerCase().includes('starting') ? 'starting' :
+                description.toLowerCase().includes('completed') ? 'completed' :
+                description.toLowerCase().includes('failed') ? 'failed' : 'running'
+      };
+    }
+    return null;
   }
 
   private static handleMessageStreamEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {

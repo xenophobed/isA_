@@ -256,7 +256,7 @@ export const HuntWidgetModule: React.FC<HuntWidgetModuleProps> = ({
             },
             // BaseWidget state with converted data
             outputHistory: outputHistory, // Use converted data instead of moduleProps.outputHistory
-            currentOutput: outputHistory[0] || null, // Show latest result as current
+            currentOutput: moduleProps.currentOutput, // Use BaseWidgetModule's currentOutput // Show latest result as current
             isStreaming: moduleProps.isStreaming,
             streamingContent: moduleProps.streamingContent,
             onSelectOutput: moduleProps.onSelectOutput,

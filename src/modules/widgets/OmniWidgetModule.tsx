@@ -302,7 +302,7 @@ export const OmniWidgetModule: React.FC<OmniWidgetModuleProps> = ({
   children
 }) => {
   // Read state from store
-  const { generatedContent, isGenerating, lastParams } = useOmniState();
+  const { generatedContent, lastParams } = useOmniState();
   
   // Convert generatedContent to outputHistory format for BaseWidget display
   const outputHistory = React.useMemo(() => {
@@ -344,7 +344,7 @@ export const OmniWidgetModule: React.FC<OmniWidgetModuleProps> = ({
             ...children.props,
             // Store state
             generatedContent,
-            isGenerating,
+            isGenerating: moduleProps.isProcessing, // Use BaseWidgetModule's processing state
             lastParams,
             // Add onGenerateContent function with template parameter preparation
             onGenerateContent: async (params: OmniWidgetParams) => {
@@ -369,9 +369,9 @@ export const OmniWidgetModule: React.FC<OmniWidgetModuleProps> = ({
               console.log('⚡ OMNI_MODULE: Clearing content');
               moduleProps.onClearHistory();
             },
-            // BaseWidget state with converted data
+            // BaseWidget state with converted data  
             outputHistory: outputHistory,
-            currentOutput: outputHistory[0] || null,
+            currentOutput: moduleProps.currentOutput, // Use BaseWidgetModule's currentOutput
             isStreaming: moduleProps.isStreaming,
             streamingContent: moduleProps.streamingContent,
             onSelectOutput: moduleProps.onSelectOutput,

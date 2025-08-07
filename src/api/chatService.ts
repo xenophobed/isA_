@@ -327,6 +327,13 @@ export class ChatService {
                 // Only process if we have actual content (skip empty or tool calls)
                 if (messageContent && messageContent.trim() && !messageContent.includes('tool_calls')) {
                   console.log('📨 CHAT_SERVICE: Processing message content:', messageContent.substring(0, 100) + '...');
+                  
+                  // 🔥 CRITICAL FIX: Call onMessageComplete when we have extracted message content
+                  // This ensures all widgets can process their final response and complete their state
+                  if (callbacks.onMessageComplete) {
+                    console.log('📨 CHAT_SERVICE: Calling onMessageComplete with extracted content');
+                    callbacks.onMessageComplete(messageContent);
+                  }
                 }
               }
             } catch (parseError) {

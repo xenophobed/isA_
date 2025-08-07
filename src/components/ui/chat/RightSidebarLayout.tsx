@@ -99,6 +99,13 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
                 onGenerateImage={moduleProps.onGenerateImage}
                 onClearImage={moduleProps.onClearImage}
                 triggeredInput={triggeredAppInput}
+                // Add missing BaseWidget props for output display
+                outputHistory={moduleProps.outputHistory}
+                currentOutput={moduleProps.currentOutput}
+                isStreaming={moduleProps.isStreaming}
+                streamingContent={moduleProps.streamingContent}
+                onSelectOutput={moduleProps.onSelectOutput}
+                onClearHistory={moduleProps.onClearHistory}
                 onBack={() => {
                   logger.trackSidebarInteraction('widget_back_to_list_clicked', currentApp || undefined, { 
                     widgetTitle: 'DreamForge AI' 
@@ -149,11 +156,6 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
           >
             <OmniWidget 
               triggeredInput={triggeredAppInput}
-              isGenerating={false}
-              generatedContent={null}
-              lastParams={null}
-              onGenerateContent={async () => {}}
-              onClearContent={() => {}}
               onBack={() => {
                 logger.trackSidebarInteraction('widget_back_to_list_clicked', currentApp || undefined, { 
                   widgetTitle: 'Omni Content' 
@@ -178,10 +180,6 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
           >
             <KnowledgeWidget 
               triggeredInput={triggeredAppInput}
-              isProcessing={false}
-              result={null}
-              onProcess={async () => {}}
-              onClearResults={() => {}}
               onBack={() => {
                 logger.trackSidebarInteraction('widget_back_to_list_clicked', currentApp || undefined, { 
                   widgetTitle: 'Knowledge Hub' 
@@ -206,10 +204,6 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
           >
             <DataScientistWidget 
               triggeredInput={triggeredAppInput}
-              isAnalyzing={false}
-              analysisResult={null}
-              onAnalyzeData={async () => {}}
-              onClearAnalysis={() => {}}
               onBack={() => {
                 logger.trackSidebarInteraction('widget_back_to_list_clicked', currentApp || undefined, { 
                   widgetTitle: 'DataWise Analytics' 

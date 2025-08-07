@@ -21,8 +21,9 @@
  * - 不处理业务逻辑，只负责消息的视觉呈现
  */
 import React, { memo, useEffect, useState } from 'react';
-import { ChatMessage } from '../../../types/chatTypes';
+import { ChatMessage, ArtifactMessage } from '../../../types/chatTypes';
 import { ArtifactComponent } from './ArtifactComponent';
+import { ArtifactMessageComponent } from './ArtifactMessageComponent';
 import { ContentType } from '../../../types/appTypes';
 import { ContentRenderer, StatusRenderer } from '../../shared';
 import { ChatWelcome } from './ChatWelcome';
@@ -95,13 +96,59 @@ export const MessageList = memo<MessageListProps>(({
       // If custom renderer returns null, continue to default rendering
     }
 
-    const isStreaming = message.isStreaming;
-    const hasContent = message.content && message.content.trim().length > 0;
-    const hasStatus = message.streamingStatus && message.streamingStatus.trim().length > 0;
-    const isArtifact = message.metadata?.type === 'artifact';
+    // Check if this is a new ArtifactMessage type
+    if (message.type === 'artifact') {
+      const artifactMessage = message as ArtifactMessage;
+      return (
+        <div 
+          className="mb-6"
+          onClick={() => onMessageClick?.(message)}
+          style={{ width: '100%', display: 'flex', justifyContent: 'flex-start' }}
+        >
+          <div style={{ width: '100%', maxWidth: '100%' }}>
+            {showAvatars && (
+              <div className="flex items-center mb-3" style={{ justifyContent: 'flex-start' }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm" style={{
+                  background: 'var(--glass-secondary)',
+                  color: 'var(--text-primary)'
+                }}>
+                  {artifactMessage.artifact.widgetType === 'dream' ? '🎨' : 
+                   artifactMessage.artifact.widgetType === 'hunt' ? '🔍' :
+                   artifactMessage.artifact.widgetType === 'omni' ? '⚡' :
+                   artifactMessage.artifact.widgetType === 'knowledge' ? '🧠' :
+                   artifactMessage.artifact.widgetType === 'data_scientist' ? '📊' : '🤖'}
+                </div>
+                <span className="ml-2 text-sm font-medium text-gray-300">
+                  {artifactMessage.artifact.widgetName || artifactMessage.artifact.widgetType}
+                </span>
+              </div>
+            )}
+            
+            {/* Use new ArtifactMessageComponent for new artifact messages */}
+            <div className="ml-10" style={{ width: 'calc(100% - 2.5rem)' }}>
+              <ArtifactMessageComponent
+                artifactMessage={artifactMessage}
+                onReopen={() => {
+                  // Handle artifact reopening - delegate to message click handler
+                  if (onMessageClick) {
+                    onMessageClick(artifactMessage);
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
     
-    // Handle artifact messages specially
-    if (isArtifact) {
+    // Handle legacy artifact messages (for backward compatibility)
+    const isStreaming = message.isStreaming;
+    const hasContent = (message as any).content && (message as any).content.trim().length > 0;
+    const hasStatus = message.streamingStatus && message.streamingStatus.trim().length > 0;
+    const isLegacyArtifact = (message as any).metadata?.type === 'artifact';
+    
+    // Handle legacy artifact messages specially
+    if (isLegacyArtifact) {
       const artifactData = message.metadata?.artifactData;
       const appIcon = (typeof message.metadata?.appIcon === 'string' ? message.metadata.appIcon : null) || '🤖';
       const appName = (typeof message.metadata?.appName === 'string' ? message.metadata.appName : null) || 'AI';
@@ -173,7 +220,8 @@ export const MessageList = memo<MessageListProps>(({
       );
     }
 
-    // Default message rendering for non-artifact messages
+    // Default message rendering for regular messages
+    const regularMessage = message as any; // Cast to access legacy properties for now
     return (
       <div 
         className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
@@ -223,7 +271,7 @@ export const MessageList = memo<MessageListProps>(({
             {hasContent ? (
               <div className="whitespace-pre-wrap break-words">
                 <ContentRenderer
-                  content={message.content}
+                  content={(message as any).content}
                   type="markdown"  // 改为 markdown 类型以支持图片等
                   variant="chat"
                   size="sm"

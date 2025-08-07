@@ -50,6 +50,7 @@ import { getChatServiceInstance } from '../hooks/useChatService';
 import { ChatMetadata, ChatMessage, StreamingStatus } from '../types/chatTypes';
 import { useUserStore } from './useUserStore';
 import { useSessionStore } from './useSessionStore';
+import { TaskItem, TaskProgress } from '../api/SSEParser';
 
 interface ChatStoreState {
   // 聊天消息
@@ -58,6 +59,11 @@ interface ChatStoreState {
   // 聊天状态
   isTyping: boolean;
   chatLoading: boolean;
+  
+  // 任务管理状态
+  currentTasks: TaskItem[];
+  taskProgress: TaskProgress | null;
+  isExecutingPlan: boolean;
   
   // 流式消息状态已集成到messages中
 }
@@ -76,6 +82,13 @@ interface ChatActions {
   setIsTyping: (typing: boolean) => void;
   setChatLoading: (loading: boolean) => void;
   
+  // 任务管理操作
+  updateTaskList: (tasks: TaskItem[]) => void;
+  updateTaskProgress: (progress: TaskProgress | null) => void;
+  updateTaskStatus: (taskId: string, status: TaskItem['status'], result?: any) => void;
+  setExecutingPlan: (executing: boolean) => void;
+  clearTasks: () => void;
+  
   // 流式消息操作
   startStreamingMessage: (id: string, status?: string) => void;
   appendToStreamingMessage: (content: string) => void;
@@ -91,6 +104,11 @@ export const useChatStore = create<ChatStore>()(
     messages: [],
     isTyping: false,
     chatLoading: false,
+    
+    // 任务管理初始状态
+    currentTasks: [],
+    taskProgress: null,
+    isExecutingPlan: false,
     
     // 消息操作
     addMessage: (message) => {
@@ -175,7 +193,11 @@ export const useChatStore = create<ChatStore>()(
         startStreamingMessage, 
         appendToStreamingMessage, 
         updateStreamingStatus, 
-        finishStreamingMessage 
+        finishStreamingMessage,
+        updateTaskProgress,
+        updateTaskList,
+        updateTaskStatus,
+        setExecutingPlan
       } = get();
 
       setChatLoading(true);
@@ -229,6 +251,7 @@ export const useChatStore = create<ChatStore>()(
         await chatService.sendMessage(content, metadata, authToken, {
           onStreamStart: (messageId: string, status?: string) => {
             startStreamingMessage(messageId, status);
+            setExecutingPlan(true); // 开始执行计划
           },
           onStreamContent: (contentChunk: string) => {
             appendToStreamingMessage(contentChunk);
@@ -240,6 +263,7 @@ export const useChatStore = create<ChatStore>()(
             finishStreamingMessage();
             setChatLoading(false);
             setIsTyping(false);
+            setExecutingPlan(false); // 完成执行计划
             logger.info(LogCategory.CHAT_FLOW, 'Message sending completed successfully');
           },
           onBillingUpdate: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => {
@@ -248,16 +272,27 @@ export const useChatStore = create<ChatStore>()(
             const userStore = useUserStore.getState();
             userStore.updateCredits(billingData.creditsRemaining);
           },
+          onTaskProgress: (progress: TaskProgress) => {
+            updateTaskProgress(progress);
+          },
+          onTaskListUpdate: (tasks: TaskItem[]) => {
+            updateTaskList(tasks);
+          },
+          onTaskStatusUpdate: (taskId: string, status: string, result?: any) => {
+            updateTaskStatus(taskId, status as TaskItem['status'], result);
+          },
           onError: (error: Error) => {
             logger.error(LogCategory.CHAT_FLOW, 'Message sending failed', { error: error.message });
             setChatLoading(false);
             setIsTyping(false);
+            setExecutingPlan(false); // 错误时停止执行
           }
         });
       } catch (error) {
         logger.error(LogCategory.CHAT_FLOW, 'Failed to send message', { error });
         setChatLoading(false);
         setIsTyping(false);
+        setExecutingPlan(false);
       }
     },
 
@@ -268,7 +303,11 @@ export const useChatStore = create<ChatStore>()(
         startStreamingMessage, 
         appendToStreamingMessage, 
         finishStreamingMessage, 
-        updateStreamingStatus 
+        updateStreamingStatus,
+        updateTaskProgress,
+        updateTaskList,
+        updateTaskStatus,
+        setExecutingPlan
       } = get();
       
       setChatLoading(true);
@@ -319,6 +358,7 @@ export const useChatStore = create<ChatStore>()(
         await chatService.sendMultimodalMessage(content, files, metadata, authToken, {
           onStreamStart: (messageId: string, status?: string) => {
             startStreamingMessage(messageId, status);
+            setExecutingPlan(true);
           },
           onStreamContent: (contentChunk: string) => {
             appendToStreamingMessage(contentChunk);
@@ -330,6 +370,7 @@ export const useChatStore = create<ChatStore>()(
             finishStreamingMessage();
             setChatLoading(false);
             setIsTyping(false);
+            setExecutingPlan(false);
             logger.info(LogCategory.CHAT_FLOW, 'Multimodal message sending completed successfully');
           },
           onBillingUpdate: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => {
@@ -338,10 +379,20 @@ export const useChatStore = create<ChatStore>()(
             const userStore = useUserStore.getState();
             userStore.updateCredits(billingData.creditsRemaining);
           },
+          onTaskProgress: (progress: TaskProgress) => {
+            updateTaskProgress(progress);
+          },
+          onTaskListUpdate: (tasks: TaskItem[]) => {
+            updateTaskList(tasks);
+          },
+          onTaskStatusUpdate: (taskId: string, status: string, result?: any) => {
+            updateTaskStatus(taskId, status as TaskItem['status'], result);
+          },
           onError: (error) => {
             logger.error(LogCategory.CHAT_FLOW, 'Multimodal message sending failed', { error: error.message });
             setChatLoading(false);
             setIsTyping(false);
+            setExecutingPlan(false);
           }
         });
       } catch (error) {
@@ -360,23 +411,68 @@ export const useChatStore = create<ChatStore>()(
       set({ chatLoading: loading });
     },
 
+    // 任务管理操作
+    updateTaskList: (tasks) => {
+      set({ currentTasks: tasks });
+      logger.info(LogCategory.CHAT_FLOW, 'Task list updated', { taskCount: tasks.length });
+    },
+
+    updateTaskProgress: (progress) => {
+      set({ taskProgress: progress });
+      if (progress) {
+        logger.info(LogCategory.CHAT_FLOW, 'Task progress updated', { 
+          toolName: progress.toolName, 
+          status: progress.status,
+          step: progress.currentStep,
+          total: progress.totalSteps
+        });
+      }
+    },
+
+    updateTaskStatus: (taskId, status, result) => {
+      set((state) => ({
+        currentTasks: state.currentTasks.map(task => 
+          task.id === taskId 
+            ? { ...task, status, result, updatedAt: new Date().toISOString() }
+            : task
+        )
+      }));
+      logger.info(LogCategory.CHAT_FLOW, 'Task status updated', { taskId, status });
+    },
+
+    setExecutingPlan: (executing) => {
+      set({ isExecutingPlan: executing });
+      logger.info(LogCategory.CHAT_FLOW, `Plan execution ${executing ? 'started' : 'stopped'}`);
+    },
+
+    clearTasks: () => {
+      set({ currentTasks: [], taskProgress: null, isExecutingPlan: false });
+      logger.info(LogCategory.CHAT_FLOW, 'Tasks cleared');
+    },
+
     // 流式消息操作
     startStreamingMessage: (id, status = '正在生成回应') => {
       set((state) => {
-        // 检查是否已经有流式消息，避免重复创建
-        const hasStreamingMessage = state.messages.some(m => m.isStreaming);
-        if (hasStreamingMessage) {
-          console.warn('⚠️ CHAT_STORE: Streaming message already exists, skipping creation');
+        // 检查是否已经有流式助手消息，避免重复创建
+        const hasStreamingAssistantMessage = state.messages.some(m => m.isStreaming && m.role === 'assistant');
+        if (hasStreamingAssistantMessage) {
+          console.warn('⚠️ CHAT_STORE: Streaming assistant message already exists, skipping creation');
           return state;
         }
         
         console.log('🔥 CHAT_STORE: Creating streaming message', { id, status, currentMessageCount: state.messages.length });
         
+        // Get current session for proper session ID
+        const sessionStore = useSessionStore.getState();
+        const currentSession = sessionStore.getCurrentSession();
+        
         const streamingMessage: ChatMessage = {
           id,
           role: 'assistant' as const,
+          type: 'regular',
           content: '',
           timestamp: new Date().toISOString(),
+          sessionId: currentSession?.id || 'default',
           isStreaming: true,
           streamingStatus: status
         };
@@ -406,35 +502,76 @@ export const useChatStore = create<ChatStore>()(
           return state;
         }
         
-        console.log('📋 CHAT_STORE: Last message details:', {
-          id: lastMessage.id,
-          role: lastMessage.role,
-          isStreaming: lastMessage.isStreaming,
-          contentLength: lastMessage.content.length,
-          hasStreamingStatus: !!lastMessage.streamingStatus
-        });
-        
-        if (!lastMessage.isStreaming) {
-          console.log('❌ CHAT_STORE: Last message is not streaming - cannot append');
+        // Handle both RegularMessage and ArtifactMessage types
+        if (lastMessage.type === 'regular') {
+          console.log('📋 CHAT_STORE: Last message details (regular):', {
+            id: lastMessage.id,
+            role: lastMessage.role,
+            isStreaming: lastMessage.isStreaming,
+            contentLength: lastMessage.content.length,
+            hasStreamingStatus: !!lastMessage.streamingStatus
+          });
+          
+          if (!lastMessage.isStreaming) {
+            console.log('❌ CHAT_STORE: Last message is not streaming - cannot append');
+            return state;
+          }
+          
+          const newContent = lastMessage.content + content;
+          console.log('✅ CHAT_STORE: Appending content successfully', { 
+            messageId: lastMessage.id,
+            appendedContent: content,
+            oldLength: lastMessage.content.length,
+            newLength: newContent.length,
+            totalContent: newContent.substring(0, 50) + '...'
+          });
+          
+          const updatedMessages = [...state.messages];
+          updatedMessages[updatedMessages.length - 1] = {
+            ...lastMessage,
+            content: newContent
+          };
+          
+          return { messages: updatedMessages };
+        } else if (lastMessage.type === 'artifact') {
+          console.log('📋 CHAT_STORE: Last message details (artifact):', {
+            id: lastMessage.id,
+            role: lastMessage.role,
+            isStreaming: lastMessage.isStreaming,
+            artifactContent: lastMessage.artifact.content,
+            hasStreamingStatus: !!lastMessage.streamingStatus
+          });
+          
+          if (!lastMessage.isStreaming) {
+            console.log('❌ CHAT_STORE: Last artifact message is not streaming - cannot append');
+            return state;
+          }
+          
+          // For artifact messages, append to the artifact content
+          const currentArtifactContent = typeof lastMessage.artifact.content === 'string' ? lastMessage.artifact.content : '';
+          const newArtifactContent = currentArtifactContent + content;
+          
+          console.log('✅ CHAT_STORE: Appending content to artifact successfully', { 
+            messageId: lastMessage.id,
+            appendedContent: content,
+            oldLength: currentArtifactContent.length,
+            newLength: newArtifactContent.length
+          });
+          
+          const updatedMessages = [...state.messages];
+          updatedMessages[updatedMessages.length - 1] = {
+            ...lastMessage,
+            artifact: {
+              ...lastMessage.artifact,
+              content: newArtifactContent
+            }
+          };
+          
+          return { messages: updatedMessages };
+        } else {
+          console.log('❌ CHAT_STORE: Unknown message type - cannot append');
           return state;
         }
-        
-        const newContent = lastMessage.content + content;
-        console.log('✅ CHAT_STORE: Appending content successfully', { 
-          messageId: lastMessage.id,
-          appendedContent: content,
-          oldLength: lastMessage.content.length,
-          newLength: newContent.length,
-          totalContent: newContent.substring(0, 50) + '...'
-        });
-        
-        const updatedMessages = [...state.messages];
-        updatedMessages[updatedMessages.length - 1] = {
-          ...lastMessage,
-          content: newContent
-        };
-        
-        return { messages: updatedMessages };
       });
     },
 
@@ -456,10 +593,21 @@ export const useChatStore = create<ChatStore>()(
         const sessionStore = useSessionStore.getState();
         const currentSession = sessionStore.getCurrentSession();
         if (currentSession) {
-          const messageWithFlag = { 
-            ...finishedMessage, 
-            metadata: { ...finishedMessage.metadata, _skipSessionSync: true } 
-          };
+          let messageWithFlag: ChatMessage;
+          
+          if (finishedMessage.type === 'regular') {
+            messageWithFlag = { 
+              ...finishedMessage, 
+              metadata: { ...finishedMessage.metadata, _skipSessionSync: true } 
+            };
+          } else {
+            // For artifact messages, we don't have metadata property, so just add the flag directly
+            messageWithFlag = { 
+              ...finishedMessage,
+              // Add a temporary property to indicate session sync (this might need to be handled differently)
+            } as ChatMessage;
+          }
+          
           sessionStore.addMessage(currentSession.id, messageWithFlag);
           logger.debug(LogCategory.CHAT_FLOW, 'Finished streaming message synced to session', {
             messageId: finishedMessage.id,
@@ -495,6 +643,11 @@ export const useChatMessages = () => useChatStore(state => state.messages);
 export const useChatTyping = () => useChatStore(state => state.isTyping);
 export const useChatLoading = () => useChatStore(state => state.chatLoading);
 
+// 任务管理选择器
+export const useCurrentTasks = () => useChatStore(state => state.currentTasks);
+export const useTaskProgress = () => useChatStore(state => state.taskProgress);
+export const useIsExecutingPlan = () => useChatStore(state => state.isExecutingPlan);
+
 // Chat操作
 export const useChatActions = () => useChatStore(state => ({
   addMessage: state.addMessage,
@@ -507,6 +660,15 @@ export const useChatActions = () => useChatStore(state => ({
   finishStreamingMessage: state.finishStreamingMessage,
   appendToStreamingMessage: state.appendToStreamingMessage,
   updateStreamingStatus: state.updateStreamingStatus
+}));
+
+// 任务管理操作
+export const useTaskActions = () => useChatStore(state => ({
+  updateTaskList: state.updateTaskList,
+  updateTaskProgress: state.updateTaskProgress,
+  updateTaskStatus: state.updateTaskStatus,
+  setExecutingPlan: state.setExecutingPlan,
+  clearTasks: state.clearTasks
 }));
 
 // ================================================================================

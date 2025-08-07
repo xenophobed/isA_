@@ -279,7 +279,7 @@ export const DataScientistWidgetModule: React.FC<DataScientistWidgetModuleProps>
             },
             // BaseWidget state with converted data
             outputHistory: outputHistory,
-            currentOutput: outputHistory[0] || null,
+            currentOutput: moduleProps.currentOutput, // Use BaseWidgetModule's currentOutput
             isStreaming: moduleProps.isStreaming,
             streamingContent: moduleProps.streamingContent,
             onSelectOutput: moduleProps.onSelectOutput,
