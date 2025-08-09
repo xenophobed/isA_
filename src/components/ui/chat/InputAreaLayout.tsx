@@ -17,6 +17,9 @@ export interface InputAreaLayoutProps {
   className?: string;
   children?: React.ReactNode;
   config?: any;
+  // Widget system integration
+  onShowWidgetSelector?: () => void;
+  showWidgetSelector?: boolean;
 }
 
 /**
@@ -37,7 +40,9 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
   suggestionsContent,
   className = '',
   children,
-  config
+  config,
+  onShowWidgetSelector,
+  showWidgetSelector
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -202,6 +207,41 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
     }
   };
 
+
+  // Unified Glass Button Style Creator
+  const createGlassButtonStyle = (color: string, isDisabled: boolean = false) => ({
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: isDisabled ? 'not-allowed' : 'pointer',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    background: `rgba(${color}, 0.1)`,
+    backdropFilter: 'blur(10px)',
+    border: `1px solid rgba(${color}, 0.2)`,
+    opacity: isDisabled ? 0.4 : 1,
+    boxShadow: `0 2px 8px rgba(${color}, 0.15)`
+  });
+
+  const createGlassButtonHoverHandlers = (color: string) => ({
+    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (!e.currentTarget.disabled) {
+        e.currentTarget.style.background = `rgba(${color}, 0.2)`;
+        e.currentTarget.style.borderColor = `rgba(${color}, 0.4)`;
+        e.currentTarget.style.transform = 'scale(1.05)';
+        e.currentTarget.style.boxShadow = `0 4px 12px rgba(${color}, 0.25)`;
+      }
+    },
+    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (!e.currentTarget.disabled) {
+        e.currentTarget.style.background = `rgba(${color}, 0.1)`;
+        e.currentTarget.style.borderColor = `rgba(${color}, 0.2)`;
+        e.currentTarget.style.transform = 'scale(1)';
+        e.currentTarget.style.boxShadow = `0 2px 8px rgba(${color}, 0.15)`;
+      }
+    }
+  });
+
   // Beautiful Loading Spinner Component
   const LoadingSpinner = () => (
     <div 
@@ -327,29 +367,40 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
         <div className="input-row">
           {/* File Upload Button Container */}
           <div className="button-container">
-            <FileUpload
-              className="upload-button disabled"
-              onFileSelect={handleFileSelection}
-              accept="image/*,application/pdf,text/*,.doc,.docx,.md,.wav,.mp3,.m4a,.flac,.ogg"
-              multiple={true}
+            <button
+              onClick={() => handleFileSelection}
               disabled={true}
+              title="File upload (coming soon)"
+              style={{
+                ...createGlassButtonStyle('107, 114, 128', true), // gray color
+                width: '40px',
+                height: '40px',
+                color: '#9ca3af'
+              }}
+              {...createGlassButtonHoverHandlers('107, 114, 128')}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M12 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M9 14l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-            </FileUpload>
+            </button>
           </div>
           
           {/* Audio Recording Button Container */}
           <div className="button-container">
             <button
-              className="audio-button disabled"
               onClick={toggleRecording}
               disabled={true}
-              title="Audio recording temporarily disabled"
+              title="Audio recording (coming soon)"
+              style={{
+                ...createGlassButtonStyle('107, 114, 128', true), // gray color
+                width: '40px',
+                height: '40px',
+                color: '#9ca3af'
+              }}
+              {...createGlassButtonHoverHandlers('107, 114, 128')}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -360,27 +411,84 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
             </button>
           </div>
           
-          {/* Chat Input Container */}
-          <div className="input-container">
+          {/* Chat Input Container with Magic Wand */}
+          <div className="input-container" style={{ position: 'relative' }}>
             <textarea
               ref={textareaRef}
               value={inputValue}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder={placeholder || "Type your message..."}
+              placeholder={inputValue.trim() ? (placeholder || "Type your message...") : "       " + (placeholder || "Type your message or click ✨ for smart widgets...")}
               disabled={disabled || isLoading}
               autoFocus={autoFocus}
               rows={1}
               className="chat-input"
+              style={{ paddingLeft: inputValue.trim() ? '12px' : '50px' }}
             />
+            {/* Magic Wand Button - Left side of textarea, only when empty */}
+            {!inputValue.trim() && (
+              <button
+                onClick={() => {
+                  playAudioFeedback('click');
+                  onShowWidgetSelector && onShowWidgetSelector();
+                }}
+                disabled={disabled || isLoading}
+                title="Open smart widgets"
+                style={{
+                  ...createGlassButtonStyle('139, 92, 246', disabled || isLoading), // purple color
+                  position: 'absolute',
+                  left: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '32px',
+                  height: '32px',
+                  color: '#a855f7'
+                }}
+                onMouseEnter={(e) => {
+                  if (!e.currentTarget.disabled) {
+                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
+                    e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                    e.currentTarget.style.color = '#8b5cf6';
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.25)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!e.currentTarget.disabled) {
+                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                    e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.2)';
+                    e.currentTarget.style.color = '#a855f7';
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.15)';
+                  }
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M15 4V2m0 16v-2m-8-8H5m16 0h-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <path d="M9 9l6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <circle cx="9" cy="9" r="1" fill="currentColor"/>
+                  <circle cx="15" cy="15" r="1" fill="currentColor"/>
+                </svg>
+              </button>
+            )}
           </div>
           
-          {/* Send Button Container */}
+          {/* Send Button Container - Restored with Glass Style */}
           <div className="button-container">
             <button
-              className={`send-button ${(!inputValue.trim() || isLoading) ? 'disabled' : 'active'}`}
               onClick={handleSendMessage}
               disabled={!inputValue.trim() || isLoading}
+              title="Send message"
+              style={{
+                ...createGlassButtonStyle(
+                  !inputValue.trim() || isLoading ? '107, 114, 128' : '34, 197, 94', // gray when disabled, green when active
+                  !inputValue.trim() || isLoading
+                ),
+                width: '40px',
+                height: '40px',
+                color: !inputValue.trim() || isLoading ? '#9ca3af' : '#22c55e'
+              }}
+              {...createGlassButtonHoverHandlers(!inputValue.trim() || isLoading ? '107, 114, 128' : '34, 197, 94')}
             >
               {isLoading ? (
                 <LoadingSpinner />

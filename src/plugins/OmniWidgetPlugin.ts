@@ -173,15 +173,27 @@ export class OmniWidgetPlugin implements WidgetPlugin {
         }, this.config.timeout);
 
         let completeContent = '';
+        let messageCount = 0;
+        let lastMessage = '';
 
         const callbacks = {
           onMessageComplete: (message: string) => {
-            clearTimeout(timeout);
+            messageCount++;
+            console.log(`⚡ OMNI_PLUGIN: onMessageComplete #${messageCount}:`, message?.substring(0, 100) + '...');
+            
             if (message && message.trim()) {
+              lastMessage = message;
               completeContent = message;
-              resolve(message);
-            } else {
-              reject(new Error('No content generated'));
+              
+              // 不要立即resolve，等待可能的后续消息
+              // 使用较短的延迟等待，如果没有新消息就resolve
+              setTimeout(() => {
+                if (lastMessage === message) { // 确认这是最后一条消息
+                  clearTimeout(timeout);
+                  console.log(`⚡ OMNI_PLUGIN: Final message selected (${messageCount} total):`, message.substring(0, 100) + '...');
+                  resolve(message);
+                }
+              }, 500); // 500ms延迟，等待可能的后续消息
             }
           },
           

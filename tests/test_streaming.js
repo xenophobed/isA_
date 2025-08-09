@@ -18,7 +18,7 @@ async function testStreamingAPI() {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        message: 'hi',
+        message: 'Search for the latest iPhone price and compare it with Samsung Galaxy prices, then analyze the price differences',
         session_id: 'test_session',
         user_id: 'test_user',
         use_streaming: true
@@ -64,8 +64,8 @@ async function testStreamingAPI() {
               timestamp: new Date().toISOString(),
               type: eventData.type,
               status: eventData.status,
-              content: eventData.content ? eventData.content.substring(0, 200) + (eventData.content.length > 200 ? '...' : '') : undefined,
-              full_content: eventData.full_content ? eventData.full_content.substring(0, 200) + (eventData.full_content.length > 200 ? '...' : '') : undefined,
+              content: eventData.content ? (typeof eventData.content === 'string' ? eventData.content.substring(0, 200) + (eventData.content.length > 200 ? '...' : '') : JSON.stringify(eventData.content).substring(0, 200)) : undefined,
+              full_content: eventData.full_content ? (typeof eventData.full_content === 'string' ? eventData.full_content.substring(0, 200) + (eventData.full_content.length > 200 ? '...' : '') : JSON.stringify(eventData.full_content).substring(0, 200)) : undefined,
               metadata: eventData.metadata,
               raw: dataContent.length > 500 ? dataContent.substring(0, 500) + '...[TRUNCATED]' : dataContent
             };
@@ -91,6 +91,41 @@ async function testStreamingAPI() {
               if (token.status === 'completed') {
                 console.log(`   ✅ Streaming completed - Total tokens: ${token.total_tokens}`);
               }
+            } 
+            // 🆕 NEW: Test task-related events (custom_stream and graph_update)
+            else if (eventData.type === 'custom_stream') {
+              console.log(`\n📋 ========== CUSTOM_STREAM EVENT ==========`);
+              if (eventData.content?.task_state) {
+                const taskState = eventData.content.task_state;
+                console.log(`   📊 TASK STATE:`, JSON.stringify(taskState, null, 2));
+                console.log(`   🎯 Current Task: ${taskState.current_task_name} (${taskState.current_task_index + 1}/${taskState.total_tasks})`);
+                console.log(`   ✅ Completed: ${taskState.completed_tasks}/${taskState.total_tasks}`);
+              } else if (eventData.content?.task_completed) {
+                const taskCompleted = eventData.content.task_completed;
+                console.log(`   ✅ TASK COMPLETED:`, JSON.stringify(taskCompleted, null, 2));
+              } else if (eventData.content?.agent_execution) {
+                const agentExecution = eventData.content.agent_execution;
+                console.log(`   🤖 AGENT EXECUTION:`, JSON.stringify(agentExecution, null, 2));
+              } else if (eventData.content?.custom_llm_chunk) {
+                console.log(`   💬 LLM CHUNK: "${eventData.content.custom_llm_chunk}"`);
+              } else if (eventData.content?.data && eventData.content?.type) {
+                console.log(`   📈 PROGRESS: ${eventData.content.type} - ${eventData.content.data}`);
+              }
+              console.log(`==========================================\n`);
+            } else if (eventData.type === 'graph_update') {
+              console.log(`\n📊 ========== GRAPH_UPDATE EVENT ==========`);
+              try {
+                const graphData = JSON.parse(eventData.content);
+                if (graphData.call_tool?.task_list) {
+                  console.log(`   📋 CALL_TOOL TASK LIST:`, JSON.stringify(graphData.call_tool.task_list, null, 2));
+                }
+                if (graphData.agent_executor?.task_list) {
+                  console.log(`   🤖 AGENT_EXECUTOR TASK LIST:`, JSON.stringify(graphData.agent_executor.task_list, null, 2));
+                }
+              } catch (parseErr) {
+                console.log(`   📊 GRAPH DATA (raw): ${eventData.content}`);
+              }
+              console.log(`==========================================\n`);
             }
             
           } catch (parseError) {
@@ -163,6 +198,55 @@ async function testStreamingAPI() {
         console.log(`📝 Content: ${event.content}`);
       }
     });
+    
+    console.log('===============================================\n');
+
+    // 🆕 NEW: Analyze task-related events
+    console.log('\n📋 ========== TASK EVENT ANALYSIS ==========');
+    const taskEvents = eventLog.filter(e => 
+      e.type === 'custom_stream' || 
+      (e.type === 'graph_update' && e.raw && (e.raw.includes('task_list') || e.raw.includes('call_tool')))
+    );
+    
+    if (taskEvents.length > 0) {
+      console.log(`📊 Found ${taskEvents.length} task-related events:`);
+      taskEvents.forEach((event, index) => {
+        console.log(`\n--- Task Event #${index + 1}: ${event.type} ---`);
+        console.log(`⏰ Time: ${event.timestamp}`);
+        if (event.raw) {
+          // Try to parse and extract task info
+          try {
+            const eventData = JSON.parse(event.raw);
+            if (eventData.type === 'custom_stream' && eventData.content?.task_state) {
+              const ts = eventData.content.task_state;
+              console.log(`📊 Task State: ${ts.current_task_name} (${ts.completed_tasks}/${ts.total_tasks})`);
+              if (ts.task_names) {
+                console.log(`📝 Task List: ${ts.task_names.join(', ')}`);
+              }
+            } else if (eventData.type === 'graph_update') {
+              const graphData = JSON.parse(eventData.content);
+              if (graphData.call_tool?.task_list) {
+                console.log(`📋 Call Tool Tasks: ${graphData.call_tool.task_list.length} tasks`);
+                graphData.call_tool.task_list.forEach((task, i) => {
+                  console.log(`   ${i + 1}. ${task.title}: ${task.description}`);
+                });
+              }
+              if (graphData.agent_executor?.task_list) {
+                console.log(`🤖 Agent Executor Tasks: ${graphData.agent_executor.task_list.length} tasks`);
+                graphData.agent_executor.task_list.forEach((task, i) => {
+                  console.log(`   ${i + 1}. ${task.title}: ${task.description}`);
+                });
+              }
+            }
+          } catch (parseErr) {
+            console.log(`⚠️ Could not parse task event details`);
+          }
+        }
+      });
+    } else {
+      console.log('❌ No task-related events found in this stream.');
+      console.log('💡 This means the API is not yet sending autonomous task execution data.');
+    }
     
     console.log('===============================================\n');
 

@@ -87,8 +87,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ className = '', children }
         <AppHeader 
           currentApp={appData.currentApp}
           availableApps={appData.availableApps}
-          showRightSidebar={appData.showRightSidebar}
-          onToggleSidebar={appData.onToggleSidebar}
         />
       </div>
       

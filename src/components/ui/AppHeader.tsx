@@ -3,6 +3,7 @@ import { AssistantToolbar } from './AssistantToolbar';
 import { TaskToolbar } from './TaskToolbar';
 import { CalendarToolbar } from './CalendarToolbar';
 import { NotificationToolbar } from './NotificationToolbar';
+import { TaskStatusIndicator } from './header/TaskStatusIndicator';
 
 interface AppHeaderProps {
   currentApp: string | null;
@@ -11,15 +12,19 @@ interface AppHeaderProps {
     name: string;
     icon: string;
   }>;
-  showRightSidebar: boolean;
-  onToggleSidebar: () => void;
+  onShowLogs?: () => void;
+  // TaskStatusIndicator props
+  streamingStatus?: string;
+  lastSSEEvent?: any;
+  onTaskControl?: (action: 'pause_all' | 'resume_all' | 'show_details') => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
   currentApp,
   availableApps,
-  showRightSidebar,
-  onToggleSidebar
+  streamingStatus,
+  lastSSEEvent,
+  onTaskControl
 }) => {
   const currentAppData = availableApps.find(app => app.id === currentApp);
 
@@ -59,6 +64,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
           <span>v0.1</span>
         </div>
+
+        {/* Task Status Indicator */}
+        <TaskStatusIndicator
+          streamingStatus={streamingStatus}
+          lastSSEEvent={lastSSEEvent}
+          onTaskControl={onTaskControl}
+          className="ml-1"
+        />
         
         {/* Personal Assistant Toolbar Suite - macOS style */}
         <div className="flex items-center gap-2">
@@ -68,24 +81,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <NotificationToolbar />
         </div>
         
-        {/* Sidebar Toggle Button */}
-        <button 
-          onClick={onToggleSidebar}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-800/60 hover:bg-gray-700/80 border border-gray-700 hover:border-gray-600 rounded-lg text-white transition-all duration-200"
-          title={showRightSidebar ? 'Hide smart widgets' : 'Show smart widgets'}
-        >
-          <svg 
-            className={`w-4 h-4 transition-transform duration-200 ${showRightSidebar ? 'rotate-180' : ''}`}
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-          <span className="text-sm font-medium">
-            {showRightSidebar ? 'Hide Widgets' : 'Smart Widgets'}
-          </span>
-        </button>
       </div>
     </header>
   );

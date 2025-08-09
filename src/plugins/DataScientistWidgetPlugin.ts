@@ -170,30 +170,47 @@ export class DataScientistWidgetPlugin implements WidgetPlugin {
         }, this.config.timeout);
 
         let analysisResult: any = null;
+        let messageCount = 0;
+        let lastMessage = '';
 
         const callbacks = {
           onMessageComplete: (message: string) => {
-            clearTimeout(timeout);
-            try {
-              // Try to parse JSON analysis result
-              const result = JSON.parse(message);
-              analysisResult = result;
-              resolve(result);
-            } catch (parseError) {
-              // If parsing fails, create structured analysis from text
-              const structuredResult = {
-                analysis: {
-                  summary: message,
-                  insights: [],
-                  recommendations: []
-                },
-                visualizations: [],
-                statistics: {
-                  dataPoints: 0,
-                  columns: []
+            messageCount++;
+            console.log(`📊 DATASCIENTIST_PLUGIN: onMessageComplete #${messageCount}:`, message?.substring(0, 100) + '...');
+            
+            if (message && message.trim()) {
+              lastMessage = message;
+              
+              // 不要立即resolve，等待可能的后续消息
+              // 使用较短的延迟等待，如果没有新消息就resolve
+              setTimeout(() => {
+                if (lastMessage === message) { // 确认这是最后一条消息
+                  clearTimeout(timeout);
+                  console.log(`📊 DATASCIENTIST_PLUGIN: Final message selected (${messageCount} total):`, message.substring(0, 100) + '...');
+                  
+                  try {
+                    // Try to parse JSON analysis result
+                    const result = JSON.parse(message);
+                    analysisResult = result;
+                    resolve(result);
+                  } catch (parseError) {
+                    // If parsing fails, create structured analysis from text
+                    const structuredResult = {
+                      analysis: {
+                        summary: message,
+                        insights: [],
+                        recommendations: []
+                      },
+                      visualizations: [],
+                      statistics: {
+                        dataPoints: 0,
+                        columns: []
+                      }
+                    };
+                    resolve(structuredResult);
+                  }
                 }
-              };
-              resolve(structuredResult);
+              }, 500); // 500ms延迟，等待可能的后续消息
             }
           },
           

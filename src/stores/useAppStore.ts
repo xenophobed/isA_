@@ -191,6 +191,16 @@ export const useAppStore = create<AppStore>()(
         triggeredAppInput: '',
         error: null
       }));
+      
+      // 重置任务历史状态（避免循环依赖，使用动态导入）
+      try {
+        import('./useChatStore').then(({ useChatStore }) => {
+          const { resetTaskHistory } = useChatStore.getState();
+          resetTaskHistory();
+        });
+      } catch (error) {
+        console.warn('Failed to reset task history:', error);
+      }
     },
     
     // UI状态

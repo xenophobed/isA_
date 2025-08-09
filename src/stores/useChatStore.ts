@@ -64,6 +64,7 @@ interface ChatStoreState {
   currentTasks: TaskItem[];
   taskProgress: TaskProgress | null;
   isExecutingPlan: boolean;
+  hasExecutedTasks: boolean; // 用于持久化显示任务面板
   
   // 流式消息状态已集成到messages中
 }
@@ -88,6 +89,7 @@ interface ChatActions {
   updateTaskStatus: (taskId: string, status: TaskItem['status'], result?: any) => void;
   setExecutingPlan: (executing: boolean) => void;
   clearTasks: () => void;
+  resetTaskHistory: () => void; // 重置任务历史，用于新会话
   
   // 流式消息操作
   startStreamingMessage: (id: string, status?: string) => void;
@@ -109,6 +111,7 @@ export const useChatStore = create<ChatStore>()(
     currentTasks: [],
     taskProgress: null,
     isExecutingPlan: false,
+    hasExecutedTasks: false,
     
     // 消息操作
     addMessage: (message) => {
@@ -441,7 +444,10 @@ export const useChatStore = create<ChatStore>()(
     },
 
     setExecutingPlan: (executing) => {
-      set({ isExecutingPlan: executing });
+      set((state) => ({
+        isExecutingPlan: executing,
+        hasExecutedTasks: executing ? true : state.hasExecutedTasks // 一旦执行过就永远为true
+      }));
       logger.info(LogCategory.CHAT_FLOW, `Plan execution ${executing ? 'started' : 'stopped'}`);
     },
 
@@ -450,17 +456,23 @@ export const useChatStore = create<ChatStore>()(
       logger.info(LogCategory.CHAT_FLOW, 'Tasks cleared');
     },
 
+    resetTaskHistory: () => {
+      set({ hasExecutedTasks: false, currentTasks: [], taskProgress: null, isExecutingPlan: false });
+      logger.info(LogCategory.CHAT_FLOW, 'Task history reset for new session');
+    },
+
     // 流式消息操作
     startStreamingMessage: (id, status = '正在生成回应') => {
       set((state) => {
-        // 检查是否已经有流式助手消息，避免重复创建
-        const hasStreamingAssistantMessage = state.messages.some(m => m.isStreaming && m.role === 'assistant');
-        if (hasStreamingAssistantMessage) {
-          console.warn('⚠️ CHAT_STORE: Streaming assistant message already exists, skipping creation');
-          return state;
-        }
+        // 先完成任何现有的流式消息，然后创建新的
+        let updatedMessages = [...state.messages];
         
-        console.log('🔥 CHAT_STORE: Creating streaming message', { id, status, currentMessageCount: state.messages.length });
+        // 完成任何现有的流式消息
+        updatedMessages = updatedMessages.map(msg => 
+          msg.isStreaming ? { ...msg, isStreaming: false, streamingStatus: undefined } : msg
+        );
+        
+        console.log('🔥 CHAT_STORE: Creating new streaming message', { id, status, currentMessageCount: updatedMessages.length });
         
         // Get current session for proper session ID
         const sessionStore = useSessionStore.getState();
@@ -480,7 +492,7 @@ export const useChatStore = create<ChatStore>()(
         // 不要在开始时同步到session，只有完成时才同步
         // 这样避免创建两条消息：一条空的，一条完整的
         
-        const newMessages = [...state.messages, streamingMessage];
+        const newMessages = [...updatedMessages, streamingMessage];
         console.log('🔥 CHAT_STORE: New messages array length:', newMessages.length);
         
         return {
@@ -647,6 +659,7 @@ export const useChatLoading = () => useChatStore(state => state.chatLoading);
 export const useCurrentTasks = () => useChatStore(state => state.currentTasks);
 export const useTaskProgress = () => useChatStore(state => state.taskProgress);
 export const useIsExecutingPlan = () => useChatStore(state => state.isExecutingPlan);
+export const useHasExecutedTasks = () => useChatStore(state => state.hasExecutedTasks);
 
 // Chat操作
 export const useChatActions = () => useChatStore(state => ({
@@ -668,7 +681,8 @@ export const useTaskActions = () => useChatStore(state => ({
   updateTaskProgress: state.updateTaskProgress,
   updateTaskStatus: state.updateTaskStatus,
   setExecutingPlan: state.setExecutingPlan,
-  clearTasks: state.clearTasks
+  clearTasks: state.clearTasks,
+  resetTaskHistory: state.resetTaskHistory
 }));
 
 // ================================================================================

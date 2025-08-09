@@ -27,6 +27,9 @@ import { ArtifactMessageComponent } from './ArtifactMessageComponent';
 import { ContentType } from '../../../types/appTypes';
 import { ContentRenderer, StatusRenderer } from '../../shared';
 import { ChatWelcome } from './ChatWelcome';
+import { TaskProgressMessage } from './TaskProgressMessage';
+import { TaskHandler } from '../../core/TaskHandler';
+import { ChatEmbeddedTaskPanel } from './ChatEmbeddedTaskPanel';
 
 // MessageActions will be implemented later
 
@@ -303,13 +306,24 @@ export const MessageList = memo<MessageListProps>(({
               </div>
             ) : null}
           </div>
+          
+          {/* Task Progress Display for streaming assistant messages */}
+          {message.role === 'assistant' && isStreaming && (
+            <TaskProgressMessage 
+              messageId={message.id}
+              compact={true}
+              showControls={true}
+              className="mt-2 ml-10"
+            />
+          )}
         </div>
       </div>
     );
   };
 
   return (
-    <div className={`conversation-stream ${className}`}>
+    <TaskHandler>
+      <div className={`conversation-stream ${className}`}>
       
       {/* Dynamic Widget-Driven Welcome */}
       {messages.length === 0 && (
@@ -318,10 +332,19 @@ export const MessageList = memo<MessageListProps>(({
 
       {/* Messages - 现在包含流式消息 */}
       {messages.map((message, index) => (
-        <div key={message.id}>
+        <div key={`${message.id}-${index}`}>
           {renderMessage(message, index)}
         </div>
       ))}
+
+      {/* Chat Embedded Task Panel - Persistent task execution display */}
+      <ChatEmbeddedTaskPanel 
+        className="mb-6"
+        initialCollapsed={false}
+        onTaskAction={(taskId, action) => {
+          console.log(`Task ${action} requested for task ${taskId}`);
+        }}
+      />
 
       {/* Typing indicator - 只在没有流式消息时显示 */}
       {isTyping && !messages.some(m => m.isStreaming) && (
@@ -362,6 +385,7 @@ export const MessageList = memo<MessageListProps>(({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </TaskHandler>
   );
 });

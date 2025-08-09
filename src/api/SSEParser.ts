@@ -63,6 +63,30 @@ export interface TaskItem {
   updatedAt: string;
 }
 
+// 🆕 Autonomous task management types
+export interface AutonomousTaskData {
+  id: string;
+  toolName: string;
+  description: string;
+  currentStep?: number;
+  totalSteps?: number;
+  status: 'detected' | 'starting' | 'running' | 'completed' | 'failed';
+  executionMode: 'autonomous' | 'manual' | 'semi-autonomous';
+  canPause: boolean;
+  canRetry: boolean;
+  metadata?: Record<string, any>;
+}
+
+export interface AutonomousTaskUpdate {
+  status?: AutonomousTaskData['status'];
+  currentStep?: number;
+  totalSteps?: number;
+  description?: string;
+  progress?: number;
+  result?: any;
+  error?: string;
+}
+
 export interface SSEParserCallbacks {
   onStreamStart?: (messageId: string, status?: string) => void;
   onStreamContent?: (content: string) => void;
@@ -77,6 +101,10 @@ export interface SSEParserCallbacks {
   onTaskProgress?: (progress: TaskProgress) => void;
   onTaskListUpdate?: (tasks: TaskItem[]) => void;
   onTaskStatusUpdate?: (taskId: string, status: string, result?: any) => void;
+  
+  // 🆕 Autonomous task callbacks
+  onAutonomousTaskDetected?: (taskData: AutonomousTaskData) => void;
+  onAutonomousTaskUpdate?: (taskId: string, update: AutonomousTaskUpdate) => void;
 }
 
 // ================================================================================
@@ -288,30 +316,96 @@ export class SSEParser {
       return;
     }
 
-    // 处理工具执行进度和任务管理
+    // 🆕 处理任务状态更新 - 基于真实API结构
+    if (content.task_state) {
+      console.log(`📊 SSE_PARSER: Task State Update:`, content.task_state);
+      const taskState = content.task_state;
+      
+      // 转换为TaskProgress格式
+      const taskProgress: TaskProgress = {
+        toolName: taskState.current_task_name || 'Task Execution',
+        description: `Executing ${taskState.current_task_name || 'tasks'} (${taskState.completed_tasks + 1}/${taskState.total_tasks})`,
+        currentStep: taskState.current_task_index + 1,
+        totalSteps: taskState.total_tasks,
+        status: taskState.status === 'executing' ? 'running' : 
+                taskState.status === 'task_completed' ? 'completed' : 'running'
+      };
+      
+      callbacks.onTaskProgress?.(taskProgress);
+      
+      // 创建任务列表
+      if (taskState.task_names && taskState.task_names.length > 0) {
+        const tasks: TaskItem[] = taskState.task_names.map((name: string, index: number) => ({
+          id: `task_${index + 1}`,
+          title: name,
+          description: `Task ${index + 1}: ${name}`,
+          status: index < taskState.completed_tasks ? 'completed' :
+                  index === taskState.current_task_index ? 'running' : 'pending',
+          progress: index < taskState.completed_tasks ? 100 : 
+                   index === taskState.current_task_index ? 50 : 0,
+          result: index < taskState.completed_tasks ? 'Completed successfully' : null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }));
+        
+        callbacks.onTaskListUpdate?.(tasks);
+      }
+      return;
+    }
+
+    // 🆕 处理单个任务完成通知
+    if (content.task_completed) {
+      console.log(`✅ SSE_PARSER: Task Completed:`, content.task_completed);
+      const taskCompleted = content.task_completed;
+      
+      callbacks.onTaskStatusUpdate?.(
+        `task_${taskCompleted.task_index + 1}`,
+        'completed',
+        {
+          title: taskCompleted.task_title,
+          status: taskCompleted.status,
+          remaining_tasks: taskCompleted.remaining_tasks
+        }
+      );
+      return;
+    }
+
+    // 🆕 处理Agent执行状态
+    if (content.agent_execution) {
+      console.log(`🤖 SSE_PARSER: Agent Execution Status:`, content.agent_execution);
+      const agentExecution = content.agent_execution;
+      
+      // 更新整体状态
+      callbacks.onStreamStatus?.(
+        `Agent Status: ${agentExecution.status} (${agentExecution.completed}/${agentExecution.total_tasks} tasks)`
+      );
+      return;
+    }
+
+    // 处理工具执行进度和任务管理 (legacy support)
     if (content.data && content.type === 'progress') {
       console.log(`🔧 SSE_PARSER: Tool progress: ${content.data}`);
       
-      // 解析任务进度信息
-      const progressData = this.parseTaskProgress(content.data);
-      if (progressData) {
-        console.log(`📋 SSE_PARSER: Parsed task progress:`, progressData);
-        // 调用任务进度回调（如果存在）
-        callbacks.onTaskProgress?.(progressData);
+      // 🆕 解析任务进度信息并创建任务事件
+      const taskEvent = this.parseTaskEventFromProgress(content.data);
+      if (taskEvent) {
+        console.log(`📋 SSE_PARSER: Parsed task event:`, taskEvent);
+        // 调用任务事件回调
+        callbacks.onTaskProgress?.(taskEvent);
       }
       
       callbacks.onStreamStatus?.(content.data);
       return;
     }
 
-    // 处理任务列表更新
+    // 处理任务列表更新 (legacy support)
     if (content.type === 'task_list' && content.tasks) {
       console.log(`📝 SSE_PARSER: Task list update:`, content.tasks);
       callbacks.onTaskListUpdate?.(content.tasks);
       return;
     }
 
-    // 处理任务状态更新
+    // 处理任务状态更新 (legacy support)
     if (content.type === 'task_status' && content.task_id) {
       console.log(`🔄 SSE_PARSER: Task status update:`, content);
       callbacks.onTaskStatusUpdate?.(content.task_id, content.status, content.result);
@@ -322,21 +416,32 @@ export class SSEParser {
   }
 
   /**
-   * 解析任务进度信息
+   * 🆕 从进度信息解析任务事件
    */
-  private static parseTaskProgress(progressText: string): TaskProgress | null {
+  private static parseTaskEventFromProgress(progressText: string): TaskProgress | null {
     // 解析格式如: "[web_search] Starting execution (1/3)"
     const match = progressText.match(/\[([^\]]+)\]\s+(.+?)\s*(?:\((\d+)\/(\d+)\))?/);
     if (match) {
       const [, toolName, description, current, total] = match;
+      
+      // 确定任务状态
+      let status: 'starting' | 'running' | 'completed' | 'failed';
+      if (description.toLowerCase().includes('starting')) {
+        status = 'starting';
+      } else if (description.toLowerCase().includes('completed')) {
+        status = 'completed';
+      } else if (description.toLowerCase().includes('failed')) {
+        status = 'failed';
+      } else {
+        status = 'running';
+      }
+      
       return {
         toolName,
         description,
         currentStep: current ? parseInt(current) : undefined,
         totalSteps: total ? parseInt(total) : undefined,
-        status: description.toLowerCase().includes('starting') ? 'starting' :
-                description.toLowerCase().includes('completed') ? 'completed' :
-                description.toLowerCase().includes('failed') ? 'failed' : 'running'
+        status
       };
     }
     return null;
@@ -424,6 +529,55 @@ export class SSEParser {
     
     console.log(`📊 SSE_PARSER: Graph update: ${content}`);
     
+    try {
+      // 尝试解析content作为JSON来获取任务列表
+      const graphData = JSON.parse(content);
+      
+      // 🆕 从call_tool节点获取任务列表
+      if (graphData.call_tool && graphData.call_tool.task_list) {
+        console.log(`📋 SSE_PARSER: Found task list in call_tool:`, graphData.call_tool.task_list);
+        const taskList = graphData.call_tool.task_list;
+        
+        // 转换为标准TaskItem格式
+        const tasks: TaskItem[] = taskList.map((task: any, index: number) => ({
+          id: task.id?.toString() || `task_${index + 1}`,
+          title: task.title || `Task ${index + 1}`,
+          description: task.description || '',
+          status: 'pending' as const,
+          progress: 0,
+          result: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }));
+        
+        callbacks.onTaskListUpdate?.(tasks);
+      }
+      
+      // 🆕 从agent_executor节点也可以获取任务列表
+      if (graphData.agent_executor && graphData.agent_executor.task_list) {
+        console.log(`📋 SSE_PARSER: Found task list in agent_executor:`, graphData.agent_executor.task_list);
+        const taskList = graphData.agent_executor.task_list;
+        
+        // 转换为标准TaskItem格式
+        const tasks: TaskItem[] = taskList.map((task: any, index: number) => ({
+          id: task.id?.toString() || `task_${index + 1}`,
+          title: task.title || `Task ${index + 1}`,
+          description: task.description || '',
+          status: 'pending' as const,
+          progress: 0,
+          result: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }));
+        
+        callbacks.onTaskListUpdate?.(tasks);
+      }
+    } catch (parseError) {
+      // 如果JSON解析失败，继续使用原有逻辑
+      console.log('📊 SSE_PARSER: Could not parse graph content as JSON, using fallback logic');
+    }
+    
+    // 原有的状态处理逻辑
     if (data?.reason_model?.next_action) {
       const action = data.reason_model.next_action;
       const status = action === 'call_tool' ? '🔧 Calling tools...' : 

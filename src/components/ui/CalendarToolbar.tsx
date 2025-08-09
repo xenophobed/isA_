@@ -17,6 +17,43 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 
+// Glass Button Style Creator for Calendar Toolbar
+const createGlassButtonStyle = (color: string, size: 'sm' | 'md' = 'md', isDisabled: boolean = false) => ({
+  borderRadius: '8px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: isDisabled ? 'not-allowed' : 'pointer',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  background: `rgba(${color}, 0.1)`,
+  backdropFilter: 'blur(10px)',
+  border: `1px solid rgba(${color}, 0.2)`,
+  opacity: isDisabled ? 0.4 : 1,
+  boxShadow: `0 2px 8px rgba(${color}, 0.15)`,
+  width: size === 'sm' ? '20px' : '24px',
+  height: size === 'sm' ? '20px' : '24px',
+  color: `rgb(${color})`
+});
+
+const createGlassButtonHoverHandlers = (color: string, isDisabled: boolean = false) => ({
+  onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!isDisabled) {
+      e.currentTarget.style.background = `rgba(${color}, 0.2)`;
+      e.currentTarget.style.borderColor = `rgba(${color}, 0.4)`;
+      e.currentTarget.style.transform = 'scale(1.05)';
+      e.currentTarget.style.boxShadow = `0 4px 12px rgba(${color}, 0.25)`;
+    }
+  },
+  onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!isDisabled) {
+      e.currentTarget.style.background = `rgba(${color}, 0.1)`;
+      e.currentTarget.style.borderColor = `rgba(${color}, 0.2)`;
+      e.currentTarget.style.transform = 'scale(1)';
+      e.currentTarget.style.boxShadow = `0 2px 8px rgba(${color}, 0.15)`;
+    }
+  }
+});
+
 interface CalendarEvent {
   id: string;
   title: string;
@@ -150,7 +187,18 @@ export const CalendarToolbar: React.FC<CalendarToolbarProps> = ({
       >
         {/* Calendar Icon with Badge */}
         <div className="relative">
-          <span className="text-sm">📅</span>
+          <button
+            style={createGlassButtonStyle('107, 114, 128', 'md', true)}
+            disabled
+            {...createGlassButtonHoverHandlers('107, 114, 128', true)}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+              <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
+              <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
+              <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+          </button>
           {hasUpcomingEvents && (
             <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
           )}
@@ -174,7 +222,17 @@ export const CalendarToolbar: React.FC<CalendarToolbarProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-700/50">
               <div className="flex items-center gap-2">
-                <span className="text-lg">📅</span>
+                <button
+                  style={createGlassButtonStyle('59, 130, 246', 'md')}
+                  {...createGlassButtonHoverHandlers('59, 130, 246')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
+                  </svg>
+                </button>
                 <div>
                   <h3 className="text-sm font-semibold text-white">Calendar</h3>
                   <p className="text-xs text-gray-400">
@@ -187,8 +245,12 @@ export const CalendarToolbar: React.FC<CalendarToolbarProps> = ({
                 onClick={() => setIsOpen(false)}
                 className="w-6 h-6 flex items-center justify-center hover:bg-gray-700/50 rounded text-gray-400 hover:text-white transition-colors"
                 title="Close"
+                style={createGlassButtonStyle('239, 68, 68', 'sm')}
+                {...createGlassButtonHoverHandlers('239, 68, 68')}
               >
-                ✕
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
               </button>
             </div>
 

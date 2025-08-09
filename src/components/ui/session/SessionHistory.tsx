@@ -166,7 +166,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                     </div>
                   </div>
                   
-                  {session.id !== 'default' && editingSessionId !== session.id && (
+                  {editingSessionId !== session.id && (
                     <div className="flex items-center gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={(e) => {

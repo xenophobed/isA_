@@ -24,6 +24,7 @@ export enum LogCategory {
   SIDEBAR_INTERACTION = 'SIDEBAR_INTERACTION',
   EVENT_EMISSION = 'EVENT_EMISSION',
   CHAT_FLOW = 'CHAT_FLOW',
+  TASK_MANAGEMENT = 'TASK_MANAGEMENT',
   SYSTEM = 'SYSTEM'
 }
 
@@ -138,6 +139,7 @@ class MainAppLogger {
       [LogCategory.SIDEBAR_INTERACTION]: '📋',
       [LogCategory.EVENT_EMISSION]: '📡',
       [LogCategory.CHAT_FLOW]: '💬',
+      [LogCategory.TASK_MANAGEMENT]: '📋',
       [LogCategory.SYSTEM]: '⚙️'
     };
 

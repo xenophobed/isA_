@@ -172,39 +172,55 @@ export class HuntWidgetPlugin implements WidgetPlugin {
         }, this.config.timeout);
 
         let searchResults: any[] = [];
+        let messageCount = 0;
+        let lastMessage = '';
 
         const callbacks = {
           onMessageComplete: (message: string) => {
-            clearTimeout(timeout);
-            try {
-              // Try to parse JSON results from message
-              const results = JSON.parse(message);
-              if (Array.isArray(results)) {
-                searchResults = results;
-                resolve(results);
-              } else {
-                // Fallback: create a single result from the message
-                const fallbackResult = {
-                  title: `Search Results for: ${query}`,
-                  description: message,
-                  content: message,
-                  query: query,
-                  timestamp: new Date().toISOString(),
-                  type: 'search_response'
-                };
-                resolve([fallbackResult]);
-              }
-            } catch (parseError) {
-              // If parsing fails, create a single result
-              const fallbackResult = {
-                title: `Search Results for: ${query}`,
-                description: message,
-                content: message,
-                query: query,
-                timestamp: new Date().toISOString(),
-                type: 'search_response'
-              };
-              resolve([fallbackResult]);
+            messageCount++;
+            console.log(`🔍 HUNT_PLUGIN: onMessageComplete #${messageCount}:`, message?.substring(0, 100) + '...');
+            
+            if (message && message.trim()) {
+              lastMessage = message;
+              
+              // 等待可能的后续消息
+              setTimeout(() => {
+                if (lastMessage === message) { // 确认这是最后一条消息
+                  clearTimeout(timeout);
+                  console.log(`🔍 HUNT_PLUGIN: Final message selected (${messageCount} total):`, message.substring(0, 100) + '...');
+                  
+                  try {
+                    // Try to parse JSON results from message
+                    const results = JSON.parse(message);
+                    if (Array.isArray(results)) {
+                      searchResults = results;
+                      resolve(results);
+                    } else {
+                      // Fallback: create a single result from the message
+                      const fallbackResult = {
+                        title: `Search Results for: ${query}`,
+                        description: message,
+                        content: message,
+                        query: query,
+                        timestamp: new Date().toISOString(),
+                        type: 'search_response'
+                      };
+                      resolve([fallbackResult]);
+                    }
+                  } catch (parseError) {
+                    // If parsing fails, create a single result
+                    const fallbackResult = {
+                      title: `Search Results for: ${query}`,
+                      description: message,
+                      content: message,
+                      query: query,
+                      timestamp: new Date().toISOString(),
+                      type: 'search_response'
+                    };
+                    resolve([fallbackResult]);
+                  }
+                }
+              }, 500); // 500ms延迟，等待可能的后续消息
             }
           },
           

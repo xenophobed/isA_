@@ -38,6 +38,7 @@
 import React, { useState, memo, useCallback, useMemo } from 'react';
 import { ChatContentLayout } from './ChatContentLayout';
 import { InputAreaLayout } from './InputAreaLayout';
+import { SmartWidgetSelector } from '../widgets/SmartWidgetSelector';
 
 // Pure interface - no dependency on stores
 export interface ChatMessage {
@@ -54,18 +55,34 @@ export interface ChatLayoutProps {
   // Layout configuration
   headerContent?: React.ReactNode;
   showHeader?: boolean;
+  
+  // 🆕 Left Panel (会话管理)
+  leftPanelContent?: React.ReactNode;
+  showLeftPanel?: boolean;
+  leftPanelWidth?: string | number;
+  
+  // 🆕 Right Panel (会话信息管理)
+  rightPanelContent?: React.ReactNode;
+  showRightPanel?: boolean;
+  rightPanelWidth?: string | number;
+  
+  // 🆕 Right Sidebar (Widget 弹出, 现在支持半屏/全屏模式)
+  rightSidebarContent?: React.ReactNode;
+  showRightSidebar?: boolean;
+  rightSidebarWidth?: string | number;
+  rightSidebarMode?: 'half' | 'fullscreen'; // 新增模式支持
+  
+  // Legacy props (保持兼容性)
   sidebarContent?: React.ReactNode;
   showSidebar?: boolean;
   sidebarPosition?: 'left' | 'right';
   sidebarWidth?: string | number;
-  rightSidebarContent?: React.ReactNode;
-  rightSidebarWidth?: string | number;
+  sidebarMode?: 'exclusive' | 'inclusive';
+  
   inputSuggestionsContent?: React.ReactNode;
   className?: string;
   fullscreen?: boolean;
   onFullscreenToggle?: (fullscreen: boolean) => void;
-  showRightSidebar?: boolean;
-  sidebarMode?: 'exclusive' | 'inclusive';
   children?: React.ReactNode;
   
   // Data props - provided by modules
@@ -76,6 +93,21 @@ export interface ChatLayoutProps {
   // Event callbacks - handled by modules
   onSendMessage?: (content: string, metadata?: Record<string, any>) => Promise<void>;
   onSendMultimodal?: (content: string, files: File[], metadata?: Record<string, any>) => Promise<void>;
+  onMessageClick?: (message: any) => void;
+  
+  // 🆕 Widget System Integration
+  showWidgetSelector?: boolean;
+  onCloseWidgetSelector?: () => void;
+  onShowWidgetSelector?: () => void;
+  onWidgetSelect?: (widgetId: string, mode: 'half' | 'full') => void;
+  
+  // 🆕 Full-screen widget support
+  showFullScreenWidget?: boolean;
+  fullScreenWidget?: React.ReactNode;
+  onCloseFullScreenWidget?: () => void;
+  
+  // 🆕 Right Panel toggle callback
+  onToggleRightPanel?: () => void;
   
   // Configuration props - passed through from modules
   conversationProps?: any;
@@ -90,20 +122,34 @@ export interface ChatLayoutProps {
 export const ChatLayout = memo<ChatLayoutProps>(({
   headerContent,
   showHeader = true,
+  
+  // 🆕 New 3-panel layout props
+  leftPanelContent,
+  showLeftPanel = true,
+  leftPanelWidth = '16.67%',
+  
+  rightPanelContent,
+  showRightPanel = false,
+  rightPanelWidth = '16.67%',
+  
+  rightSidebarContent,
+  showRightSidebar = false,
+  rightSidebarWidth = '50%',
+  rightSidebarMode = 'half',
+  
+  // Legacy props (for backward compatibility)
   sidebarContent,
   showSidebar = true,
   sidebarPosition = 'left',
   sidebarWidth = '16.67%',
-  rightSidebarContent,
-  rightSidebarWidth = '50%',
+  sidebarMode = 'exclusive',
+  
   inputSuggestionsContent,
   conversationProps = {},
   inputProps = {},
   className = '',
   fullscreen = false,
   onFullscreenToggle,
-  showRightSidebar = false,
-  sidebarMode = 'exclusive',
   children,
   // Data props from modules
   messages = [],
@@ -112,20 +158,67 @@ export const ChatLayout = memo<ChatLayoutProps>(({
   
   // Event callbacks from modules
   onSendMessage,
-  onSendMultimodal
+  onSendMultimodal,
+  onMessageClick,
+  
+  // Widget System Integration
+  showWidgetSelector = false,
+  onCloseWidgetSelector,
+  onShowWidgetSelector,
+  onWidgetSelect,
+  
+  // Full-screen widget support
+  showFullScreenWidget = false,
+  fullScreenWidget,
+  onCloseFullScreenWidget,
+  
+  // Right Panel toggle callback
+  onToggleRightPanel
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(fullscreen);
   
-  // Handle exclusive sidebar logic
-  const actualShowLeftSidebar = useMemo(() => 
-    sidebarMode === 'exclusive' ? (showSidebar && !showRightSidebar) : showSidebar,
-    [sidebarMode, showSidebar, showRightSidebar]
-  );
+  // 🆕 计算布局尺寸 (从ThreeColumnLayout移植)
+  const layoutConfig = useMemo(() => {
+    console.log('🔧 ChatLayout: Computing layout config', { 
+      showSidebar, showRightPanel, showRightSidebar 
+    });
+    // Widget半屏模式时的特殊处理
+    if (showRightSidebar) {
+      return {
+        showLeftSidebar: false, // Widget模式时隐藏左侧栏
+        leftWidth: '0%',
+        centerWidth: '50%', // Chat占一半
+        rightSidebarWidth: rightSidebarWidth || '50%', // Widget占一半
+        showRightPanel: false, // Widget模式时隐藏右侧panel
+        rightPanelWidth: '0%'
+      };
+    }
     
-  const actualShowRightSidebar = useMemo(() => 
-    sidebarMode === 'exclusive' ? showRightSidebar : showRightSidebar,
-    [sidebarMode, showRightSidebar]
-  );
+    // 正常模式 - 计算布局比例
+    const leftWidth = showSidebar ? 16.67 : 0; // 1/6 = 16.67%
+    const rightWidth = showRightPanel ? 16.67 : 0; // 1/6 = 16.67%  
+    const centerWidth = 100 - leftWidth - rightWidth;
+    
+    const config = {
+      showLeftSidebar: showSidebar,
+      leftWidth: `${leftWidth}%`,
+      centerWidth: `${Math.max(centerWidth, 30)}%`, // 最小保持30%
+      rightSidebarWidth: rightSidebarWidth || '50%',
+      showRightPanel: showRightPanel,
+      rightPanelWidth: `${rightWidth}%`
+    };
+    
+    console.log('🔧 ChatLayout: Final layout config', config);
+    return config;
+  }, [showSidebar, showRightPanel, showRightSidebar, rightSidebarWidth]);
+
+  // Backward compatibility: map legacy props to new props
+  const effectiveLeftPanelContent = leftPanelContent || (sidebarPosition === 'left' ? sidebarContent : null);
+  const effectiveShowLeftPanel = layoutConfig.showLeftSidebar && (leftPanelContent || (sidebarPosition === 'left' && showSidebar));
+  
+  // Right sidebar mode determines overlay vs inline
+  const isRightSidebarFullscreen = rightSidebarMode === 'fullscreen';
+  const isRightSidebarOverlay = showRightSidebar;
   
   // Handle fullscreen toggle
   const toggleFullscreen = useCallback(() => {
@@ -137,10 +230,15 @@ export const ChatLayout = memo<ChatLayoutProps>(({
     }
   }, [isFullscreen, onFullscreenToggle]);
   
-  // Format sidebar width to CSS value
-  const formattedSidebarWidth = useMemo(() => 
-    typeof sidebarWidth === 'number' ? `${sidebarWidth}px` : sidebarWidth,
-    [sidebarWidth]
+  // Format widths to CSS values
+  const formattedLeftPanelWidth = useMemo(() => 
+    typeof leftPanelWidth === 'number' ? `${leftPanelWidth}px` : leftPanelWidth,
+    [leftPanelWidth]
+  );
+    
+  const formattedRightPanelWidth = useMemo(() => 
+    typeof rightPanelWidth === 'number' ? `${rightPanelWidth}px` : rightPanelWidth,
+    [rightPanelWidth]
   );
     
   const formattedRightSidebarWidth = useMemo(() => 
@@ -148,87 +246,201 @@ export const ChatLayout = memo<ChatLayoutProps>(({
     [rightSidebarWidth]
   );
   
-  // Determine layout classes
+  // Layout classes
   const layoutClass = useMemo(() => 
     `isa-chat-layout ${className} ${isFullscreen ? 'isa-fullscreen' : ''}`,
     [className, isFullscreen]
   );
   
-  const sidebarClass = useMemo(() => 
-    `isa-chat-sidebar isa-sidebar-${sidebarPosition}`,
-    [sidebarPosition]
-  );
+  // Calculate main content width based on visible panels
+  const mainContentStyle = useMemo(() => {
+    if (isRightSidebarFullscreen) {
+      return { display: 'none' }; // Hide main content in fullscreen widget mode
+    }
+    
+    let widthCalc = '100%';
+    if (effectiveShowLeftPanel && showRightPanel) {
+      widthCalc = `calc(100% - ${formattedLeftPanelWidth} - ${formattedRightPanelWidth})`;
+    } else if (effectiveShowLeftPanel) {
+      widthCalc = `calc(100% - ${formattedLeftPanelWidth})`;
+    } else if (showRightPanel) {
+      widthCalc = `calc(100% - ${formattedRightPanelWidth})`;
+    }
+    
+    return { width: widthCalc };
+  }, [effectiveShowLeftPanel, showRightPanel, isRightSidebarFullscreen, formattedLeftPanelWidth, formattedRightPanelWidth]);
   
-  const rightSidebarClass = 'isa-chat-sidebar isa-sidebar-right';
-  
-  return (
-    <div className={`${layoutClass} flex flex-col h-full text-white overflow-hidden`} style={{ background: 'transparent' }}>
-      
-      {showHeader && (
-        <header className="isa-chat-header h-16 backdrop-blur-xl flex items-center justify-between px-6 z-10" style={{ background: 'var(--glass-primary)' }}>
-          {headerContent || (
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--gradient-secondary)', boxShadow: '0 0 20px var(--accent-soft)' }}>
-                <span className="text-white font-bold text-lg">A</span>
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-white">AI Agent SDK</h1>
-                <p className="text-blue-200 text-sm">Smart Integration Platform</p>
-              </div>
-            </div>
-          )}
-        </header>
-      )}
-      
-      <div className="flex flex-1 overflow-hidden" style={{ height: showHeader ? 'calc(100% - 4rem)' : '100%' }}>
-        {actualShowLeftSidebar && sidebarContent && (
-          <aside 
-            className={`${sidebarClass} backdrop-blur-xl flex-shrink-0 order-1 z-10`}
-            style={{ width: formattedSidebarWidth, background: 'var(--glass-primary)' }}
+  // 渲染全屏Widget模式 (从ThreeColumnLayout移植)
+  if (showFullScreenWidget && fullScreenWidget) {
+    return (
+      <div className="fixed inset-0 z-50 bg-gray-900">
+        {/* 全屏Widget头部 */}
+        <div className="h-12 bg-gray-800 border-b border-white/10 flex items-center justify-between px-4">
+          <div className="text-white font-medium">Widget Full Screen Mode</div>
+          <button
+            onClick={onCloseFullScreenWidget}
+            className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center text-white/70 hover:text-white transition-all"
           >
-            {sidebarContent}
-          </aside>
-        )}
-        
-        <div className="flex-1 flex flex-col order-2">
-          {/* Chat content area */}
-          <ChatContentLayout 
-            {...conversationProps}
-            className="flex-1"
-            messages={messages}
-            isLoading={isLoading}
-            isTyping={isTyping}
-            onSendMessage={onSendMessage}
-          />
-          
-          {/* Input area */}
-          <InputAreaLayout 
-            placeholder={inputProps.placeholder}
-            multiline={inputProps.multiline}
-            maxRows={inputProps.maxRows}
-            disabled={inputProps.disabled}
-            autoFocus={inputProps.autoFocus}
-            onBeforeSend={inputProps.onBeforeSend}
-            onAfterSend={inputProps.onAfterSend}
-            onError={inputProps.onError}
-            onFileSelect={inputProps.onFileSelect}
-            onSend={onSendMessage}
-            onSendMultimodal={onSendMultimodal}
-            suggestionsContent={inputSuggestionsContent}
-            config={inputProps.config ? { components: inputProps.config } : undefined}
-          />
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
         
-        {actualShowRightSidebar && rightSidebarContent && (
-          <aside 
-            className={`${rightSidebarClass} backdrop-blur-xl flex-shrink-0 order-3 z-20`}
-            style={{ width: formattedRightSidebarWidth, background: 'var(--glass-secondary)' }}
+        {/* 全屏Widget内容 */}
+        <div className="h-[calc(100%-3rem)] overflow-hidden">
+          {fullScreenWidget}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className={`flex flex-col h-full ${className}`}
+      style={{
+        width: '100%',
+        maxWidth: '100%',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Header */}
+      {showHeader && headerContent && (
+        <div className="flex-shrink-0 border-b border-white/10">
+          {headerContent}
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <div 
+        className="flex-1 flex overflow-hidden"
+        style={{
+          width: '100%',
+          maxWidth: '100%',
+          position: 'relative',
+          flex: '1 1 0%'
+        }}
+      >
+        
+        {/* Left Sidebar */}
+        {layoutConfig.showLeftSidebar && effectiveLeftPanelContent && (
+          <div 
+            className="flex-shrink-0 border-r border-white/10"
+            style={{ width: layoutConfig.leftWidth }}
+          >
+            {effectiveLeftPanelContent}
+          </div>
+        )}
+
+        {/* Center Chat Area */}
+        <div 
+          className="flex-1 flex flex-col overflow-hidden"
+          style={{
+            minWidth: 0,
+            position: 'relative'
+          }}
+        >
+          {/* Chat Content */}
+          <div className="flex-1 overflow-hidden">
+            <ChatContentLayout
+              messages={messages}
+              isLoading={isLoading}
+              isTyping={isTyping}
+              onMessageClick={onMessageClick}
+              {...conversationProps}
+            />
+          </div>
+
+          {/* Input Area */}
+          <div className="flex-shrink-0 border-t border-white/10">
+            <InputAreaLayout
+              onSend={onSendMessage}
+              onSendMultimodal={onSendMultimodal}
+              onShowWidgetSelector={onShowWidgetSelector}
+              showWidgetSelector={showWidgetSelector}
+              {...inputProps}
+            />
+          </div>
+        </div>
+
+        {/* Right Sidebar (半屏Widget模式) */}
+        {showRightSidebar && rightSidebarContent && (
+          <div 
+            className="flex-shrink-0 border-l border-white/10 bg-gray-900/50"
+            style={{ width: '50%' }}
           >
             {rightSidebarContent}
-          </aside>
+          </div>
+        )}
+
+        {/* Right Panel (会话管理) */}
+        {layoutConfig.showRightPanel && rightPanelContent && (
+          <div 
+            className="flex-shrink-0 border-l border-white/10"
+            style={{ width: '16.67%' }}
+          >
+            {rightPanelContent}
+          </div>
+        )}
+
+        {/* Right Panel Toggle Arrow - Only show in normal mode (no widget) */}
+        {!showRightSidebar && (
+          <div className="absolute right-0 top-1/2 transform -translate-y-1/2 z-20">
+            <button
+              onClick={() => {
+                if (onToggleRightPanel) {
+                  onToggleRightPanel();
+                } else {
+                  console.log('Toggle right panel - callback not provided');
+                }
+              }}
+              className={`w-8 h-12 bg-gray-800/80 hover:bg-gray-700/90 border-l border-t border-b border-white/10 rounded-l-lg flex items-center justify-center text-white/70 hover:text-white transition-all shadow-lg hover:shadow-xl ${
+                showRightPanel ? 'translate-x-0' : 'translate-x-0 bg-blue-600/80 hover:bg-blue-500/90'
+              }`}
+              title={showRightPanel ? 'Hide panel' : 'Show panel'}
+            >
+              <svg 
+                className={`w-4 h-4 transition-transform ${showRightPanel ? 'rotate-0' : 'rotate-180'}`}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
         )}
       </div>
       
+      {/* Smart Widget Selector Modal */}
+      {showWidgetSelector && (
+        <SmartWidgetSelector
+          isOpen={showWidgetSelector}
+          onClose={onCloseWidgetSelector || (() => {})}
+          onWidgetSelect={onWidgetSelect || (() => {})}
+        />
+      )}
+      
+      {/* Full-screen Widget Mode */}
+      {showFullScreenWidget && fullScreenWidget && (
+        <div className="fixed inset-0 z-50 bg-gray-900">
+          <div className="h-12 bg-gray-800 border-b border-white/10 flex items-center justify-between px-4">
+            <div className="text-white font-medium">Widget Full Screen Mode</div>
+            <button
+              onClick={onCloseFullScreenWidget}
+              className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center text-white/70 hover:text-white transition-all"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="h-[calc(100%-3rem)] overflow-hidden">
+            {fullScreenWidget}
+          </div>
+        </div>
+      )}
+
       {/* Render children for modals, overlays, etc. */}
       {children}
     </div>

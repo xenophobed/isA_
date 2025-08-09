@@ -175,6 +175,9 @@ export class DreamWidgetPlugin implements WidgetPlugin {
           reject(new Error('Image generation timeout'));
         }, this.config.timeout);
 
+        let messageCount = 0;
+        let lastMessage = '';
+
         const callbacks = {
           onArtifactCreated: (artifact: any) => {
             clearTimeout(timeout);
@@ -186,14 +189,26 @@ export class DreamWidgetPlugin implements WidgetPlugin {
           },
           
           onMessageComplete: (message?: string) => {
-            clearTimeout(timeout);
-            // Extract image URL from the final message
-            if (message) {
+            messageCount++;
+            console.log(`🎨 DREAM_PLUGIN: onMessageComplete #${messageCount}:`, message?.substring(0, 100) + '...');
+            
+            if (message && message.trim()) {
+              lastMessage = message;
+              
+              // Extract image URL from the message
               const imageUrlMatch = message.match(/https:\/\/[^\s\)]+\.jpg|https:\/\/[^\s\)]+\.png|https:\/\/[^\s\)]+\.webp/);
               if (imageUrlMatch) {
-                resolve(imageUrlMatch[0]);
+                // 不要立即resolve，等待可能的后续消息
+                // 使用较短的延迟等待，如果没有新消息就resolve
+                setTimeout(() => {
+                  if (lastMessage === message) { // 确认这是最后一条消息
+                    clearTimeout(timeout);
+                    console.log(`🎨 DREAM_PLUGIN: Final message selected (${messageCount} total):`, message.substring(0, 100) + '...');
+                    resolve(imageUrlMatch[0]);
+                  }
+                }, 500); // 500ms延迟，等待可能的后续消息
               } else {
-                // If no image URL found in message, check for artifact
+                // If no image URL found in message, wait for artifact or check later
                 console.warn('🎨 Dream Plugin: No image URL found in message, waiting for artifact...');
               }
             }

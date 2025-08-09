@@ -31,20 +31,19 @@
  */
 import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { ChatLayout, ChatLayoutProps } from '../components/ui/chat/ChatLayout';
-import { ChatMessage } from '../types/chatTypes';
+import { RightPanel } from '../components/ui/chat/RightPanel';
+import { AppId } from '../types/appTypes';
 import { useChat } from '../hooks/useChat';
 import { useChatActions } from '../stores/useChatStore';
 import { useAuth } from '../hooks/useAuth';
-import { useArtifactLogic } from './ArtifactModule';
-import { ArtifactComponent } from '../components/ui/chat/ArtifactComponent';
 import { useCurrentSession, useSessionActions } from '../stores/useSessionStore';
-import { ChatSession } from '../stores/useSessionStore';
 import { logger, LogCategory } from '../utils/logger';
 import { useUserModule } from './UserModule';
 import { UpgradeModal } from '../components/ui/UpgradeModal';
 import { useAppActions } from '../stores/useAppStore';
 import { ArtifactMessage } from '../types/chatTypes';
 import { detectPluginTrigger, executePlugin } from '../plugins';
+import { useTask } from '../hooks/useTask';
 
 interface ChatModuleProps extends Omit<ChatLayoutProps, 'messages' | 'isLoading' | 'isTyping' | 'onSendMessage' | 'onSendMultimodal'> {
   // All ChatLayout props except the data and callback props that we'll provide from business logic
@@ -64,6 +63,20 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   // Module state for upgrade modal
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   
+  // Extract widget selector and panel state from props (managed by parent)
+  const {
+    showWidgetSelector = false,
+    onCloseWidgetSelector,
+    onShowWidgetSelector,
+    showRightPanel = false,
+    onToggleRightPanel,
+    ...otherProps
+  } = props;
+  
+  // Widget system state (managed internally)
+  const [currentWidgetMode, setCurrentWidgetMode] = useState<'half' | 'full' | null>(null);
+  const [selectedWidgetContent, setSelectedWidgetContent] = useState<React.ReactNode>(null);
+  
   // Get chat interface state using the hook (now pure state aggregation)
   const chatInterface = useChat();
   
@@ -82,6 +95,9 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   
   // Get app actions for navigation
   const { setCurrentApp } = useAppActions();
+  
+  // // 🆕 任务管理集成
+  // const { taskActions } = useTask();
   
   // 🆕 Widget事件监听系统
   const eventEmitterRef = useRef<{
@@ -464,8 +480,10 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       
       try {
         const token = await userModule.getAccessToken();
+        
         await chatActions.sendMessage(content, enrichedMetadata, token);
         console.log('✅ CHAT_MODULE: Regular chat message sent successfully');
+        
       } catch (error) {
         console.error('❌ CHAT_MODULE: Failed to send regular chat message:', error);
         throw error;
@@ -549,7 +567,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   }, [chatActions, auth0User, userModule]);
 
   // Handle message click for artifact navigation
-  const handleMessageClick = useCallback((message: ChatMessage) => {
+  const handleMessageClick = useCallback((message: any) => {
     console.log('💬 CHAT_MODULE: Message clicked:', message);
     
     // Check if this is an artifact message and navigate to the corresponding widget
@@ -569,12 +587,13 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       const appId = widgetToAppMap[widgetType as keyof typeof widgetToAppMap];
       if (appId) {
         console.log(`🔄 CHAT_MODULE: Navigating to ${appId} widget for artifact:`, artifactMessage.artifact.id);
-        setCurrentApp(appId);
+        setCurrentApp(appId as AppId);
       } else {
         console.warn('💬 CHAT_MODULE: Unknown widget type for navigation:', widgetType);
       }
     }
   }, [setCurrentApp]);
+
 
   // Handle upgrade modal actions
   const handleUpgrade = useCallback(async (planType: 'pro' | 'enterprise') => {
@@ -595,17 +614,82 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     setShowUpgradeModal(false);
   }, []);
 
+  // Handle widget selection - 打开真正的widget
+  const handleWidgetSelect = useCallback((widgetId: string, mode: 'half' | 'full') => {
+    console.log('🔧 CHAT_MODULE: Widget selected:', { widgetId, mode });
+    
+    // ✅ 设置Plugin模式标志，让Widget知道它们正在Chat环境中运行
+    if (typeof window !== 'undefined') {
+      (window as any).__CHAT_MODULE_PLUGIN_MODE__ = true;
+    }
+    
+    // 导入RightSidebarLayout来显示真正的widget
+    import('../components/ui/chat/RightSidebarLayout').then(({ RightSidebarLayout }) => {
+      const widgetContent = (
+        <RightSidebarLayout
+          currentApp={widgetId}
+          showRightSidebar={true}
+          triggeredAppInput=""
+          onCloseApp={handleCloseWidget}
+          onAppSelect={(appId) => {
+            console.log('Widget app selected:', appId);
+          }}
+        />
+      );
+      
+      setCurrentWidgetMode(mode);
+      setSelectedWidgetContent(widgetContent);
+    });
+    
+    // Close widget selector through parent callback
+    if (onCloseWidgetSelector) {
+      onCloseWidgetSelector();
+    }
+  }, [onCloseWidgetSelector]);
+
+  const handleCloseWidget = useCallback(() => {
+    setCurrentWidgetMode(null);
+    setSelectedWidgetContent(null);
+    
+    // ✅ 清理Plugin模式标志
+    if (typeof window !== 'undefined') {
+      (window as any).__CHAT_MODULE_PLUGIN_MODE__ = false;
+    }
+  }, []);
+
+
   // Pass all data and business logic callbacks as props to pure UI component
   return (
     <>
       <ChatLayout
-        {...props}
+        {...otherProps}
         messages={chatInterface.messages}
         isLoading={chatInterface.isLoading}
         isTyping={chatInterface.isTyping}
         onSendMessage={handleSendMessage}
         onSendMultimodal={handleSendMultimodal}
         onMessageClick={handleMessageClick}
+        
+        // Right Panel (会话信息管理)
+        showRightPanel={showRightPanel}
+        onToggleRightPanel={onToggleRightPanel}
+        rightPanelContent={<RightPanel />}
+        
+        // Widget System Integration
+        showWidgetSelector={showWidgetSelector}
+        onCloseWidgetSelector={onCloseWidgetSelector}
+        onShowWidgetSelector={onShowWidgetSelector}
+        onWidgetSelect={handleWidgetSelect}
+        
+        // Half-screen widget mode
+        showRightSidebar={currentWidgetMode === 'half'}
+        rightSidebarContent={selectedWidgetContent}
+        rightSidebarMode="half"
+        
+        // Full-screen widget mode  
+        showFullScreenWidget={currentWidgetMode === 'full'}
+        fullScreenWidget={selectedWidgetContent}
+        onCloseFullScreenWidget={handleCloseWidget}
       />
       
       {/* Upgrade Modal */}

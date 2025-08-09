@@ -221,7 +221,7 @@ export class PluginManager implements IPluginManager {
   detectTrigger(message: string): PluginTriggerResult {
     const messageLower = message.toLowerCase().trim();
 
-    for (const [pluginId, registration] of this.plugins) {
+    for (const [pluginId, registration] of Array.from(this.plugins.entries())) {
       if (!registration.enabled || !registration.plugin.triggers) {
         continue;
       }

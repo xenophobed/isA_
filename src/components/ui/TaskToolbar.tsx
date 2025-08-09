@@ -17,6 +17,43 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 
+// Glass Button Style Creator for Task Toolbar
+const createGlassButtonStyle = (color: string, size: 'sm' | 'md' = 'md', isDisabled: boolean = false) => ({
+  borderRadius: '8px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: isDisabled ? 'not-allowed' : 'pointer',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  background: `rgba(${color}, 0.1)`,
+  backdropFilter: 'blur(10px)',
+  border: `1px solid rgba(${color}, 0.2)`,
+  opacity: isDisabled ? 0.4 : 1,
+  boxShadow: `0 2px 8px rgba(${color}, 0.15)`,
+  width: size === 'sm' ? '20px' : '24px',
+  height: size === 'sm' ? '20px' : '24px',
+  color: `rgb(${color})`
+});
+
+const createGlassButtonHoverHandlers = (color: string, isDisabled: boolean = false) => ({
+  onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!isDisabled) {
+      e.currentTarget.style.background = `rgba(${color}, 0.2)`;
+      e.currentTarget.style.borderColor = `rgba(${color}, 0.4)`;
+      e.currentTarget.style.transform = 'scale(1.05)';
+      e.currentTarget.style.boxShadow = `0 4px 12px rgba(${color}, 0.25)`;
+    }
+  },
+  onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!isDisabled) {
+      e.currentTarget.style.background = `rgba(${color}, 0.1)`;
+      e.currentTarget.style.borderColor = `rgba(${color}, 0.2)`;
+      e.currentTarget.style.transform = 'scale(1)';
+      e.currentTarget.style.boxShadow = `0 2px 8px rgba(${color}, 0.15)`;
+    }
+  }
+});
+
 interface Task {
   id: string;
   title: string;
@@ -130,12 +167,17 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
   };
 
   const getPriorityIcon = (priority: string) => {
-    switch (priority) {
-      case 'high': return '🔴';
-      case 'medium': return '🟡';
-      case 'low': return '🟢';
-      default: return '⚪';
-    }
+    const color = priority === 'high' ? '239, 68, 68' : priority === 'medium' ? '251, 191, 36' : '34, 197, 94';
+    return (
+      <button
+        style={createGlassButtonStyle(color, 'sm')}
+        {...createGlassButtonHoverHandlers(color)}
+      >
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" fill="currentColor"/>
+        </svg>
+      </button>
+    );
   };
 
   const pendingTasksCount = tasks.filter(t => !t.completed).length;
@@ -153,7 +195,16 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
       >
         {/* Task Icon with Badge */}
         <div className="relative">
-          <span className="text-sm">✅</span>
+          <button
+            style={createGlassButtonStyle('107, 114, 128', 'md', true)}
+            disabled
+            {...createGlassButtonHoverHandlers('107, 114, 128', true)}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
         </div>
         
         {/* Label */}
@@ -174,7 +225,15 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-700/50">
               <div className="flex items-center gap-2">
-                <span className="text-lg">✅</span>
+                <button
+                  style={createGlassButtonStyle('34, 197, 94', 'md')}
+                  {...createGlassButtonHoverHandlers('34, 197, 94')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
                 <div>
                   <h3 className="text-sm font-semibold text-white">Tasks</h3>
                   <p className="text-xs text-gray-400">
@@ -187,8 +246,12 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
                 onClick={() => setIsOpen(false)}
                 className="w-6 h-6 flex items-center justify-center hover:bg-gray-700/50 rounded text-gray-400 hover:text-white transition-colors"
                 title="Close"
+                style={createGlassButtonStyle('239, 68, 68', 'sm')}
+                {...createGlassButtonHoverHandlers('239, 68, 68')}
               >
-                ✕
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
               </button>
             </div>
 
@@ -223,7 +286,19 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
             <div className="max-h-96 overflow-y-auto">
               {tasks.length === 0 ? (
                 <div className="p-4 text-center text-gray-400 text-sm">
-                  <div className="text-2xl mb-2">📝</div>
+                  <button
+                    style={createGlassButtonStyle('107, 114, 128', 'md')}
+                    className="mb-2"
+                    {...createGlassButtonHoverHandlers('107, 114, 128')}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M16 13H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M16 17H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M10 9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
                   <div>No tasks yet</div>
                 </div>
               ) : (
@@ -251,7 +326,7 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
                         {/* Task Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs">{getPriorityIcon(task.priority)}</span>
+                            {getPriorityIcon(task.priority)}
                             <span
                               className={`text-sm ${
                                 task.completed 
@@ -279,9 +354,14 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
                         {/* Delete Button */}
                         <button
                           onClick={() => deleteTask(task.id)}
-                          className="w-6 h-6 flex items-center justify-center hover:bg-red-500/20 rounded text-gray-400 hover:text-red-400 transition-colors"
+                          style={createGlassButtonStyle('239, 68, 68', 'sm')}
+                          className="transition-colors"
+                          {...createGlassButtonHoverHandlers('239, 68, 68')}
                         >
-                          🗑️
+                          <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
+                            <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
                         </button>
                       </div>
                     </div>
@@ -299,7 +379,18 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
                       {pendingTasksCount} task{pendingTasksCount !== 1 ? 's' : ''} remaining
                     </span>
                   ) : (
-                    <span className="text-green-400">All tasks completed! 🎉</span>
+                    <span className="text-green-400 flex items-center gap-1">
+                      All tasks completed!
+                      <button
+                        style={createGlassButtonStyle('34, 197, 94', 'sm')}
+                        {...createGlassButtonHoverHandlers('34, 197, 94')}
+                      >
+                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
+                          <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                    </span>
                   )}
                 </div>
                 <button className="text-purple-400 hover:text-purple-300 transition-colors">

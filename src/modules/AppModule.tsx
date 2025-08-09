@@ -50,7 +50,6 @@ import { AppId } from '../types/appTypes';
 
 // 🆕 Plugin System Integration
 import { initializePluginSystem } from '../plugins';
-import SessionArtifactTester from '../components/debug/SessionArtifactTester';
 
 // Available apps configuration - managed by AppModule but business logic in respective modules
 const AVAILABLE_APPS = [
@@ -121,6 +120,12 @@ interface AppModuleProps extends Omit<AppLayoutProps, 'children'> {
 export const AppModule: React.FC<AppModuleProps> = (props) => {
   // User Portal state
   const [showUserPortal, setShowUserPortal] = useState(false);
+  
+  // Widget selector state
+  const [showWidgetSelector, setShowWidgetSelector] = useState(false);
+  
+  // Right panel state
+  const [showRightPanel, setShowRightPanel] = useState(false);
   
   // 🆕 Initialize Plugin System
   React.useEffect(() => {
@@ -196,9 +201,37 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
   }, [setCurrentApp, setShowRightSidebar]);
 
   const handleToggleSidebar = useCallback(() => {
-    setShowRightSidebar(!showRightSidebar);
-    logger.info(LogCategory.APP_TRIGGER, 'Sidebar toggled', { newState: !showRightSidebar });
-  }, [showRightSidebar, setShowRightSidebar]);
+    setShowWidgetSelector(true);
+    logger.info(LogCategory.APP_TRIGGER, 'Widget selector opened');
+  }, []);
+
+  const handleCloseWidgetSelector = useCallback(() => {
+    setShowWidgetSelector(false);
+    logger.info(LogCategory.APP_TRIGGER, 'Widget selector closed');
+  }, []);
+
+  const handleShowWidgetSelector = useCallback(() => {
+    setShowWidgetSelector(true);
+    logger.info(LogCategory.APP_TRIGGER, 'Widget selector opened via magic wand');
+  }, []);
+
+  const handleWidgetSelect = useCallback((widgetId: string, mode: 'half' | 'full') => {
+    setCurrentApp(widgetId as AppId);
+    setShowWidgetSelector(false);
+    
+    if (mode === 'half') {
+      setShowRightSidebar(true);
+    }
+    // Full mode will be handled by ChatModule
+    
+    logger.info(LogCategory.APP_TRIGGER, 'Widget selected from selector', { widgetId, mode });
+  }, [setCurrentApp, setShowRightSidebar]);
+
+  const handleToggleRightPanel = useCallback(() => {
+    setShowRightPanel(!showRightPanel);
+    logger.info(LogCategory.APP_TRIGGER, 'Right panel toggled', { newState: !showRightPanel });
+  }, [showRightPanel]);
+
 
   // Prepare data for pure UI component
   const appLayoutData = useMemo(() => ({
@@ -233,20 +266,18 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
   return (
     <>
       {/* 🆕 Session Artifact Tester - Development Only */}
-      <SessionArtifactTester />
       
       <AppLayout {...props}>
       {() => ({
         // Simplified Chat with pure module integration
         chatModule: (
           <ChatModule
-            showHeader={false}
-            showSidebar={true}
-            showRightSidebar={showRightSidebar}
-            sidebarPosition="left"
-            sidebarWidth="300px"
-            rightSidebarWidth="50%"
-            className="w-full h-full"
+            showWidgetSelector={showWidgetSelector}
+            onCloseWidgetSelector={handleCloseWidgetSelector}
+            onShowWidgetSelector={handleShowWidgetSelector}
+            onWidgetSelect={handleWidgetSelect}
+            showRightPanel={showRightPanel}
+            onToggleRightPanel={handleToggleRightPanel}
             
             // Handle file selection
             inputProps={{

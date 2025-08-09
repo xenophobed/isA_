@@ -10,7 +10,7 @@ import { APIDataFlowTester } from '../src/components/debug/APIDataFlowTester';
 import { SimpleAPITester } from '../src/components/debug/SimpleAPITester';
 
 const DemoPage: React.FC = () => {
-  const [activeDemo, setActiveDemo] = useState<'components' | 'widget-output' | 'session-api' | 'api-dataflow'>('components');
+  const [activeDemo, setActiveDemo] = useState<'components' | 'widget-output' | 'task-management' | 'session-api' | 'api-dataflow'>('components');
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -38,6 +38,16 @@ const DemoPage: React.FC = () => {
               }`}
             >
               Widget Output Design
+            </button>
+            <button
+              onClick={() => setActiveDemo('task-management')}
+              className={`px-4 py-2 rounded transition-all ${
+                activeDemo === 'task-management'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              任务管理系统
             </button>
             <button
               onClick={() => setActiveDemo('session-api')}

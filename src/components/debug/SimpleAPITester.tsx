@@ -91,7 +91,7 @@ export const SimpleAPITester: React.FC = () => {
           newMessages: newMessages.map(msg => ({
             id: msg.id,
             role: msg.role,
-            contentLength: msg.content.length,
+            contentLength: ('content' in msg) ? msg.content.length : 0,
             isStreaming: msg.isStreaming,
             streamingStatus: msg.streamingStatus
           }))
@@ -235,9 +235,9 @@ export const SimpleAPITester: React.FC = () => {
                   {msg.role}:
                 </span>
                 <span className="text-gray-700 ml-2">
-                  {msg.content.length > 100 
+                  {(('content' in msg) && msg.content && msg.content.length > 100) 
                     ? msg.content.substring(0, 100) + '...' 
-                    : msg.content
+                    : ('content' in msg) ? msg.content : 'No content'
                   }
                 </span>
                 {msg.isStreaming && (
