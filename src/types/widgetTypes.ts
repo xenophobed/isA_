@@ -380,7 +380,7 @@ export interface CustomResultHandlers {
   buildTemplateParams?: (params: any) => any;
   
   // 处理完整消息回调
-  onMessageComplete?: (completeMessage: string, params: any, helpers: WidgetHelpers, get?: any) => void;
+  onMessageComplete?: (completeMessage?: string, params?: any, helpers?: WidgetHelpers, get?: any) => void;
   
   // 处理Artifact创建回调
   onArtifactCreated?: (artifact: any, params: any, helpers: WidgetHelpers, get?: any) => void;
@@ -397,7 +397,7 @@ export interface ChatServiceCallbacks {
   onMessageStart?: (messageId: string, status: string) => void;
   onMessageContent?: (contentChunk: string) => void;
   onMessageStatus?: (status: string) => void;
-  onMessageComplete?: (completeMessage: string) => void;
+  onMessageComplete?: (completeMessage?: string) => void;
   onArtifactCreated?: (artifact: any) => void;
   onError?: (error: any) => void;
 }

@@ -130,20 +130,20 @@ export const useChatStore = create<ChatStore>()(
       });
       
       // 同时将消息添加到当前session（防止循环调用）
-      if (!message.metadata?._skipSessionSync) {
+      if (!('metadata' in message && message.metadata?._skipSessionSync)) {
         const sessionStore = useSessionStore.getState();
         const currentSession = sessionStore.getCurrentSession();
         if (currentSession) {
           // 添加标记防止循环调用
-          const messageWithFlag = { ...message, metadata: { ...message.metadata, _skipSessionSync: true } };
-          sessionStore.addMessage(currentSession.id, messageWithFlag);
+          const messageWithFlag = { ...message, metadata: { ...('metadata' in message ? message.metadata : {}), _skipSessionSync: true } };
+          sessionStore.addMessage(currentSession.id, messageWithFlag as any); // TODO: Fix type compatibility
         }
       }
       
       logger.info(LogCategory.CHAT_FLOW, 'Message added/updated in chat store and session', { 
         messageId: message.id, 
         role: message.role, 
-        contentLength: message.content.length 
+        contentLength: ('content' in message && message.content) ? message.content.length : 0 
       });
     },
 
@@ -173,9 +173,9 @@ export const useChatStore = create<ChatStore>()(
         // 直接设置消息，不触发addMessage的同步逻辑
         const messagesWithFlag = session.messages.map(msg => ({
           ...msg,
-          metadata: { ...msg.metadata, _skipSessionSync: true }
+          metadata: { ...('metadata' in msg ? msg.metadata : {}), _skipSessionSync: true }
         }));
-        set({ messages: messagesWithFlag });
+        set({ messages: messagesWithFlag as any }); // TODO: Fix complex type compatibility
         logger.info(LogCategory.CHAT_FLOW, 'Messages loaded from session to chat store', {
           sessionId: session.id,
           messageCount: session.messages.length
@@ -270,10 +270,20 @@ export const useChatStore = create<ChatStore>()(
             logger.info(LogCategory.CHAT_FLOW, 'Message sending completed successfully');
           },
           onBillingUpdate: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => {
-            // 更新用户credit余额
+            // 📡 智能信用余额更新
+            console.log('💰 CHAT_STORE: Billing update received', {
+              creditsRemaining: billingData.creditsRemaining,
+              totalCredits: billingData.totalCredits,
+              modelCalls: billingData.modelCalls,
+              toolCalls: billingData.toolCalls,
+              timestamp: new Date().toISOString()
+            });
+            
             logger.info(LogCategory.CHAT_FLOW, 'Billing update received', billingData);
+            
+            // 🚀 使用新的智能更新机制
             const userStore = useUserStore.getState();
-            userStore.updateCredits(billingData.creditsRemaining);
+            userStore.updateCredits(billingData.creditsRemaining, 'billing');
           },
           onTaskProgress: (progress: TaskProgress) => {
             updateTaskProgress(progress);
@@ -377,10 +387,20 @@ export const useChatStore = create<ChatStore>()(
             logger.info(LogCategory.CHAT_FLOW, 'Multimodal message sending completed successfully');
           },
           onBillingUpdate: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => {
-            // 更新用户credit余额
+            // 📡 智能信用余额更新
+            console.log('💰 CHAT_STORE: Billing update received', {
+              creditsRemaining: billingData.creditsRemaining,
+              totalCredits: billingData.totalCredits,
+              modelCalls: billingData.modelCalls,
+              toolCalls: billingData.toolCalls,
+              timestamp: new Date().toISOString()
+            });
+            
             logger.info(LogCategory.CHAT_FLOW, 'Billing update received', billingData);
+            
+            // 🚀 使用新的智能更新机制
             const userStore = useUserStore.getState();
-            userStore.updateCredits(billingData.creditsRemaining);
+            userStore.updateCredits(billingData.creditsRemaining, 'billing');
           },
           onTaskProgress: (progress: TaskProgress) => {
             updateTaskProgress(progress);
@@ -620,7 +640,7 @@ export const useChatStore = create<ChatStore>()(
             } as ChatMessage;
           }
           
-          sessionStore.addMessage(currentSession.id, messageWithFlag);
+          sessionStore.addMessage(currentSession.id, messageWithFlag as any); // TODO: Fix type compatibility
           logger.debug(LogCategory.CHAT_FLOW, 'Finished streaming message synced to session', {
             messageId: finishedMessage.id,
             sessionId: currentSession.id

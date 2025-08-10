@@ -172,9 +172,9 @@ export const SessionModule: React.FC<SessionModuleProps> = (props) => {
     const optimizedMessages = messages.map(msg => ({
       id: msg.id,
       role: msg.role,
-      content: msg.content.length > 2000 ? msg.content.substring(0, 2000) + '...[truncated]' : msg.content,
-      timestamp: msg.timestamp,
-      metadata: msg.metadata,
+      content: ('content' in msg && msg.content) ? (msg.content.length > 2000 ? msg.content.substring(0, 2000) + '...[truncated]' : msg.content) : '',
+      timestamp: msg.timestamp || new Date().toISOString(),
+      metadata: ('metadata' in msg) ? msg.metadata : undefined,
       processed: true // 重要：确保保存到会话的消息都标记为已处理
     }));
     
@@ -185,12 +185,13 @@ export const SessionModule: React.FC<SessionModuleProps> = (props) => {
     let lastMessageContent = currentSession.lastMessage;
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
-      if (lastMessage.role === 'assistant' && lastMessage.content) {
+      const content = ('content' in lastMessage && lastMessage.content) ? lastMessage.content : '';
+      if (lastMessage.role === 'assistant' && content) {
         // 如果最后一条是AI回复，使用AI回复作为摘要
-        lastMessageContent = lastMessage.content.substring(0, 100) + (lastMessage.content.length > 100 ? '...' : '');
+        lastMessageContent = content.substring(0, 100) + (content.length > 100 ? '...' : '');
       } else if (lastMessage.role === 'user') {
         // 如果最后一条是用户消息，显示"等待回复"
-        lastMessageContent = `${lastMessage.content.substring(0, 50)}${lastMessage.content.length > 50 ? '...' : ''} (等待回复)`;
+        lastMessageContent = `${content.substring(0, 50)}${content.length > 50 ? '...' : ''} (等待回复)`;
       }
     } else if (artifacts.length > 0) {
       lastMessageContent = `Generated ${artifacts[artifacts.length - 1].appName} content`;
@@ -202,7 +203,7 @@ export const SessionModule: React.FC<SessionModuleProps> = (props) => {
       timestamp: new Date().toISOString(),
       messageCount: messages.length,
       artifacts: artifacts.map(a => a.id),
-      messages: recentMessages,
+      messages: recentMessages as any, // TODO: Fix type compatibility
       metadata: {
         ...currentSession.metadata,
         apps_used: Array.from(appsUsed),

@@ -32,26 +32,25 @@
  * - artifacts: 生成的内容工件
  */
 import React, { useEffect, useState } from 'react';
-import { SimpleAIProvider } from './providers/SimpleAIProvider';
+import { AIProvider } from './providers/AIProvider';
 import { Auth0Provider } from './providers/Auth0Provider';
 import { ChatModule } from './modules/ChatModule';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { AppHeader } from './components/ui/AppHeader';
-import { ArtifactModule } from './modules/ArtifactModule';
-import { SidebarManager } from './components/managers/sidebar_manager';
-import { SessionManager } from './components/managers/SessionManager';
-import { StreamingHandler } from './services/SSEProcessor';
+// Removed ArtifactModule import - now handled by MessageList
+// Removed invalid imports - SidebarManager and SessionManager don't exist
+// Removed StreamingHandler import - doesn't exist
 import { ChatInputHandler } from './components/core/ChatInputHandler';
-import { useAppStore, useChatActions } from './stores/useAppStore';
+import { useAppStore, useAppActions } from './stores/useAppStore';
 import { useCurrentTasks, useTaskProgress, useIsExecutingPlan, useChatMessages } from './stores/useChatStore';
 import { useAuth } from './hooks/useAuth';
-import { useSimpleAI } from './providers/SimpleAIProvider';
-import { UserButton } from './components/ui/UserButton';
+import { useAI } from './providers/AIProvider';
+import { UserButton } from './components/ui/user/UserButton';
 import { LoginScreen } from './components/ui/LoginScreen';
-import { UserManagementDrawer } from './components/ui/UserManagementDrawer';
-import { AppArtifact, AppId } from './types/app_types';
+// Removed UserManagementDrawer import - doesn't exist
+import { AppArtifact, AppId } from './types/appTypes';
 import { logger, LogCategory } from './utils/logger';
-import { LoggingDashboard } from './components/dashboard/logging_dashboard';
+// Removed LoggingDashboard import - doesn't exist
 
 /**
  * Main App Content Component (inside provider)
@@ -63,10 +62,8 @@ const MainAppContent: React.FC = () => {
   const { 
     isAuthenticated, 
     isLoading: authLoading, 
-    user: externalUser, 
-    login, 
-    creditsRemaining, 
-    currentPlan
+    auth0User: externalUser, 
+    login
   } = useAuth();
   
   // App state management with Zustand - centralized
@@ -75,8 +72,6 @@ const MainAppContent: React.FC = () => {
     setCurrentApp,
     showRightSidebar,
     setShowRightSidebar,
-    artifacts,
-    setArtifacts,
     triggeredAppInput,
     setTriggeredAppInput,
     chatKey,
@@ -84,8 +79,7 @@ const MainAppContent: React.FC = () => {
     setShowLoggingDashboard,
     startNewChat,
     closeApp,
-    reopenApp,
-    dream
+    reopenApp
   } = useAppStore();
 
   // 用户管理抽屉状态
@@ -103,20 +97,20 @@ const MainAppContent: React.FC = () => {
   const isExecutingPlan = useIsExecutingPlan();
   const messages = useChatMessages();
 
-  const dreamGeneratedImage = dream.generatedImage;
+  const dreamGeneratedImage = null; // TODO: Implement dream functionality
 
   // Initialize component logging - 必须在条件渲染之前调用
   useEffect(() => {
     logger.info(LogCategory.COMPONENT_RENDER, 'MainApp component mounted', { 
       isAuthenticated, 
       userId: externalUser?.user_id,
-      credits: creditsRemaining,
-      plan: currentPlan
+      credits: 0, // TODO: Get from UserModule
+      plan: 'unknown' // TODO: Get from UserModule
     });
     return () => {
       logger.info(LogCategory.COMPONENT_RENDER, 'MainApp component unmounted');
     };
-  }, [isAuthenticated, externalUser?.user_id, creditsRemaining, currentPlan]);
+  }, [isAuthenticated, externalUser?.user_id]);
 
   // 🆕 Derive streaming status from real data
   const streamingStatus = React.useMemo(() => {
@@ -154,8 +148,7 @@ const MainAppContent: React.FC = () => {
     };
   }, [taskProgress, currentTasks]);
 
-  // Get SimpleAI client and chat actions  
-  const { setIsTyping } = useChatActions();
+  // TODO: Implement typing status management
 
   // 如果正在加载认证状态，显示加载界面
   if (authLoading) {
@@ -225,12 +218,7 @@ const MainAppContent: React.FC = () => {
   const sidebarContent = (
     <div className="p-6 h-full flex flex-col">
       <div className="flex-1">
-        <SessionManager
-          onSessionSelect={(session) => {
-            console.log('📋 Session selected:', session);
-          }}
-          onNewSession={handleNewChat}
-        />
+        {/* TODO: Implement session management UI */}
       </div>
       
       {/* User Management at Bottom */}
@@ -309,7 +297,7 @@ const MainAppContent: React.FC = () => {
       }
     };
     
-    setArtifacts(prev => [...prev, artifact]);
+    // TODO: Implement artifact management
     // Note: setDreamGeneratedImage already called by Dream sidebar
     
     // Emit event to chat layer
@@ -318,19 +306,9 @@ const MainAppContent: React.FC = () => {
 
   // 🆕 新的Widget管理系统 - 不再是直接的右侧栏，而是通过弹窗和模式选择
   const legacyRightSidebarContent = (
-    <SidebarManager 
-      currentApp={currentApp}
-      showRightSidebar={showRightSidebar}
-      triggeredAppInput={triggeredAppInput}
-      dreamGeneratedImage={dreamGeneratedImage}
-      onCloseApp={closeApp}
-      onDreamImageGenerated={handleDreamImageGenerated}
-      onAppSelect={(appId: string) => {
-        console.log('🚀 Opening app from sidebar:', appId);
-        setCurrentApp(appId as AppId);
-        setTriggeredAppInput(''); // Clear any previous input
-      }}
-    />
+    <div>
+      {/* TODO: Implement right sidebar content */}
+    </div>
   );
 
   // 🆕 新的头部内容，包含 SMART WIDGET 按钮
@@ -352,13 +330,10 @@ const MainAppContent: React.FC = () => {
   return (
     <>
       {/* Background handlers */}
-      <StreamingHandler 
-        showRightSidebar={showRightSidebar}
-        currentApp={currentApp}
-      />
+      {/* TODO: Implement streaming handler */}
       
       <div className="w-full h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800">
-        <ChatInputHandler availableApps={availableApps}>
+        <ChatInputHandler>
           {({ onBeforeSend, onFileSelect }) => (
             <ChatModule
               key={chatKey}
@@ -398,12 +373,7 @@ const MainAppContent: React.FC = () => {
                   });
                   console.log('🔍 Custom renderer called:', { role: message.role, content: message.content?.substring(0, 50) + '...', currentApp, showRightSidebar });
                   
-                  return (
-                    <ArtifactModule
-                      message={message}
-                      reopenApp={reopenApp}
-                    />
-                  );
+                  return null; // ArtifactModule is now a hook, UI handled elsewhere
                 }
               }}
             />
@@ -411,15 +381,9 @@ const MainAppContent: React.FC = () => {
         </ChatInputHandler>
       </div>
       
-      <LoggingDashboard 
-        isOpen={showLoggingDashboard}
-        onClose={() => setShowLoggingDashboard(false)}
-      />
+      {/* TODO: Implement logging dashboard */}
       
-      <UserManagementDrawer 
-        isOpen={showUserDrawer}
-        onClose={() => setShowUserDrawer(false)}
-      />
+      {/* TODO: Implement user management drawer */}
     </>
   );
 };
@@ -436,9 +400,9 @@ export const MainApp: React.FC = () => {
       }}
     >
       <Auth0Provider>
-        <SimpleAIProvider apiEndpoint={process.env.REACT_APP_API_ENDPOINT || "http://localhost:8080"}>
+        <AIProvider apiEndpoint={process.env.REACT_APP_API_ENDPOINT || "http://localhost:8080"}>
           <MainAppContent />
-        </SimpleAIProvider>
+        </AIProvider>
       </Auth0Provider>
     </ErrorBoundary>
   );

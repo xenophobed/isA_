@@ -79,15 +79,15 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
     if (!currentTask) return null;
 
     return (
-      <div className="flex items-center space-x-3 p-3 bg-gray-800/50 rounded-lg border border-gray-600/50">
-        <div className="flex items-center space-x-2">
-          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-          <span className="text-sm font-medium text-gray-300">
+      <div className="task-progress-mobile flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 p-3 bg-gray-800/50 rounded-lg border border-gray-600/50">
+        <div className="flex items-center space-x-2 min-w-0 flex-1">
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse flex-shrink-0"></div>
+          <span className="text-sm font-medium text-gray-300 truncate">
             {currentTask.title}
           </span>
         </div>
         
-        <div className="flex-1">
+        <div className="flex-1 sm:flex-none sm:w-24">
           <TaskProgressBar 
             progress={currentTask.progress}
             status={currentTask.status}
@@ -97,20 +97,24 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
         </div>
         
         {showControls && currentTask.canPause && (
-          <div className="flex space-x-1">
+          <div className="flex space-x-2 justify-end sm:justify-start">
             <button
               onClick={() => handleTaskAction(currentTask.id, 'pause')}
-              className="p-1 text-xs text-gray-400 hover:text-gray-200"
+              className="p-2 text-amber-400 hover:text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 rounded transition-colors"
               title="暂停"
             >
-              ⏸️
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+              </svg>
             </button>
             <button
               onClick={() => handleTaskAction(currentTask.id, 'cancel')}
-              className="p-1 text-xs text-gray-400 hover:text-red-400"
+              className="p-2 text-red-400 hover:text-red-300 bg-red-400/10 hover:bg-red-400/20 rounded transition-colors"
               title="取消"
             >
-              ❌
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         )}
@@ -187,7 +191,7 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
   // ================================================================================
 
   return (
-    <div className={`mt-2 ${className}`}>
+    <div className={`mt-2 task-progress-container ${className}`}>
       {compact ? renderCompactView() : renderExpandedView()}
     </div>
   );

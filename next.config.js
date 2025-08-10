@@ -1,9 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false, // 暂时禁用以避免开发模式下的重复渲染
-  experimental: {
-    appDir: false
-  },
   async rewrites() {
     return [
       {

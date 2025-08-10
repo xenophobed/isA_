@@ -82,10 +82,12 @@ export const useDreamWidgetStore = createBaseWidgetStore(
   // Custom result handlers  
   {
     // 不使用 store 级别的 buildTemplateParams，让 DreamWidgetModule 处理模板参数
-    onMessageComplete: (completeMessage: string, params: any, helpers: any, get: any) => {
+    onMessageComplete: (completeMessage?: string, params?: any, helpers?: any, get?: any) => {
       const store = get();
       const setDreamGeneratedImage = store.setDreamGeneratedImage;
-      extractImageFromMessage(completeMessage, setDreamGeneratedImage, helpers);
+      if (completeMessage && get && helpers) {
+        extractImageFromMessage(completeMessage, setDreamGeneratedImage, helpers);
+      }
     },
     onArtifactCreated: (artifact: any, params: any, helpers: any, get: any) => {
       const store = get();
@@ -201,12 +203,14 @@ export const useHuntWidgetStore = createBaseWidgetStore(
       const setHuntCurrentStatus = store.setHuntCurrentStatus;
       setHuntCurrentStatus(status);
     },
-    onMessageComplete: (completeMessage: string, params: any, helpers: any, get: any) => {
+    onMessageComplete: (completeMessage?: string, params?: any, helpers?: any, get?: any) => {
       const store = get();
       const setHuntSearchResults = store.setHuntSearchResults;
       const setHuntLastQuery = store.setHuntLastQuery;
       setHuntLastQuery(params.query || '');
-      extractSearchResultFromMessage(completeMessage, params, setHuntSearchResults, helpers);
+      if (completeMessage && params && helpers) {
+        extractSearchResultFromMessage(completeMessage, params, setHuntSearchResults, helpers);
+      }
     },
     onArtifactCreated: (artifact: any, params: any, helpers: any, get: any) => {
       const store = get();
@@ -265,10 +269,12 @@ export const useOmniWidgetStore = createBaseWidgetStore(
   // Custom result handlers
   {
     buildTemplateParams: templateBuilders.contentGeneration,
-    onMessageComplete: (completeMessage: string, params: any, helpers: any, get: any) => {
+    onMessageComplete: (completeMessage?: string, params?: any, helpers?: any, get?: any) => {
       const store = get();
       const setOmniGeneratedContent = store.setOmniGeneratedContent;
-      extractTextFromMessage(completeMessage, setOmniGeneratedContent, helpers);
+      if (completeMessage && helpers) {
+        extractTextFromMessage(completeMessage, setOmniGeneratedContent, helpers);
+      }
     },
     onArtifactCreated: (artifact: any, params: any, helpers: any, get: any) => {
       const store = get();
@@ -319,10 +325,12 @@ export const useDataScientistWidgetStore = createBaseWidgetStore(
   // Custom result handlers
   {
     buildTemplateParams: templateBuilders.dataAnalysis,
-    onMessageComplete: (completeMessage: string, params: any, helpers: any, get: any) => {
+    onMessageComplete: (completeMessage?: string, params?: any, helpers?: any, get?: any) => {
       const store = get();
       const setDataScientistAnalysisResult = store.setDataScientistAnalysisResult;
-      extractAnalysisFromMessage(completeMessage, setDataScientistAnalysisResult, helpers);
+      if (completeMessage && helpers) {
+        extractAnalysisFromMessage(completeMessage, setDataScientistAnalysisResult, helpers);
+      }
     },
     onArtifactCreated: (artifact: any, params: any, helpers: any, get: any) => {
       const store = get();
@@ -399,7 +407,7 @@ export const useKnowledgeWidgetStore = createBaseWidgetStore(
   // Custom result handlers
   {
     buildTemplateParams: templateBuilders.knowledgeAnalysis,
-    onMessageComplete: (completeMessage: string, params: any, helpers: any, get: any) => {
+    onMessageComplete: (completeMessage?: string, params?: any, helpers?: any, get?: any) => {
       const store = get();
       const setKnowledgeAnalysisResult = store.setKnowledgeAnalysisResult;
       const setKnowledgeDocuments = store.setKnowledgeDocuments;
@@ -409,7 +417,9 @@ export const useKnowledgeWidgetStore = createBaseWidgetStore(
         setKnowledgeDocuments(params.documents);
       }
       
-      extractTextFromMessage(completeMessage, setKnowledgeAnalysisResult, helpers);
+      if (completeMessage && helpers) {
+        extractTextFromMessage(completeMessage, setKnowledgeAnalysisResult, helpers);
+      }
     },
     onArtifactCreated: (artifact: any, params: any, helpers: any, get: any) => {
       const store = get();

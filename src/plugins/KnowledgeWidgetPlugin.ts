@@ -175,7 +175,7 @@ export class KnowledgeWidgetPlugin implements WidgetPlugin {
         let lastMessage = '';
 
         const callbacks = {
-          onMessageComplete: (message: string) => {
+          onMessageComplete: (message?: string) => {
             messageCount++;
             console.log(`🧠 KNOWLEDGE_PLUGIN: onMessageComplete #${messageCount}:`, message?.substring(0, 100) + '...');
             

@@ -21,7 +21,9 @@ const IndexPage: React.FC<IndexPageProps> = ({ isMarketingSite, hostname }) => {
     // 如果不是营销站点，重定向到 /app 页面
     if (!isMarketingSite) {
       console.log('🔄 Redirecting to /app for main application');
-      router.replace('/app');
+      // 保留URL参数（包括Auth0回调参数）
+      const urlParams = window.location.search;
+      router.replace(`/app${urlParams}`);
       return;
     }
   }, [isMarketingSite, router]);

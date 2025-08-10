@@ -72,7 +72,7 @@ export interface UserStore {
   clearErrors: () => void;
   
   // Actions - Credits Management
-  updateCredits: (credits: number) => void;
+  updateCredits: (credits: number, source?: 'api' | 'billing' | 'manual') => void;
   consumeCreditsOptimistic: (consumption: CreditConsumption) => void;
   revertCreditsOptimistic: () => void;
 }
@@ -184,29 +184,75 @@ export const useUserStore = create<UserStore>()(
     // Credits Management Actions
     // ================================================================================
     
-    updateCredits: (credits: number) => {
+    // 🆕 智能信用更新机制
+    updateCredits: (newCredits: number, source?: 'api' | 'billing' | 'manual') => {
       const currentUser = get().externalUser;
-      if (currentUser) {
-        console.log('💳 USER_STORE: Updating credits', { 
-          auth0_id: currentUser.auth0_id,
-          oldCredits: currentUser.credits,
-          newCredits: credits,
-          difference: currentUser.credits - credits
+      if (!currentUser) {
+        console.warn('💳 USER_STORE: Cannot update credits - no current user');
+        return;
+      }
+      
+      const oldCredits = currentUser.credits;
+      const difference = newCredits - oldCredits;
+      const timestamp = new Date().toISOString();
+      
+      // 🔍 数据验证
+      if (newCredits < 0) {
+        console.warn('💳 USER_STORE: Invalid credits value - cannot be negative', { newCredits });
+        return;
+      }
+      
+      // 🛡️ 防御性检查：确保用户数据完整
+      if (!currentUser.auth0_id) {
+        console.error('💳 USER_STORE: Critical error - currentUser missing auth0_id', {
+          currentUser,
+          hasAuth0Id: !!currentUser.auth0_id,
+          userKeys: Object.keys(currentUser),
+          newCredits,
+          source
         });
+        return; // 阻止继续执行，避免错误传播
+      }
+      
+      console.log('💳 USER_STORE: 🚀 Updating user credits', { 
+        auth0_id: currentUser.auth0_id,
+        transition: `${oldCredits} → ${newCredits}`,
+        difference: difference > 0 ? `+${difference}` : `${difference}`,
+        source: source || 'unknown',
+        timestamp,
+        totalCredits: currentUser.credits_total // 保持总积分不变
+      });
         
-        logger.info(LogCategory.USER_AUTH, 'Updating user credits', { 
-          auth0_id: currentUser.auth0_id,
-          oldCredits: currentUser.credits,
-          newCredits: credits 
-        });
+      logger.info(LogCategory.USER_AUTH, 'Smart credit update', { 
+        auth0_id: currentUser.auth0_id,
+        oldCredits,
+        newCredits,
+        difference,
+        source
+      });
         
-        set({ 
-          externalUser: { 
-            ...currentUser, 
-            credits 
-          },
-          creditsError: null // Clear error on successful update
-        });
+      set({ 
+        externalUser: { 
+          ...currentUser, 
+          credits: newCredits,
+          // 🔧 修复：确保credits_total保持不变（除非是API源的完整用户数据更新）
+          credits_total: currentUser.credits_total // 保持总积分不变
+        },
+        creditsError: null // 清除之前的错误
+      });
+      
+      // 📢 发出信用更新通知（供其他组件监听）
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('userCreditsUpdated', {
+          detail: {
+            auth0_id: currentUser.auth0_id,
+            oldCredits,
+            newCredits,
+            difference,
+            source,
+            timestamp
+          }
+        }));
       }
     },
     

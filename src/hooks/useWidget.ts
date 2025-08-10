@@ -71,8 +71,8 @@ export const useWidget = () => {
       description: 'Multi-purpose content creation',
       component: null as any
     },
-    'data_scientist': {
-      id: 'data_scientist',
+    'data-scientist': {
+      id: 'data-scientist',
       title: 'DataWise Analytics',
       icon: '📊',
       description: 'Data analysis and insights',
@@ -98,6 +98,27 @@ export const useWidget = () => {
       icon: '📄',
       description: 'Document processing and analysis',
       component: null as any
+    },
+    assistant: {
+      id: 'assistant',
+      title: 'AI Assistant',
+      icon: '🤖',
+      description: 'General purpose AI assistant',
+      component: null as any
+    },
+    'code-reviewer': {
+      id: 'code-reviewer',
+      title: 'Code Reviewer',
+      icon: '👨‍💻',
+      description: 'Code review and analysis',
+      component: null as any
+    },
+    translator: {
+      id: 'translator',
+      title: 'Translator',
+      icon: '🌐',
+      description: 'Multi-language translation',
+      component: null as any
     }
   }), []);
   
@@ -117,7 +138,7 @@ export const useWidget = () => {
         return widgetStates.hunt.isSearching ? 'processing' : 'idle';
       case 'omni':
         return widgetStates.omni.isGenerating ? 'generating' : 'idle';
-      case 'data_scientist':
+      case 'data-scientist':
         return widgetStates.dataScientist.isAnalyzing ? 'processing' : 'idle';
       case 'knowledge':
         return widgetStates.knowledge.isProcessing ? 'processing' : 'idle';
@@ -146,7 +167,7 @@ export const useWidget = () => {
           generatedContent: widgetStates.omni.generatedContent,
           params: widgetStates.omni.lastParams
         };
-      case 'data_scientist':
+      case 'data-scientist':
         return {
           analysisResult: widgetStates.dataScientist.analysisResult,
           params: widgetStates.dataScientist.lastParams

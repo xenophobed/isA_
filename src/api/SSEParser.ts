@@ -611,7 +611,7 @@ export class SSEParser {
     if (data?.success && data.credits_remaining !== undefined) {
       const billingData = {
         creditsRemaining: data.credits_remaining,
-        totalCredits: data.total_credits || data.credits_remaining, // fallback if total not provided
+        totalCredits: data.total_credits || 1, // 本次消耗的积分，不是用户总积分
         modelCalls: data.model_calls || 0,
         toolCalls: data.tool_calls || 0
       };

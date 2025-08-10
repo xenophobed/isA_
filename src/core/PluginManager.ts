@@ -284,7 +284,7 @@ export class PluginManager implements IPluginManager {
       }>
     };
 
-    for (const [id, registration] of this.plugins) {
+    for (const [id, registration] of Array.from(this.plugins.entries())) {
       if (registration.enabled) {
         stats.enabledPlugins++;
       }
@@ -306,7 +306,7 @@ export class PluginManager implements IPluginManager {
    * 清空所有插件
    */
   clear(): void {
-    for (const [pluginId] of this.plugins) {
+    for (const pluginId of Array.from(this.plugins.keys())) {
       this.unregister(pluginId);
     }
     logger.info(LogCategory.SYSTEM, '🔌 All plugins cleared');

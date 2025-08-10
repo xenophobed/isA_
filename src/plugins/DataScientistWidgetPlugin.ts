@@ -23,7 +23,7 @@ import { logger, LogCategory } from '../utils/logger';
  */
 export class DataScientistWidgetPlugin implements WidgetPlugin {
   // 插件基础信息
-  id: AppId = 'data_scientist';
+  id: AppId = 'data-scientist';
   name = 'DataWise Analytics';
   icon = '📊';
   description = 'Advanced data analysis and insights generation';
@@ -174,7 +174,7 @@ export class DataScientistWidgetPlugin implements WidgetPlugin {
         let lastMessage = '';
 
         const callbacks = {
-          onMessageComplete: (message: string) => {
+          onMessageComplete: (message?: string) => {
             messageCount++;
             console.log(`📊 DATASCIENTIST_PLUGIN: onMessageComplete #${messageCount}:`, message?.substring(0, 100) + '...');
             

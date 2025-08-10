@@ -66,7 +66,7 @@ export const useArtifactLogic = () => {
       console.log('📱 ARTIFACT_MODULE: Reopening artifact from message:', artifactMessage.artifact.widgetType);
       // Map widget type to app ID
       const appId = artifactMessage.artifact.widgetType; // 'dream', 'hunt', etc.
-      setCurrentApp(appId);
+      setCurrentApp(appId as any); // TODO: Fix type casting
       setShowRightSidebar(true);
     }
   }, [legacyArtifacts, artifactMessages, setCurrentApp, setShowRightSidebar]);

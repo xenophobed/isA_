@@ -177,7 +177,7 @@ export class OmniWidgetPlugin implements WidgetPlugin {
         let lastMessage = '';
 
         const callbacks = {
-          onMessageComplete: (message: string) => {
+          onMessageComplete: (message?: string) => {
             messageCount++;
             console.log(`⚡ OMNI_PLUGIN: onMessageComplete #${messageCount}:`, message?.substring(0, 100) + '...');
             

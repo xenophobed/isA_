@@ -663,7 +663,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     <>
       <ChatLayout
         {...otherProps}
-        messages={chatInterface.messages}
+        messages={chatInterface.messages as any} // TODO: Fix type mismatch
         isLoading={chatInterface.isLoading}
         isTyping={chatInterface.isTyping}
         onSendMessage={handleSendMessage}

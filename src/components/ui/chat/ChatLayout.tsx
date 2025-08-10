@@ -325,7 +325,7 @@ export const ChatLayout = memo<ChatLayoutProps>(({
         {/* Left Sidebar */}
         {layoutConfig.showLeftSidebar && effectiveLeftPanelContent && (
           <div 
-            className="flex-shrink-0 border-r border-white/10"
+            className="isa-chat-sidebar isa-sidebar-left flex-shrink-0 border-r border-white/10 sm:relative sm:transform-none"
             style={{ width: layoutConfig.leftWidth }}
           >
             {effectiveLeftPanelContent}
@@ -366,7 +366,7 @@ export const ChatLayout = memo<ChatLayoutProps>(({
         {/* Right Sidebar (半屏Widget模式) */}
         {showRightSidebar && rightSidebarContent && (
           <div 
-            className="flex-shrink-0 border-l border-white/10 bg-gray-900/50"
+            className="isa-chat-sidebar isa-sidebar-right flex-shrink-0 border-l border-white/10 bg-gray-900/50 sm:relative sm:transform-none"
             style={{ width: '50%' }}
           >
             {rightSidebarContent}
@@ -376,7 +376,7 @@ export const ChatLayout = memo<ChatLayoutProps>(({
         {/* Right Panel (会话管理) */}
         {layoutConfig.showRightPanel && rightPanelContent && (
           <div 
-            className="flex-shrink-0 border-l border-white/10"
+            className="isa-chat-sidebar isa-sidebar-right flex-shrink-0 border-l border-white/10 sm:relative sm:transform-none"
             style={{ width: '16.67%' }}
           >
             {rightPanelContent}

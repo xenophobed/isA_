@@ -38,6 +38,7 @@ import { UserService } from '../api/userService';
 import { logger, LogCategory } from '../utils/logger';
 import { PlanType, CreateExternalUserData, CreditConsumption } from '../types/userTypes';
 import { useUser } from '../hooks/useUser';
+import '../utils/creditMonitor'; // 🎯 初始化信用监控系统
 
 // ================================================================================
 // UserModule Interface
@@ -207,68 +208,76 @@ export const UserModule: React.FC<{ children: React.ReactNode }> = ({ children }
   // User Synchronization Logic
   // ================================================================================
 
-  const initializeUser = useCallback(async () => {
+  const initializeUser = useCallback(async (): Promise<void> => {
+    // 🔒 防护：检查认证状态
     if (!auth0User?.sub || !auth0User?.email || !auth0User?.name || !isAuthenticated) {
-      console.log('👤 UserModule: Skipping user initialization - missing auth data', {
-        hasSub: !!auth0User?.sub,
-        hasEmail: !!auth0User?.email,
-        hasName: !!auth0User?.name,
-        isAuthenticated
-      });
-      return;
+      const missingData = {
+        sub: !auth0User?.sub,
+        email: !auth0User?.email,
+        name: !auth0User?.name,
+        authenticated: !isAuthenticated
+      };
+      throw new Error(`User initialization blocked - missing: ${Object.entries(missingData).filter(([, missing]) => missing).map(([key]) => key).join(', ')}`);
     }
 
+    const startTime = Date.now();
+    const userData: CreateExternalUserData = {
+      auth0_id: auth0User.sub,
+      email: auth0User.email,
+      name: auth0User.name
+    };
+
     try {
-      console.log('👤 UserModule: Starting user initialization', {
+      console.log('👤 UserModule: 🚀 Initializing user', {
         auth0_id: auth0User.sub,
         email: auth0User.email,
-        name: auth0User.name
+        timestamp: new Date().toISOString()
       });
 
-      logger.info(LogCategory.USER_AUTH, 'Starting user initialization', {
-        auth0_id: auth0User.sub,
-        email: auth0User.email,
-        name: auth0User.name
-      });
+      logger.info(LogCategory.USER_AUTH, 'Starting user initialization', userData);
 
-      const userData: CreateExternalUserData = {
-        auth0_id: auth0User.sub,
-        email: auth0User.email,
-        name: auth0User.name
-      };
-
-      // Use userService through useUser hook (if available) or direct service
-      try {
-        console.log('👤 UserModule: Calling userService.ensureUserExists');
-        const userResult = await userService.ensureUserExists(userData);
-        console.log('👤 UserModule: User ensured successfully', { 
-          auth0_id: userResult.auth0_id, 
-          credits: userResult.credits,
-          plan: userResult.plan 
-        });
-        logger.info(LogCategory.USER_AUTH, 'External user ensured successfully', { 
-          auth0_id: userResult.auth0_id,
-          credits: userResult.credits 
-        });
-        
-        // IMPORTANT: Save the user data to store through userHook
-        // This was the missing piece - we need to update the store with the fetched user data
-        const userStore = useUserStore.getState();
-        userStore.setExternalUser(userResult);
-        console.log('👤 UserModule: User data saved to store', { 
-          credits: userResult.credits,
-          plan: userResult.plan 
-        });
-        
-      } catch (error) {
-        console.error('👤 UserModule: Failed to ensure user exists', error);
-        logger.error(LogCategory.USER_AUTH, 'Failed to ensure user exists', { error });
-        throw error;
+      // 🔄 Step 1: 确保外部用户存在
+      console.log('👤 UserModule: 📡 Calling userService.ensureUserExists...');
+      const userResult = await userService.ensureUserExists(userData);
+      
+      // 📊 Step 2: 验证返回的用户数据
+      if (!userResult || !userResult.auth0_id) {
+        throw new Error('Invalid user data returned from service');
       }
 
+      console.log('👤 UserModule: ✅ User ensured successfully', { 
+        auth0_id: userResult.auth0_id, 
+        credits: userResult.credits,
+        totalCredits: userResult.credits_total,
+        plan: userResult.plan,
+        executionTime: Date.now() - startTime + 'ms'
+      });
+        
+      // 💾 Step 3: 保存用户数据到store
+      console.log('👤 UserModule: 💾 Saving user data to store...');
+      const userStore = useUserStore.getState();
+      userStore.setExternalUser(userResult);
+      
+      logger.info(LogCategory.USER_AUTH, 'User initialization completed successfully', { 
+        auth0_id: userResult.auth0_id,
+        credits: userResult.credits,
+        executionTime: Date.now() - startTime
+      });
+        
     } catch (error) {
-      console.error('👤 UserModule: User initialization failed', error);
-      logger.error(LogCategory.USER_AUTH, 'User initialization failed', { error });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('👤 UserModule: ❌ User initialization failed', {
+        error: errorMessage,
+        auth0_id: auth0User.sub,
+        executionTime: Date.now() - startTime + 'ms'
+      });
+      
+      logger.error(LogCategory.USER_AUTH, 'User initialization failed', { 
+        error: errorMessage,
+        auth0_id: auth0User.sub 
+      });
+      
+      throw error; // 重新抛出错误供调用者处理
     }
   }, [auth0User?.sub, auth0User?.email, auth0User?.name, isAuthenticated, userService]);
 
@@ -355,36 +364,82 @@ export const UserModule: React.FC<{ children: React.ReactNode }> = ({ children }
   // Effects
   // ================================================================================
 
-  // Initialize user when Auth0 authentication completes
+  // 🆕 优雅的用户初始化状态管理
+  const [initializationStatus, setInitializationStatus] = React.useState<'idle' | 'initializing' | 'initialized' | 'error'>('idle');
+  const initializationRef = React.useRef<string | null>(null); // 追踪当前初始化的用户ID
+  
+  // 统一的用户初始化Effect - 避免重复初始化
   useEffect(() => {
-    console.log('👤 UserModule: useEffect triggered', {
+    const currentUserId = auth0User?.sub;
+    const hasRequiredData = auth0User?.sub && auth0User?.email && auth0User?.name;
+    
+    console.log('👤 UserModule: Auth state changed', {
       auth0Loading,
       isAuthenticated,
-      hasAuth0User: !!auth0User,
-      auth0UserId: auth0User?.sub
+      hasRequiredData,
+      currentUserId,
+      initializationStatus,
+      previousUserId: initializationRef.current
     });
 
-    if (!auth0Loading && isAuthenticated && auth0User) {
-      console.log('👤 UserModule: Conditions met, initializing user');
-      initializeUser();
-    } else if (!auth0Loading && !isAuthenticated) {
-      console.log('👤 UserModule: User not authenticated, clearing state');
-      userHook.clearUser();
-    } else {
-      console.log('👤 UserModule: Waiting for auth completion', {
-        auth0Loading,
-        isAuthenticated,
-        hasAuth0User: !!auth0User
-      });
+    // 🔄 情况1：正在加载 - 等待
+    if (auth0Loading) {
+      console.log('👤 UserModule: Auth0 still loading, waiting...');
+      return;
     }
-  }, [auth0Loading, isAuthenticated, auth0User?.sub, auth0User?.email, auth0User?.name, initializeUser, userHook.clearUser]);
 
-  // Separate effect for initializeUser to avoid dependency issues
-  useEffect(() => {
-    if (!auth0Loading && isAuthenticated && auth0User?.sub && auth0User?.email && auth0User?.name) {
-      initializeUser();
+    // 🚪 情况2：未认证 - 清理状态
+    if (!isAuthenticated) {
+      console.log('👤 UserModule: User not authenticated, clearing state');
+      if (initializationStatus !== 'idle') {
+        setInitializationStatus('idle');
+        initializationRef.current = null;
+        userHook.clearUser();
+      }
+      return;
     }
-  }, [initializeUser]);
+
+    // ✅ 情况3：已认证但缺少数据 - 等待完整数据
+    if (!hasRequiredData) {
+      console.log('👤 UserModule: Authenticated but missing required user data, waiting...');
+      return;
+    }
+
+    // 🎯 情况4：完整认证数据可用
+    const shouldInitialize = (
+      initializationStatus === 'idle' || 
+      initializationRef.current !== currentUserId
+    ) && initializationStatus !== 'initializing';
+
+    if (shouldInitialize) {
+      console.log('👤 UserModule: Starting user initialization', {
+        userId: currentUserId,
+        previousStatus: initializationStatus
+      });
+      
+      setInitializationStatus('initializing');
+      initializationRef.current = currentUserId || null;
+      
+      initializeUser()
+        .then(() => {
+          console.log('👤 UserModule: User initialization completed successfully');
+          setInitializationStatus('initialized');
+        })
+        .catch((error) => {
+          console.error('👤 UserModule: User initialization failed', error);
+          setInitializationStatus('error');
+        });
+    }
+  }, [
+    auth0Loading, 
+    isAuthenticated, 
+    auth0User?.sub, 
+    auth0User?.email, 
+    auth0User?.name,
+    initializationStatus,
+    initializeUser, 
+    userHook.clearUser
+  ]);
 
   // ================================================================================
   // Computed Values

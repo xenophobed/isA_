@@ -30,9 +30,9 @@
  *   - Authentication logic (handled by useAuth)
  */
 
-import { useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { useUserStore } from '../stores/useUserStore';
-import { userService } from '../api/userService';
+import { UserService } from '../api/userService';
 import { logger, LogCategory } from '../utils/logger';
 import { 
   ExternalUser, 
@@ -61,6 +61,15 @@ export interface UseUserReturn {
   hasCredits: boolean;
   currentPlan: string;
   usagePercentage: number;
+  creditInsights: {
+    remaining: number;
+    total: number;
+    used: number;
+    usageRatio: number;
+    isLowBalance: boolean;
+    isNearEmpty: boolean;
+    isEmpty: boolean;
+  };
   
   // User Actions
   ensureUser: (userData: CreateExternalUserData, accessToken: string) => Promise<void>;
@@ -98,14 +107,41 @@ export const useUser = (): UseUserReturn => {
   } = useUserStore();
 
   // ================================================================================
-  // Computed Values
+  // 💎 Computed Values - 优雅的信用状态计算
   // ================================================================================
 
-  const credits = externalUser?.credits || 0;
-  const totalCredits = externalUser?.credits_total || 0;
+  const credits = externalUser?.credits ?? 0;
+  const totalCredits = externalUser?.credits_total ?? 0;
   const hasCredits = credits > 0;
   const currentPlan = externalUser?.plan || 'free';
   const usagePercentage = totalCredits > 0 ? Math.round(((totalCredits - credits) / totalCredits) * 100) : 0;
+  
+  // 🔍 Advanced credit insights
+  const creditInsights = React.useMemo(() => {
+    const remaining = credits;
+    const total = totalCredits;
+    const used = total - remaining;
+    const usageRatio = total > 0 ? used / total : 0;
+    
+    console.log('💳 useUser: Credit insights computed', {
+      remaining,
+      total,
+      used,
+      usagePercentage: Math.round(usageRatio * 100),
+      planType: currentPlan,
+      timestamp: new Date().toISOString()
+    });
+    
+    return {
+      remaining,
+      total,
+      used,
+      usageRatio,
+      isLowBalance: remaining < (total * 0.1), // 低于10%余额
+      isNearEmpty: remaining < 10, // 少于10个积分
+      isEmpty: remaining === 0
+    };
+  }, [credits, totalCredits, currentPlan]);
 
   // ================================================================================
   // User Management Actions
@@ -132,31 +168,74 @@ export const useUser = (): UseUserReturn => {
   }, [setLoading, setUserError, setExternalUser]);
 
   const fetchCurrentUser = useCallback(async (accessToken: string) => {
+    const startTime = Date.now();
+    
     try {
       setLoading(true);
       setUserError(null);
       
+      console.log('📡 useUser: Fetching current user data with auth token...');
       logger.info(LogCategory.USER_AUTH, 'Fetching current user');
       
-      // TODO: Use authenticated userService from UserModule
-      const user = await userService.getCurrentUser();
+      // 🔑 创建带认证的userService实例
+      const authenticatedUserService = new UserService(
+        undefined, // 使用默认URL
+        async () => ({
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        })
+      );
+      
+      console.log('🔑 useUser: Using authenticated userService with token:', {
+        tokenLength: accessToken?.length,
+        tokenStart: accessToken?.substring(0, 20) + '...',
+        timestamp: new Date().toISOString()
+      });
+      
+      // 🔄 使用认证的userService获取最新用户数据
+      const user = await authenticatedUserService.getCurrentUser();
       
       if (user) {
+        // 🎯 比较并更新用户数据
+        const previousCredits = externalUser?.credits ?? -1;
+        const newCredits = user.credits;
+        
+        console.log('📡 useUser: ✅ User data fetched successfully', {
+          auth0_id: user.auth0_id,
+          creditsChange: {
+            from: previousCredits,
+            to: newCredits,
+            diff: previousCredits >= 0 ? newCredits - previousCredits : 'initial'
+          },
+          plan: user.plan,
+          executionTime: Date.now() - startTime + 'ms'
+        });
+        
         setExternalUser(user);
-        logger.info(LogCategory.USER_AUTH, 'Current user fetched successfully', { auth0_id: user.auth0_id });
+        logger.info(LogCategory.USER_AUTH, 'Current user fetched successfully', { 
+          auth0_id: user.auth0_id,
+          credits: user.credits
+        });
       } else {
+        console.warn('📡 useUser: No current user data returned from service');
         logger.warn(LogCategory.USER_AUTH, 'No current user found');
       }
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch user';
+      console.error('📡 useUser: ❌ Failed to fetch current user', {
+        error: errorMessage,
+        executionTime: Date.now() - startTime + 'ms',
+        hasAccessToken: !!accessToken,
+        tokenLength: accessToken?.length
+      });
       logger.error(LogCategory.USER_AUTH, 'Failed to fetch current user', { error });
       setUserError(errorMessage);
       throw error;
     } finally {
       setLoading(false);
     }
-  }, [setLoading, setUserError, setExternalUser]);
+  }, [setLoading, setUserError, setExternalUser, externalUser?.credits]);
 
   const clearUser = useCallback(() => {
     logger.info(LogCategory.USER_AUTH, 'Clearing user state');
@@ -173,8 +252,16 @@ export const useUser = (): UseUserReturn => {
       
       logger.info(LogCategory.USER_AUTH, 'Consuming user credits', { auth0_id, amount: consumption.amount });
       
-      // TODO: Use authenticated userService from UserModule
-      const consumptionResult = await userService.consumeCredits(auth0_id, consumption);
+      // 🔑 使用认证的userService
+      const authenticatedUserService = new UserService(
+        undefined,
+        async () => ({
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        })
+      );
+      
+      const consumptionResult = await authenticatedUserService.consumeCredits(auth0_id, consumption);
       
       // Update user with remaining credits from result
       if (externalUser) {
@@ -192,7 +279,7 @@ export const useUser = (): UseUserReturn => {
       setCreditsError(errorMessage);
       throw error;
     }
-  }, [setCreditsError, setExternalUser]);
+  }, [setCreditsError, setExternalUser, externalUser]);
 
   // ================================================================================
   // Subscription Management Actions
@@ -204,8 +291,16 @@ export const useUser = (): UseUserReturn => {
       
       logger.info(LogCategory.USER_AUTH, 'Fetching user subscription', { auth0_id });
       
-      // TODO: Use authenticated userService from UserModule
-      const subscription = await userService.getUserSubscription(auth0_id);
+      // 🔑 使用认证的userService
+      const authenticatedUserService = new UserService(
+        undefined,
+        async () => ({
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        })
+      );
+      
+      const subscription = await authenticatedUserService.getUserSubscription(auth0_id);
       
       setSubscription(subscription);
       logger.info(LogCategory.USER_AUTH, 'Subscription fetched successfully', { 
@@ -227,8 +322,16 @@ export const useUser = (): UseUserReturn => {
       
       logger.info(LogCategory.USER_AUTH, 'Creating checkout session', { planType });
       
-      // TODO: Use authenticated userService from UserModule
-      const checkoutSession = await userService.createCheckoutSession(planType);
+      // 🔑 使用认证的userService
+      const authenticatedUserService = new UserService(
+        undefined,
+        async () => ({
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        })
+      );
+      
+      const checkoutSession = await authenticatedUserService.createCheckoutSession(planType);
       
       logger.info(LogCategory.USER_AUTH, 'Checkout session created successfully', { planType });
       return checkoutSession.url;
@@ -260,6 +363,7 @@ export const useUser = (): UseUserReturn => {
     hasCredits,
     currentPlan,
     usagePercentage,
+    creditInsights,
     
     // User Actions
     ensureUser,

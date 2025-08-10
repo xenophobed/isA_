@@ -390,15 +390,84 @@ div.input-area-container .suggestions-panel {
     gap: 8px !important;
   }
   
-  /* Adjust sidebar widths for mobile */
+  /* Hide sidebars on mobile by default - show them as overlays */
   .isa-chat-sidebar {
-    min-width: 280px !important;
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    z-index: 50 !important;
+    width: 90vw !important;
+    max-width: 320px !important;
+    background: var(--glass-primary) !important;
+    backdrop-filter: blur(20px) saturate(120%) !important;
+    border: 1px solid var(--glass-border) !important;
+    transform: translateX(-100%) !important;
+    transition: transform 0.3s ease-in-out !important;
+  }
+  
+  .isa-chat-sidebar.open {
+    transform: translateX(0) !important;
+  }
+  
+  .isa-chat-sidebar.isa-sidebar-right {
+    right: 0 !important;
+    transform: translateX(100%) !important;
+  }
+  
+  .isa-chat-sidebar.isa-sidebar-right.open {
+    transform: translateX(0) !important;
   }
   
   /* Mobile-friendly touch targets */
   button, .upload-button, input, textarea {
     min-height: 44px !important;
     min-width: 44px !important;
+  }
+  
+  /* Chat layout adjustments for mobile */
+  .isa-chat-layout {
+    flex-direction: column !important;
+  }
+  
+  /* Task execution panels - mobile optimization */
+  .task-execution-panel {
+    max-height: 40vh !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Mobile task item styling */
+  .task-item-mobile {
+    padding: 12px 16px !important;
+    border-radius: 12px !important;
+  }
+  
+  .task-item-mobile .task-title {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+    font-weight: 500 !important;
+  }
+  
+  .task-item-mobile .task-status {
+    font-size: 11px !important;
+    padding: 2px 6px !important;
+    border-radius: 6px !important;
+  }
+  
+  .task-item-mobile .task-progress-bar {
+    height: 3px !important;
+    border-radius: 2px !important;
+  }
+  
+  /* Compact task controls for mobile */
+  .task-controls-mobile {
+    gap: 6px !important;
+  }
+  
+  .task-controls-mobile button {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    font-size: 12px !important;
   }
 }
 
@@ -747,6 +816,105 @@ div.input-area-container button.audio-button.recording {
   .suggestions-button {
     min-width: 2.5rem;
     min-height: 2.5rem;
+  }
+}
+
+/* ============================================================================
+ * UTILITY CLASSES - Line clamping and mobile-specific utilities
+ * ============================================================================ */
+
+/* Line clamping utilities */
+.line-clamp-1 {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 1 !important;
+  overflow: hidden !important;
+}
+
+.line-clamp-2 {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  overflow: hidden !important;
+}
+
+.line-clamp-3 {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 3 !important;
+  overflow: hidden !important;
+}
+
+/* Mobile-specific task panel improvements */
+@media (max-width: 640px) {
+  .line-clamp-none {
+    display: block !important;
+    -webkit-box-orient: unset !important;
+    -webkit-line-clamp: unset !important;
+    overflow: visible !important;
+  }
+  
+  /* Better mobile task progress display */
+  .task-execution-panel {
+    border-radius: 16px !important;
+  }
+  
+  .task-item-mobile {
+    background: var(--glass-secondary) !important;
+    border: 1px solid var(--glass-border) !important;
+  }
+  
+  /* Improved mobile task controls */
+  .task-controls-mobile button {
+    background: var(--glass-secondary) !important;
+    border: 1px solid var(--glass-border) !important;
+    backdrop-filter: blur(10px) !important;
+  }
+  
+  /* Task progress message optimization for mobile */
+  .task-progress-mobile {
+    padding: 8px 12px !important;
+    border-radius: 12px !important;
+    margin: 8px 0 !important;
+  }
+  
+  /* Chat message optimizations for mobile */
+  .conversation-stream {
+    padding: 12px !important;
+  }
+  
+  .conversation-stream .mb-6 {
+    margin-bottom: 16px !important;
+  }
+  
+  .conversation-stream .mb-4 {
+    margin-bottom: 12px !important;
+  }
+  
+  /* Mobile message layout improvements */
+  .message-avatar-mobile {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 12px !important;
+  }
+  
+  .message-content-mobile {
+    padding: 12px 14px !important;
+    border-radius: 16px !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+  }
+}
+
+/* Touch-friendly improvements */
+@media (pointer: coarse) {
+  .task-controls-mobile button {
+    min-width: 48px !important;
+    min-height: 48px !important;
+  }
+  
+  .task-execution-panel {
+    -webkit-overflow-scrolling: touch !important;
   }
 }
 
