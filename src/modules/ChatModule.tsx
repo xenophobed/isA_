@@ -374,7 +374,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     // Business logic: Enrich metadata with user and session info
     const enrichedMetadata = {
       ...metadata,
-      auth0_id: auth0User?.sub || 'anonymous',
+      user_id: auth0User?.sub || (() => { throw new Error('User not authenticated') })(),
       session_id: sessionId
     };
     
@@ -426,7 +426,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
           options: pluginTrigger.extractedParams || {},
           context: {
             sessionId,
-            userId: auth0User?.sub || 'anonymous',
+            userId: auth0User?.sub || (() => { throw new Error('User not authenticated') })(),
             messageId: userMessage.id
           }
         };
@@ -530,7 +530,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     // Business logic: Enrich metadata with user and session info
     const enrichedMetadata = {
       ...metadata,
-      auth0_id: auth0User?.sub || 'anonymous',
+      user_id: auth0User?.sub || (() => { throw new Error('User not authenticated') })(),
       session_id: metadata?.session_id || 'default',
       files: files.map(f => ({ name: f.name, type: f.type, size: f.size })) // Add file info to metadata
     };

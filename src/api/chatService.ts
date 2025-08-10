@@ -68,10 +68,16 @@ export class ChatService {
         }
       });
 
+      // Check if user is authenticated - this should NEVER be empty
+      const userId = metadata.user_id;
+      if (!userId) {
+        throw new Error('CHAT_SERVICE: No user_id provided. User must be authenticated before sending messages.');
+      }
+
       // Prepare request body
       const requestBody = JSON.stringify({
         message,
-        user_id: metadata.user_id || 'anonymous',
+        user_id: userId,
         session_id: metadata.session_id || 'default',
         prompt_name: metadata.prompt_name || null,
         prompt_args: metadata.prompt_args || {}
