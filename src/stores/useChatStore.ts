@@ -51,6 +51,7 @@ import { ChatMetadata, ChatMessage, StreamingStatus } from '../types/chatTypes';
 import { useUserStore } from './useUserStore';
 import { useSessionStore } from './useSessionStore';
 import { TaskItem, TaskProgress } from '../api/SSEParser';
+import { HILInterruptDetectedEvent, HILCheckpointCreatedEvent, HILExecutionStatusData } from '../types/aguiTypes';
 
 interface ChatStoreState {
   // 聊天消息
@@ -65,6 +66,13 @@ interface ChatStoreState {
   taskProgress: TaskProgress | null;
   isExecutingPlan: boolean;
   hasExecutedTasks: boolean; // 用于持久化显示任务面板
+  
+  // HIL (Human-in-the-Loop) 状态
+  hilStatus: 'idle' | 'waiting_for_human' | 'processing_response' | 'error';
+  currentHILInterrupt: HILInterruptDetectedEvent | null;
+  hilHistory: HILInterruptDetectedEvent[];
+  hilCheckpoints: HILCheckpointCreatedEvent[];
+  currentThreadId: string | null;
   
   // 流式消息状态已集成到messages中
 }
@@ -96,6 +104,18 @@ interface ChatActions {
   appendToStreamingMessage: (content: string) => void;
   finishStreamingMessage: () => void;
   updateStreamingStatus: (status: StreamingStatus | string) => void;
+  
+  // HIL操作
+  setHILStatus: (status: 'idle' | 'waiting_for_human' | 'processing_response' | 'error') => void;
+  setCurrentHILInterrupt: (interrupt: HILInterruptDetectedEvent | null) => void;
+  addHILToHistory: (interrupt: HILInterruptDetectedEvent) => void;
+  addHILCheckpoint: (checkpoint: HILCheckpointCreatedEvent) => void;
+  setCurrentThreadId: (threadId: string | null) => void;
+  clearHILState: () => void;
+  // HIL Resume操作 (基于实际测试的API)
+  resumeHILExecution: (sessionId: string, resumeValue: any, token?: string) => Promise<void>;
+  // Execution Status监控 (基于实际测试的API)
+  checkExecutionStatus: (sessionId: string, token?: string) => Promise<any>;
 }
 
 export type ChatStore = ChatStoreState & ChatActions;
@@ -112,6 +132,13 @@ export const useChatStore = create<ChatStore>()(
     taskProgress: null,
     isExecutingPlan: false,
     hasExecutedTasks: false,
+    
+    // HIL初始状态
+    hilStatus: 'idle',
+    currentHILInterrupt: null,
+    hilHistory: [],
+    hilCheckpoints: [],
+    currentThreadId: null,
     
     // 消息操作
     addMessage: (message) => {
@@ -200,7 +227,12 @@ export const useChatStore = create<ChatStore>()(
         updateTaskProgress,
         updateTaskList,
         updateTaskStatus,
-        setExecutingPlan
+        setExecutingPlan,
+        setHILStatus,
+        setCurrentHILInterrupt,
+        addHILToHistory,
+        addHILCheckpoint,
+        setCurrentThreadId
       } = get();
 
       setChatLoading(true);
@@ -294,11 +326,44 @@ export const useChatStore = create<ChatStore>()(
           onTaskStatusUpdate: (taskId: string, status: string, result?: any) => {
             updateTaskStatus(taskId, status as TaskItem['status'], result);
           },
+          // HIL回调处理
+          onHILInterrupt: (hilEvent: HILInterruptDetectedEvent) => {
+            setHILStatus('waiting_for_human');
+            setCurrentHILInterrupt(hilEvent);
+            addHILToHistory(hilEvent);
+            setCurrentThreadId(hilEvent.thread_id);
+            logger.info(LogCategory.CHAT_FLOW, 'HIL interrupt detected', { 
+              threadId: hilEvent.thread_id,
+              type: hilEvent.type
+            });
+          },
+          onHILCheckpoint: (checkpoint: HILCheckpointCreatedEvent) => {
+            addHILCheckpoint(checkpoint);
+            logger.info(LogCategory.CHAT_FLOW, 'HIL checkpoint created', { 
+              threadId: checkpoint.thread_id,
+              type: checkpoint.type
+            });
+          },
+          onHILStatusUpdate: (statusData: HILExecutionStatusData) => {
+            if (statusData.status === 'waiting_for_human') {
+              setHILStatus('waiting_for_human');
+            } else if (statusData.status === 'processing_response') {
+              setHILStatus('processing_response');
+            } else if (statusData.status === 'completed') {
+              setHILStatus('idle');
+              setCurrentHILInterrupt(null);
+            }
+            logger.info(LogCategory.CHAT_FLOW, 'HIL status updated', { 
+              status: statusData.status,
+              threadId: statusData.thread_id
+            });
+          },
           onError: (error: Error) => {
             logger.error(LogCategory.CHAT_FLOW, 'Message sending failed', { error: error.message });
             setChatLoading(false);
             setIsTyping(false);
             setExecutingPlan(false); // 错误时停止执行
+            setHILStatus('error'); // HIL错误状态
           }
         });
       } catch (error) {
@@ -320,7 +385,12 @@ export const useChatStore = create<ChatStore>()(
         updateTaskProgress,
         updateTaskList,
         updateTaskStatus,
-        setExecutingPlan
+        setExecutingPlan,
+        setHILStatus,
+        setCurrentHILInterrupt,
+        addHILToHistory,
+        addHILCheckpoint,
+        setCurrentThreadId
       } = get();
       
       setChatLoading(true);
@@ -411,11 +481,44 @@ export const useChatStore = create<ChatStore>()(
           onTaskStatusUpdate: (taskId: string, status: string, result?: any) => {
             updateTaskStatus(taskId, status as TaskItem['status'], result);
           },
+          // HIL回调处理
+          onHILInterrupt: (hilEvent: HILInterruptDetectedEvent) => {
+            setHILStatus('waiting_for_human');
+            setCurrentHILInterrupt(hilEvent);
+            addHILToHistory(hilEvent);
+            setCurrentThreadId(hilEvent.thread_id);
+            logger.info(LogCategory.CHAT_FLOW, 'HIL interrupt detected in multimodal', { 
+              threadId: hilEvent.thread_id,
+              type: hilEvent.type
+            });
+          },
+          onHILCheckpoint: (checkpoint: HILCheckpointCreatedEvent) => {
+            addHILCheckpoint(checkpoint);
+            logger.info(LogCategory.CHAT_FLOW, 'HIL checkpoint created in multimodal', { 
+              threadId: checkpoint.thread_id,
+              type: checkpoint.type
+            });
+          },
+          onHILStatusUpdate: (statusData: HILExecutionStatusData) => {
+            if (statusData.status === 'waiting_for_human') {
+              setHILStatus('waiting_for_human');
+            } else if (statusData.status === 'processing_response') {
+              setHILStatus('processing_response');
+            } else if (statusData.status === 'completed') {
+              setHILStatus('idle');
+              setCurrentHILInterrupt(null);
+            }
+            logger.info(LogCategory.CHAT_FLOW, 'HIL status updated in multimodal', { 
+              status: statusData.status,
+              threadId: statusData.thread_id
+            });
+          },
           onError: (error) => {
             logger.error(LogCategory.CHAT_FLOW, 'Multimodal message sending failed', { error: error.message });
             setChatLoading(false);
             setIsTyping(false);
             setExecutingPlan(false);
+            setHILStatus('error'); // HIL错误状态
           }
         });
       } catch (error) {
@@ -472,13 +575,31 @@ export const useChatStore = create<ChatStore>()(
     },
 
     clearTasks: () => {
-      set({ currentTasks: [], taskProgress: null, isExecutingPlan: false });
-      logger.info(LogCategory.CHAT_FLOW, 'Tasks cleared');
+      set({ 
+        currentTasks: [], 
+        taskProgress: null, 
+        isExecutingPlan: false,
+        // Also clear HIL state when clearing tasks
+        hilStatus: 'idle',
+        currentHILInterrupt: null
+      });
+      logger.info(LogCategory.CHAT_FLOW, 'Tasks and HIL state cleared');
     },
 
     resetTaskHistory: () => {
-      set({ hasExecutedTasks: false, currentTasks: [], taskProgress: null, isExecutingPlan: false });
-      logger.info(LogCategory.CHAT_FLOW, 'Task history reset for new session');
+      set({ 
+        hasExecutedTasks: false, 
+        currentTasks: [], 
+        taskProgress: null, 
+        isExecutingPlan: false,
+        // Reset HIL state for new session
+        hilStatus: 'idle',
+        currentHILInterrupt: null,
+        hilHistory: [],
+        hilCheckpoints: [],
+        currentThreadId: null
+      });
+      logger.info(LogCategory.CHAT_FLOW, 'Task history and HIL state reset for new session');
     },
 
     // 流式消息操作
@@ -666,6 +787,201 @@ export const useChatStore = create<ChatStore>()(
         return { messages: updatedMessages };
       });
       logger.debug(LogCategory.CHAT_FLOW, 'Streaming status updated in chat store', { status });
+    },
+
+    // HIL操作实现
+    setHILStatus: (status) => {
+      set({ hilStatus: status });
+      logger.info(LogCategory.CHAT_FLOW, 'HIL status updated', { status });
+    },
+
+    setCurrentHILInterrupt: (interrupt) => {
+      set({ currentHILInterrupt: interrupt });
+      if (interrupt) {
+        logger.info(LogCategory.CHAT_FLOW, 'Current HIL interrupt set', { 
+          threadId: interrupt.thread_id,
+          type: interrupt.type,
+          timestamp: interrupt.timestamp
+        });
+      } else {
+        logger.info(LogCategory.CHAT_FLOW, 'Current HIL interrupt cleared');
+      }
+    },
+
+    addHILToHistory: (interrupt) => {
+      set((state) => ({
+        hilHistory: [...state.hilHistory, interrupt]
+      }));
+      logger.info(LogCategory.CHAT_FLOW, 'HIL interrupt added to history', { 
+        threadId: interrupt.thread_id,
+        type: interrupt.type,
+        historyCount: get().hilHistory.length + 1
+      });
+    },
+
+    addHILCheckpoint: (checkpoint) => {
+      set((state) => ({
+        hilCheckpoints: [...state.hilCheckpoints, checkpoint]
+      }));
+      logger.info(LogCategory.CHAT_FLOW, 'HIL checkpoint added', { 
+        threadId: checkpoint.thread_id,
+        type: checkpoint.type,
+        checkpointCount: get().hilCheckpoints.length + 1
+      });
+    },
+
+    setCurrentThreadId: (threadId) => {
+      set({ currentThreadId: threadId });
+      logger.info(LogCategory.CHAT_FLOW, 'Current thread ID updated', { threadId });
+    },
+
+    clearHILState: () => {
+      set({
+        hilStatus: 'idle',
+        currentHILInterrupt: null,
+        hilHistory: [],
+        hilCheckpoints: [],
+        currentThreadId: null
+      });
+      logger.info(LogCategory.CHAT_FLOW, 'HIL state cleared');
+    },
+
+    // HIL Resume执行 (基于2025-08-16实际测试API)
+    resumeHILExecution: async (sessionId: string, resumeValue: any, token?: string) => {
+      const { 
+        setHILStatus,
+        setCurrentHILInterrupt,
+        startStreamingMessage, 
+        appendToStreamingMessage, 
+        finishStreamingMessage, 
+        updateStreamingStatus,
+        updateTaskProgress,
+        updateTaskList,
+        updateTaskStatus,
+        setExecutingPlan
+      } = get();
+
+      try {
+        logger.info(LogCategory.CHAT_FLOW, 'Starting HIL resume execution', {
+          sessionId,
+          resumeValueType: typeof resumeValue
+        });
+
+        // 更新HIL状态为处理中
+        setHILStatus('processing_response');
+        
+        // 获取 ChatService 实例
+        let chatService = getChatServiceInstance();
+        if (!chatService) {
+          throw new Error('ChatService not available for HIL resume');
+        }
+
+        // 使用token或默认值
+        const authToken = token || 'dev_key_test';
+        
+        // 获取用户信息
+        const userStore = useUserStore.getState();
+        const userId = userStore.user?.id || 'test_user';
+
+        // 调用resumeChat API
+        await chatService.resumeChat(sessionId, userId, resumeValue, authToken, {
+          onStreamStart: (messageId: string, status?: string) => {
+            startStreamingMessage(messageId, status || '🔄 Resuming HIL execution...');
+            setExecutingPlan(true);
+          },
+          onStreamContent: (contentChunk: string) => {
+            appendToStreamingMessage(contentChunk);
+          },
+          onStreamStatus: (status: string) => {
+            updateStreamingStatus(status);
+          },
+          onStreamComplete: () => {
+            finishStreamingMessage();
+            setHILStatus('idle'); // HIL完成，回到空闲状态
+            setCurrentHILInterrupt(null); // 清除当前中断
+            setExecutingPlan(false);
+            logger.info(LogCategory.CHAT_FLOW, 'HIL resume execution completed successfully');
+          },
+          onTaskProgress: (progress) => {
+            updateTaskProgress(progress);
+          },
+          onTaskListUpdate: (tasks) => {
+            updateTaskList(tasks);
+          },
+          onTaskStatusUpdate: (taskId: string, status: string, result?: any) => {
+            updateTaskStatus(taskId, status as any, result);
+          },
+          // HIL回调 - 处理可能的嵌套HIL中断
+          onHILInterrupt: (hilEvent: HILInterruptDetectedEvent) => {
+            setHILStatus('waiting_for_human');
+            setCurrentHILInterrupt(hilEvent);
+            logger.info(LogCategory.CHAT_FLOW, 'Nested HIL interrupt during resume', { 
+              threadId: hilEvent.thread_id,
+              type: hilEvent.type
+            });
+          },
+          onError: (error: Error) => {
+            logger.error(LogCategory.CHAT_FLOW, 'HIL resume execution failed', { 
+              error: error.message,
+              sessionId
+            });
+            setHILStatus('error');
+            setExecutingPlan(false);
+          }
+        });
+
+      } catch (error) {
+        logger.error(LogCategory.CHAT_FLOW, 'Failed to start HIL resume execution', { 
+          error,
+          sessionId
+        });
+        setHILStatus('error');
+        throw error;
+      }
+    },
+
+    // Execution Status监控 (基于2025-08-16实际测试API)
+    checkExecutionStatus: async (sessionId: string, token?: string) => {
+      try {
+        logger.info(LogCategory.CHAT_FLOW, 'Checking execution status', { sessionId });
+
+        // 获取 ChatService 实例
+        let chatService = getChatServiceInstance();
+        if (!chatService) {
+          throw new Error('ChatService not available for status check');
+        }
+
+        // 使用token或默认值
+        const authToken = token || 'dev_key_test';
+
+        // 调用getExecutionStatus API
+        const statusData = await chatService.getExecutionStatus(sessionId, authToken);
+        
+        // 根据status数据更新HIL状态
+        if (statusData.status === 'interrupted' && statusData.interrupts?.length > 0) {
+          const { setHILStatus, setCurrentThreadId } = get();
+          setHILStatus('waiting_for_human');
+          setCurrentThreadId(statusData.thread_id);
+          
+          logger.info(LogCategory.CHAT_FLOW, 'Execution interrupted detected via status check', {
+            sessionId,
+            status: statusData.status,
+            interruptCount: statusData.interrupts.length
+          });
+        } else if (statusData.status === 'running') {
+          const { setHILStatus } = get();
+          setHILStatus('idle');
+        }
+
+        return statusData;
+        
+      } catch (error) {
+        logger.error(LogCategory.CHAT_FLOW, 'Failed to check execution status', { 
+          error,
+          sessionId
+        });
+        throw error;
+      }
     }
   }))
 );
@@ -680,6 +996,13 @@ export const useCurrentTasks = () => useChatStore(state => state.currentTasks);
 export const useTaskProgress = () => useChatStore(state => state.taskProgress);
 export const useIsExecutingPlan = () => useChatStore(state => state.isExecutingPlan);
 export const useHasExecutedTasks = () => useChatStore(state => state.hasExecutedTasks);
+
+// HIL选择器
+export const useHILStatus = () => useChatStore(state => state.hilStatus);
+export const useCurrentHILInterrupt = () => useChatStore(state => state.currentHILInterrupt);
+export const useHILHistory = () => useChatStore(state => state.hilHistory);
+export const useHILCheckpoints = () => useChatStore(state => state.hilCheckpoints);
+export const useCurrentThreadId = () => useChatStore(state => state.currentThreadId);
 
 // Chat操作
 export const useChatActions = () => useChatStore(state => ({
@@ -703,6 +1026,18 @@ export const useTaskActions = () => useChatStore(state => ({
   setExecutingPlan: state.setExecutingPlan,
   clearTasks: state.clearTasks,
   resetTaskHistory: state.resetTaskHistory
+}));
+
+// HIL操作
+export const useHILActions = () => useChatStore(state => ({
+  setHILStatus: state.setHILStatus,
+  setCurrentHILInterrupt: state.setCurrentHILInterrupt,
+  addHILToHistory: state.addHILToHistory,
+  addHILCheckpoint: state.addHILCheckpoint,
+  setCurrentThreadId: state.setCurrentThreadId,
+  clearHILState: state.clearHILState,
+  resumeHILExecution: state.resumeHILExecution,
+  checkExecutionStatus: state.checkExecutionStatus
 }));
 
 // ================================================================================

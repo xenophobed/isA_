@@ -348,6 +348,10 @@ interface BaseWidgetProps {
   onSelectOutput?: (item: OutputHistoryItem) => void;
   onClearHistory?: () => void;
   
+  // 🎪 Event handling - should route to WidgetHandler
+  onEditAction?: (actionId: string, content: any) => void;
+  onManagementAction?: (actionId: string, params?: any) => void;
+  
   // Input area content
   children: ReactNode;
   
@@ -384,6 +388,8 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
   artifactSessions = [],
   currentSessionId,
   currentVersionId,
+  onSessionChange,
+  onVersionChange,
   aiActions = {},
   enableScrollActions = true,
   useCompactLayout = true,
@@ -396,6 +402,11 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
   editActions = [],
   onSelectOutput,
   onClearHistory,
+  
+  // 🎪 Event handling
+  onEditAction,
+  onManagementAction,
+  
   children,
   managementActions = [],
   isProcessing = false,
@@ -514,49 +525,61 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
         <div className="flex items-center gap-3">
           {/* Session/Version Dropdowns with elegant styling */}
           <div className="flex items-center gap-2">
-            {/* Session Dropdown with enhanced styling */}
-            <div className="w-40">
-              <Dropdown
-                options={[{ id: 'session1', label: 'Session 1', icon: '🎯' }]}
-                value="session1"
-                onChange={() => {}}
-                customTrigger={(selected, isOpen) => (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="w-full justify-between text-xs shadow-lg hover:shadow-xl backdrop-blur-xl"
-                    icon={selected?.icon || '🎯'}
-                  >
-                    <span className="truncate font-medium">{selected?.label || 'Session'}</span>
-                    <span className={`transform transition-all duration-200 ml-1 ${isOpen ? 'rotate-180 text-blue-400' : 'text-white/60'}`}>
-                      ▼
-                    </span>
-                  </Button>
-                )}
-              />
-            </div>
+            {/* Session Dropdown with dynamic data */}
+            {artifactSessions && artifactSessions.length > 0 && currentSessionId && onSessionChange && (
+              <div className="w-40">
+                <Dropdown
+                  options={artifactSessions.map(session => ({
+                    id: session.id,
+                    label: session.title,
+                    icon: '🎯'
+                  }))}
+                  value={currentSessionId}
+                  onChange={onSessionChange}
+                  customTrigger={(selected, isOpen) => (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full justify-between text-xs shadow-lg hover:shadow-xl backdrop-blur-xl"
+                      icon={selected?.icon || '🎯'}
+                    >
+                      <span className="truncate font-medium">{selected?.label || 'Session'}</span>
+                      <span className={`transform transition-all duration-200 ml-1 ${isOpen ? 'rotate-180 text-blue-400' : 'text-white/60'}`}>
+                        ▼
+                      </span>
+                    </Button>
+                  )}
+                />
+              </div>
+            )}
             
-            {/* Version Dropdown with enhanced styling */}
-            <div className="w-28">
-              <Dropdown
-                options={[{ id: 'v1', label: 'v1', icon: '✨' }]}
-                value="v1"
-                onChange={() => {}}
-                customTrigger={(selected, isOpen) => (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="w-full justify-between text-xs shadow-lg hover:shadow-xl backdrop-blur-xl"
-                    icon={selected?.icon || '✨'}
-                  >
-                    <span className="truncate font-medium">{selected?.label || 'v1'}</span>
-                    <span className={`transform transition-all duration-200 ml-1 ${isOpen ? 'rotate-180 text-blue-400' : 'text-white/60'}`}>
-                      ▼
-                    </span>
-                  </Button>
-                )}
-              />
-            </div>
+            {/* Version Dropdown with dynamic data */}
+            {currentSession && currentSession.versions.length > 0 && currentVersionId && onVersionChange && (
+              <div className="w-28">
+                <Dropdown
+                  options={currentSession.versions.map(version => ({
+                    id: version.id,
+                    label: `v${version.version}`,
+                    icon: version.isFollowUp ? '🔄' : '✨'
+                  }))}
+                  value={currentVersionId}
+                  onChange={onVersionChange}
+                  customTrigger={(selected, isOpen) => (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full justify-between text-xs shadow-lg hover:shadow-xl backdrop-blur-xl"
+                      icon={selected?.icon || '✨'}
+                    >
+                      <span className="truncate font-medium">{selected?.label || 'v1'}</span>
+                      <span className={`transform transition-all duration-200 ml-1 ${isOpen ? 'rotate-180 text-blue-400' : 'text-white/60'}`}>
+                        ▼
+                      </span>
+                    </Button>
+                  )}
+                />
+              </div>
+            )}
           </div>
           
           {/* Elegant Back Button with improved styling */}
@@ -820,7 +843,14 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
                 key={action.id}
                 variant={action.variant === 'primary' ? 'primary' : action.variant === 'danger' ? 'danger' : 'ghost'}
                 size="sm"
-                onClick={action.onClick}
+                onClick={() => {
+                  // Route to WidgetHandler if callback exists, otherwise use legacy onClick
+                  if (onManagementAction) {
+                    onManagementAction(action.id, action);
+                  } else {
+                    action.onClick?.();
+                  }
+                }}
                 disabled={action.disabled}
                 icon={action.icon}
                 className="flex-col h-auto py-2"

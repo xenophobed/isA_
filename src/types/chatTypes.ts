@@ -153,7 +153,19 @@ export interface ChatHookState {
   widgetStates: any; // Widget states aggregated from useAllWidgetStates
   isAnyWidgetGenerating: boolean; // True if any widget is generating content
   
+  // HIL状态聚合
+  hilStatus: 'idle' | 'waiting_for_human' | 'processing_response' | 'error';
+  currentHILInterrupt: any | null; // HILInterruptDetectedEvent from aguiTypes
+  hilHistory: any[]; // HILInterruptDetectedEvent[] from aguiTypes
+  hilCheckpoints: any[]; // HILCheckpointCreatedEvent[] from aguiTypes
+  currentThreadId: string | null;
+  
   // 派生状态
   hasStreamingMessage: boolean;
   streamingMessage: ChatMessage | undefined;
+  // HIL派生状态
+  isHILActive: boolean;
+  hasActiveHILInterrupt: boolean;
+  hilInterruptCount: number;
+  hilCheckpointCount: number;
 }

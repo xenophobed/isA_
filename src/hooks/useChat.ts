@@ -21,13 +21,23 @@
  */
 
 import { useMemo } from 'react';
-import { useChatMessages, useChatLoading, useChatTyping } from '../stores/useChatStore';
+import { 
+  useChatMessages, 
+  useChatLoading, 
+  useChatTyping,
+  useHILStatus,
+  useCurrentHILInterrupt,
+  useHILHistory,
+  useHILCheckpoints,
+  useCurrentThreadId
+} from '../stores/useChatStore';
 import { useCurrentSession, useSessionStore } from '../stores/useSessionStore'; // 从session获取历史messages
 import { useArtifactStore } from '../stores/useArtifactStore';
 import { useCurrentApp, useShowRightSidebar } from '../stores/useAppStore';
 import { useAllWidgetStates, useIsAnyWidgetGenerating } from '../stores/useWidgetStores';
 import { ChatHookState, ChatMessage } from '../types/chatTypes';
 import { AppArtifact } from '../types/appTypes';
+import { HILInterruptDetectedEvent, HILCheckpointCreatedEvent } from '../types/aguiTypes';
 
 /**
  * Chat状态监听Hook - 纯数据聚合，无副作用
@@ -37,6 +47,7 @@ import { AppArtifact } from '../types/appTypes';
  * 2. 应用导航状态 (useAppStore) 
  * 3. 工件状态 (useArtifactStore)
  * 4. Widget状态聚合 (useWidgetStores)
+ * 5. HIL状态聚合 (useChatStore)
  * 
  * @returns 聚合的聊天状态数据
  */
@@ -73,6 +84,13 @@ export const useChat = (): ChatHookState => {
   const isLoading = useChatLoading();
   const isTyping = useChatTyping();
   
+  // 2.5. HIL状态聚合 - 从useChatStore获取HIL相关状态
+  const hilStatus = useHILStatus();
+  const currentHILInterrupt = useCurrentHILInterrupt();
+  const hilHistory = useHILHistory();
+  const hilCheckpoints = useHILCheckpoints();
+  const currentThreadId = useCurrentThreadId();
+  
   // 3. 应用导航状态 - 选择性订阅
   const currentApp = useCurrentApp();
   const showRightSidebar = useShowRightSidebar();
@@ -108,6 +126,27 @@ export const useChat = (): ChatHookState => {
       : null;
   }, [artifacts]);
   
+  // HIL派生状态计算
+  const isHILActive = useMemo((): boolean => 
+    hilStatus === 'waiting_for_human' || hilStatus === 'processing_response',
+    [hilStatus]
+  );
+  
+  const hasActiveHILInterrupt = useMemo((): boolean => 
+    !!currentHILInterrupt,
+    [currentHILInterrupt]
+  );
+  
+  const hilInterruptCount = useMemo((): number => 
+    hilHistory.length,
+    [hilHistory.length]
+  );
+  
+  const hilCheckpointCount = useMemo((): number => 
+    hilCheckpoints.length,
+    [hilCheckpoints.length]
+  );
+  
   // 7. 聚合所有状态并返回
   return {
     // 聊天核心数据
@@ -127,8 +166,20 @@ export const useChat = (): ChatHookState => {
     widgetStates,
     isAnyWidgetGenerating,
     
+    // HIL状态聚合
+    hilStatus,
+    currentHILInterrupt,
+    hilHistory,
+    hilCheckpoints,
+    currentThreadId,
+    
     // 派生状态
     hasStreamingMessage,
-    streamingMessage
+    streamingMessage,
+    // HIL派生状态
+    isHILActive,
+    hasActiveHILInterrupt,
+    hilInterruptCount,
+    hilCheckpointCount
   };
 };

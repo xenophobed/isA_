@@ -16,7 +16,7 @@
  * - 用户友好：清晰的视觉层次和交互
  */
 
-import React, { memo, useEffect, useState, useCallback, createContext, useContext } from 'react';
+import React, { memo, useEffect, useState, useCallback, createContext, useContext, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 
 // ================================================================================
@@ -44,13 +44,21 @@ export interface ToastProps {
   };
   onClose?: () => void;
   className?: string;
+  // Accessibility props
+  'aria-label'?: string;
+  'aria-describedby'?: string;
+  role?: string;
+  announceOnShow?: boolean; // Announce to screen readers
 }
 
 export interface ToastContextValue {
   toasts: ToastProps[];
   addToast: (toast: Omit<ToastProps, 'id'>) => string;
+  addToasts: (toasts: Array<Omit<ToastProps, 'id'>>) => string[];
   removeToast: (id: string) => void;
+  removeToasts: (ids: string[]) => void;
   removeAllToasts: () => void;
+  removeByType: (type: ToastType) => void;
   updateToast: (id: string, updates: Partial<ToastProps>) => void;
 }
 
@@ -58,70 +66,71 @@ export interface ToastContainerProps {
   position?: ToastPosition;
   maxToasts?: number;
   className?: string;
+  virtualized?: boolean;
+  maxHeight?: number;
 }
 
 // ================================================================================
 // 样式配置
 // ================================================================================
 
-const getTypeConfig = (type: ToastType) => {
-  const configs = {
-    success: {
-      icon: '✅',
-      bgColor: 'var(--glass-primary)',
-      borderColor: 'var(--glass-border)',
-      iconColor: 'text-green-400',
-      progressColor: 'bg-green-400',
-      glowColor: '#10b981'
-    },
-    error: {
-      icon: '❌',
-      bgColor: 'var(--glass-primary)',
-      borderColor: 'var(--glass-border)',
-      iconColor: 'text-red-400',
-      progressColor: 'bg-red-400',
-      glowColor: '#ef4444'
-    },
-    warning: {
-      icon: '⚠️',
-      bgColor: 'bg-orange-500/20',
-      borderColor: 'border-orange-500/30',
-      iconColor: 'text-orange-400',
-      progressColor: 'bg-orange-400'
-    },
-    info: {
-      icon: 'ℹ️',
-      bgColor: 'var(--glass-primary)',
-      borderColor: 'var(--glass-border)',
-      iconColor: 'var(--accent-soft)',
-      progressColor: 'var(--accent-soft)',
-      glowColor: 'var(--accent-soft)'
-    },
-    loading: {
-      icon: '⏳',
-      bgColor: 'var(--glass-primary)',
-      borderColor: 'var(--glass-border)',
-      iconColor: 'var(--accent-muted)',
-      progressColor: 'var(--accent-muted)',
-      glowColor: 'var(--accent-muted)'
-    }
-  };
+// Optimized type configuration using design system
+const TYPE_CONFIGS = {
+  success: {
+    icon: '✅',
+    bgColor: 'glass-primary',
+    borderColor: 'border-glass-border',
+    iconColor: 'text-green-400',
+    progressColor: 'bg-green-400',
+    glowColor: '#10b981'
+  },
+  error: {
+    icon: '❌',
+    bgColor: 'glass-primary',
+    borderColor: 'border-glass-border',
+    iconColor: 'text-red-400',
+    progressColor: 'bg-red-400',
+    glowColor: '#ef4444'
+  },
+  warning: {
+    icon: '⚠️',
+    bgColor: 'bg-orange-500/20',
+    borderColor: 'border-orange-500/30',
+    iconColor: 'text-orange-400',
+    progressColor: 'bg-orange-400',
+    glowColor: '#f59e0b'
+  },
+  info: {
+    icon: 'ℹ️',
+    bgColor: 'glass-primary',
+    borderColor: 'border-glass-border',
+    iconColor: 'text-primary',
+    progressColor: 'bg-primary',
+    glowColor: 'var(--color-primary)'
+  },
+  loading: {
+    icon: '⏳',
+    bgColor: 'glass-primary',
+    borderColor: 'border-glass-border',
+    iconColor: 'text-secondary',
+    progressColor: 'bg-secondary',
+    glowColor: 'var(--color-secondary)'
+  }
+} as const;
 
-  return configs[type];
-};
+const getTypeConfig = (type: ToastType) => TYPE_CONFIGS[type];
 
-const getPositionClasses = (position: ToastPosition): string => {
-  const positions = {
-    'top-left': 'top-4 left-4',
-    'top-center': 'top-4 left-1/2 transform -translate-x-1/2',
-    'top-right': 'top-4 right-4',
-    'bottom-left': 'bottom-4 left-4',
-    'bottom-center': 'bottom-4 left-1/2 transform -translate-x-1/2',
-    'bottom-right': 'bottom-4 right-4'
-  };
+// Optimized position classes using design system
+const POSITION_CLASSES = {
+  'top-left': 'top-xl left-xl',
+  'top-center': 'top-xl left-1/2 transform -translate-x-1/2',
+  'top-right': 'top-xl right-xl',
+  'bottom-left': 'bottom-xl left-xl',
+  'bottom-center': 'bottom-xl left-1/2 transform -translate-x-1/2',
+  'bottom-right': 'bottom-xl right-xl'
+} as const;
 
-  return positions[position];
-};
+const getPositionClasses = (position: ToastPosition): string => POSITION_CLASSES[position];
 
 const getAnimationClasses = (position: ToastPosition): string => {
   const isTop = position.startsWith('top');
@@ -223,17 +232,26 @@ const ToastItem: React.FC<ToastProps & {
   onClose,
   onRemove,
   position,
-  className = ''
+  className = '',
+  // Accessibility props
+  ...accessibilityProps
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [announced, setAnnounced] = useState(false);
   const config = getTypeConfig(type);
 
-  // 入场动画
+  // 入场动画和无障碍公告
   useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), 10);
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+      // Announce to screen readers for important messages
+      if (accessibilityProps.announceOnShow !== false && (type === 'error' || type === 'success')) {
+        setAnnounced(true);
+      }
+    }, 10);
     return () => clearTimeout(timer);
-  }, []);
+  }, [type, accessibilityProps.announceOnShow]);
 
   // 自动关闭
   const handleAutoClose = useCallback(() => {
@@ -266,21 +284,24 @@ const ToastItem: React.FC<ToastProps & {
   return (
     <div
       className={`
-        relative mb-3 p-4 rounded-lg border backdrop-blur-lg
+        relative mb-lg p-xl rounded-xl border backdrop-blur-lg
         ${config.bgColor} ${config.borderColor}
-        transition-all duration-300 ease-out transform
+        transition-all duration-slow ease-out transform
         ${isVisible ? 'translate-x-0 opacity-100 scale-100' : 
           position.includes('right') ? 'translate-x-full opacity-0 scale-95' :
           position.includes('left') ? '-translate-x-full opacity-0 scale-95' :
-          'translate-y-2 opacity-0 scale-95'
+          'translate-y-md opacity-0 scale-95'
         }
         max-w-md min-w-[300px] shadow-lg
         ${className}
       `}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      role="alert"
-      aria-live="polite"
+      role={accessibilityProps.role || (type === 'error' ? 'alert' : 'status')}
+      aria-live={type === 'error' ? 'assertive' : 'polite'}
+      aria-label={accessibilityProps['aria-label']}
+      aria-describedby={accessibilityProps['aria-describedby']}
+      aria-atomic="true"
     >
       <div className="flex items-start gap-3">
         {/* 图标 */}
@@ -323,10 +344,13 @@ const ToastItem: React.FC<ToastProps & {
               rounded text-white/60 hover:text-white
               transition-all duration-200
               flex items-center justify-center
+              focus:outline-none focus:ring-2 focus:ring-primary/50
             "
-            aria-label="关闭通知"
+            aria-label={`Close ${type} notification`}
+            title={`Close ${type} notification`}
+            type="button"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </button>
@@ -350,16 +374,21 @@ const ToastItem: React.FC<ToastProps & {
 // Toast容器
 // ================================================================================
 
+// Virtualized Toast Container for better performance
 export const ToastContainer: React.FC<ToastContainerProps> = memo(({
   position = 'top-right',
   maxToasts = 5,
-  className = ''
+  className = '',
+  virtualized = false,
+  maxHeight = 400
 }) => {
   const { toasts, removeToast } = useToast();
 
-  const positionToasts = toasts.filter(toast => 
-    (toast.position || 'top-right') === position
-  ).slice(0, maxToasts);
+  const positionToasts = useMemo(() => 
+    toasts
+      .filter(toast => (toast.position || 'top-right') === position)
+      .slice(0, maxToasts)
+  , [toasts, position, maxToasts]);
 
   if (positionToasts.length === 0) return null;
 
@@ -371,7 +400,10 @@ export const ToastContainer: React.FC<ToastContainerProps> = memo(({
         ${className}
       `}
     >
-      <div className="pointer-events-auto">
+      <div 
+        className="pointer-events-auto"
+        style={virtualized ? { maxHeight: `${maxHeight}px`, overflowY: 'auto' } : undefined}
+      >
         {positionToasts.map(toast => (
           <ToastItem
             key={toast.id}
@@ -410,12 +442,33 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return id;
   }, []);
 
+  const addToasts = useCallback((toasts: Array<Omit<ToastProps, 'id'>>): string[] => {
+    const newToasts = toasts.map(toast => ({
+      ...toast,
+      id: `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      position: toast.position || 'top-right' as ToastPosition,
+      duration: toast.duration || 4000,
+      closable: toast.closable !== false
+    }));
+
+    setToasts(prev => [...prev, ...newToasts]);
+    return newToasts.map(t => t.id);
+  }, []);
+
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   }, []);
 
+  const removeToasts = useCallback((ids: string[]) => {
+    setToasts(prev => prev.filter(toast => !ids.includes(toast.id)));
+  }, []);
+
   const removeAllToasts = useCallback(() => {
     setToasts([]);
+  }, []);
+
+  const removeByType = useCallback((type: ToastType) => {
+    setToasts(prev => prev.filter(toast => toast.type !== type));
   }, []);
 
   const updateToast = useCallback((id: string, updates: Partial<ToastProps>) => {
@@ -424,13 +477,16 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     ));
   }, []);
 
-  const contextValue: ToastContextValue = {
+  const contextValue: ToastContextValue = useMemo(() => ({
     toasts,
     addToast,
+    addToasts,
     removeToast,
+    removeToasts,
     removeAllToasts,
+    removeByType,
     updateToast
-  };
+  }), [toasts, addToast, addToasts, removeToast, removeToasts, removeAllToasts, removeByType, updateToast]);
 
   return (
     <ToastContext.Provider value={contextValue}>

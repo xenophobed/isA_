@@ -4,6 +4,7 @@ import { TaskToolbar } from './TaskToolbar';
 import { CalendarToolbar } from './CalendarToolbar';
 import { NotificationToolbar } from './NotificationToolbar';
 import { TaskStatusIndicator } from './header/TaskStatusIndicator';
+import { ThemeToggle } from './theme/ThemeToggle';
 
 interface AppHeaderProps {
   currentApp: string | null;
@@ -34,8 +35,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       <div className="flex items-center gap-6">
         {/* Brand Logo & Title */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--gradient-secondary)' }}>
-            <span className="text-white text-sm font-bold">I</span>
+          <div 
+            className="w-8 h-8 rounded-lg flex items-center justify-center" 
+            style={{ 
+              background: 'var(--gradient-secondary)',
+              boxShadow: '0 2px 6px rgba(66, 133, 244, 0.2)'
+            }}
+          >
+            <span className="text-sm font-bold" style={{ color: 'var(--text-inverse)' }}>I</span>
           </div>
           <div className="flex flex-col">
             <h1 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
@@ -52,7 +59,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: 'var(--glass-primary)', border: '1px solid var(--glass-border)' }}>
             <span className="text-sm">{currentAppData.icon}</span>
             <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{currentAppData.name}</span>
-            <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
+            <div 
+              className="w-1.5 h-1.5 rounded-full animate-pulse" 
+              style={{ backgroundColor: 'var(--color-accent)' }}
+            ></div>
           </div>
         )}
       </div>
@@ -60,10 +70,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       {/* Right Section - Status & Controls */}
       <div className="flex items-center gap-3">
         {/* System Status - More Subtle */}
-        <div className="flex items-center gap-2 text-xs text-gray-400">
-          <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <div 
+            className="w-1.5 h-1.5 rounded-full" 
+            style={{ backgroundColor: 'var(--color-accent)' }}
+          ></div>
           <span>v0.1</span>
         </div>
+
+        {/* Theme Toggle */}
+        <ThemeToggle size="sm" className="mx-2" />
 
         {/* Task Status Indicator */}
         <TaskStatusIndicator

@@ -177,44 +177,48 @@ export const ChatLayout = memo<ChatLayoutProps>(({
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(fullscreen);
   
-  // 🆕 计算布局尺寸 (从ThreeColumnLayout移植)
-  const layoutConfig = useMemo(() => {
-    console.log('🔧 ChatLayout: Computing layout config', { 
-      showSidebar, showRightPanel, showRightSidebar 
-    });
-    // Widget半屏模式时的特殊处理
+  // Optimized CSS Grid layout configuration
+  const gridConfig = useMemo(() => {
+    // Define grid template areas and columns based on layout state
     if (showRightSidebar) {
+      // Widget mode: hide sidebars, show chat + widget
       return {
-        showLeftSidebar: false, // Widget模式时隐藏左侧栏
-        leftWidth: '0%',
-        centerWidth: '50%', // Chat占一半
-        rightSidebarWidth: rightSidebarWidth || '50%', // Widget占一半
-        showRightPanel: false, // Widget模式时隐藏右侧panel
-        rightPanelWidth: '0%'
+        templateAreas: '"chat widget"',
+        templateColumns: '1fr 1fr',
+        showLeftSidebar: false,
+        showRightPanel: false
       };
     }
     
-    // 正常模式 - 计算布局比例
-    const leftWidth = showSidebar ? 16.67 : 0; // 1/6 = 16.67%
-    const rightWidth = showRightPanel ? 16.67 : 0; // 1/6 = 16.67%  
-    const centerWidth = 100 - leftWidth - rightWidth;
+    // Normal mode: configurable sidebars
+    const areas = [];
+    const columns = [];
     
-    const config = {
+    if (showSidebar) {
+      areas.push('left');
+      columns.push('1fr'); // Left sidebar takes flexible space
+    }
+    
+    areas.push('chat');
+    // Chat area takes remaining space
+    columns.push(showRightPanel ? '4fr' : (showSidebar ? '5fr' : '1fr')); // Proportional space
+    
+    if (showRightPanel) {
+      areas.push('right');
+      columns.push('1fr'); // Right panel takes flexible space
+    }
+    
+    return {
+      templateAreas: `"${areas.join(' ')}"`,
+      templateColumns: columns.join(' '),
       showLeftSidebar: showSidebar,
-      leftWidth: `${leftWidth}%`,
-      centerWidth: `${Math.max(centerWidth, 30)}%`, // 最小保持30%
-      rightSidebarWidth: rightSidebarWidth || '50%',
-      showRightPanel: showRightPanel,
-      rightPanelWidth: `${rightWidth}%`
+      showRightPanel: showRightPanel
     };
-    
-    console.log('🔧 ChatLayout: Final layout config', config);
-    return config;
-  }, [showSidebar, showRightPanel, showRightSidebar, rightSidebarWidth]);
+  }, [showSidebar, showRightPanel, showRightSidebar]);
 
   // Backward compatibility: map legacy props to new props
   const effectiveLeftPanelContent = leftPanelContent || (sidebarPosition === 'left' ? sidebarContent : null);
-  const effectiveShowLeftPanel = layoutConfig.showLeftSidebar && (leftPanelContent || (sidebarPosition === 'left' && showSidebar));
+  const effectiveShowLeftPanel = gridConfig.showLeftSidebar && (leftPanelContent || (sidebarPosition === 'left' && showSidebar));
   
   // Right sidebar mode determines overlay vs inline
   const isRightSidebarFullscreen = rightSidebarMode === 'fullscreen';
@@ -230,45 +234,31 @@ export const ChatLayout = memo<ChatLayoutProps>(({
     }
   }, [isFullscreen, onFullscreenToggle]);
   
-  // Format widths to CSS values
-  const formattedLeftPanelWidth = useMemo(() => 
-    typeof leftPanelWidth === 'number' ? `${leftPanelWidth}px` : leftPanelWidth,
-    [leftPanelWidth]
-  );
-    
-  const formattedRightPanelWidth = useMemo(() => 
-    typeof rightPanelWidth === 'number' ? `${rightPanelWidth}px` : rightPanelWidth,
-    [rightPanelWidth]
-  );
-    
-  const formattedRightSidebarWidth = useMemo(() => 
-    typeof rightSidebarWidth === 'number' ? `${rightSidebarWidth}px` : rightSidebarWidth,
-    [rightSidebarWidth]
-  );
-  
   // Layout classes
   const layoutClass = useMemo(() => 
     `isa-chat-layout ${className} ${isFullscreen ? 'isa-fullscreen' : ''}`,
     [className, isFullscreen]
   );
   
-  // Calculate main content width based on visible panels
-  const mainContentStyle = useMemo(() => {
-    if (isRightSidebarFullscreen) {
-      return { display: 'none' }; // Hide main content in fullscreen widget mode
+  // Responsive grid styles with mobile support
+  const gridStyles = useMemo(() => ({
+    display: 'grid',
+    gridTemplateAreas: gridConfig.templateAreas,
+    gridTemplateColumns: gridConfig.templateColumns,
+    gridTemplateRows: 'minmax(0, 1fr)',
+    gap: 'var(--space-lg)',
+    height: '100%',
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+    overflow: 'hidden',
+    // Mobile responsiveness
+    '@media (max-width: 768px)': {
+      gridTemplateAreas: '"chat"',
+      gridTemplateColumns: '1fr',
+      gap: 'var(--space-sm)'
     }
-    
-    let widthCalc = '100%';
-    if (effectiveShowLeftPanel && showRightPanel) {
-      widthCalc = `calc(100% - ${formattedLeftPanelWidth} - ${formattedRightPanelWidth})`;
-    } else if (effectiveShowLeftPanel) {
-      widthCalc = `calc(100% - ${formattedLeftPanelWidth})`;
-    } else if (showRightPanel) {
-      widthCalc = `calc(100% - ${formattedRightPanelWidth})`;
-    }
-    
-    return { width: widthCalc };
-  }, [effectiveShowLeftPanel, showRightPanel, isRightSidebarFullscreen, formattedLeftPanelWidth, formattedRightPanelWidth]);
+  }), [gridConfig]);
   
   // 渲染全屏Widget模式 (从ThreeColumnLayout移植)
   if (showFullScreenWidget && fullScreenWidget) {
@@ -311,22 +301,14 @@ export const ChatLayout = memo<ChatLayoutProps>(({
         </div>
       )}
 
-      {/* Main Content Area */}
-      <div 
-        className="flex-1 flex overflow-hidden"
-        style={{
-          width: '100%',
-          maxWidth: '100%',
-          position: 'relative',
-          flex: '1 1 0%'
-        }}
-      >
+      {/* CSS Grid Main Content Area */}
+      <div style={gridStyles} className="flex-1 overflow-hidden">
         
         {/* Left Sidebar */}
-        {layoutConfig.showLeftSidebar && effectiveLeftPanelContent && (
+        {gridConfig.showLeftSidebar && effectiveLeftPanelContent && (
           <div 
-            className="isa-chat-sidebar isa-sidebar-left flex-shrink-0 border-r border-white/10 sm:relative sm:transform-none"
-            style={{ width: layoutConfig.leftWidth }}
+            className="border-r border-glass-border overflow-hidden"
+            style={{ gridArea: 'left' }}
           >
             {effectiveLeftPanelContent}
           </div>
@@ -334,11 +316,8 @@ export const ChatLayout = memo<ChatLayoutProps>(({
 
         {/* Center Chat Area */}
         <div 
-          className="flex-1 flex flex-col overflow-hidden"
-          style={{
-            minWidth: 0,
-            position: 'relative'
-          }}
+          className="flex flex-col overflow-hidden min-w-0"
+          style={{ gridArea: 'chat' }}
         >
           {/* Chat Content */}
           <div className="flex-1 overflow-hidden">
@@ -352,7 +331,7 @@ export const ChatLayout = memo<ChatLayoutProps>(({
           </div>
 
           {/* Input Area */}
-          <div className="flex-shrink-0 border-t border-white/10">
+          <div className="flex-shrink-0 border-t border-glass-border">
             <InputAreaLayout
               onSend={onSendMessage}
               onSendMultimodal={onSendMultimodal}
@@ -363,44 +342,45 @@ export const ChatLayout = memo<ChatLayoutProps>(({
           </div>
         </div>
 
-        {/* Right Sidebar (半屏Widget模式) */}
+        {/* Right Sidebar (Widget Mode) */}
         {showRightSidebar && rightSidebarContent && (
           <div 
-            className="isa-chat-sidebar isa-sidebar-right flex-shrink-0 border-l border-white/10 bg-gray-900/50 sm:relative sm:transform-none"
-            style={{ width: '50%' }}
+            className="border-l border-glass-border glass-tertiary overflow-hidden"
+            style={{ gridArea: 'widget' }}
           >
             {rightSidebarContent}
           </div>
         )}
 
-        {/* Right Panel (会话管理) */}
-        {layoutConfig.showRightPanel && rightPanelContent && (
+        {/* Right Panel (Session Management) */}
+        {gridConfig.showRightPanel && rightPanelContent && (
           <div 
-            className="isa-chat-sidebar isa-sidebar-right flex-shrink-0 border-l border-white/10 sm:relative sm:transform-none"
-            style={{ width: '16.67%' }}
+            className="border-l border-glass-border overflow-hidden w-full max-w-full"
+            style={{ 
+              gridArea: 'right',
+              minWidth: 0,
+              maxWidth: '100%'
+            }}
           >
-            {rightPanelContent}
+            <div className="w-full h-full overflow-hidden">
+              {rightPanelContent}
+            </div>
           </div>
         )}
 
-        {/* Right Panel Toggle Arrow - Only show in normal mode (no widget) */}
+        {/* Right Panel Toggle Button */}
         {!showRightSidebar && (
           <div className="absolute right-0 top-1/2 transform -translate-y-1/2 z-20">
             <button
-              onClick={() => {
-                if (onToggleRightPanel) {
-                  onToggleRightPanel();
-                } else {
-                  console.log('Toggle right panel - callback not provided');
-                }
-              }}
-              className={`w-8 h-12 bg-gray-800/80 hover:bg-gray-700/90 border-l border-t border-b border-white/10 rounded-l-lg flex items-center justify-center text-white/70 hover:text-white transition-all shadow-lg hover:shadow-xl ${
-                showRightPanel ? 'translate-x-0' : 'translate-x-0 bg-blue-600/80 hover:bg-blue-500/90'
+              onClick={onToggleRightPanel}
+              className={`w-8 h-12 glass-secondary hover:glass-border-hover border-l border-t border-b border-glass-border rounded-l-lg layout-center text-white/70 hover:text-white transition-all shadow-lg hover:shadow-xl interactive ${
+                showRightPanel ? '' : 'bg-primary/80 hover:bg-primary-hover/90'
               }`}
               title={showRightPanel ? 'Hide panel' : 'Show panel'}
+              aria-label={showRightPanel ? 'Hide right panel' : 'Show right panel'}
             >
               <svg 
-                className={`w-4 h-4 transition-transform ${showRightPanel ? 'rotate-0' : 'rotate-180'}`}
+                className={`w-4 h-4 transition-transform duration-normal ${showRightPanel ? 'rotate-0' : 'rotate-180'}`}
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"

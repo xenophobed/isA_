@@ -28,6 +28,12 @@ interface OmniWidgetProps {
   onGenerateContent?: (params: OmniWidgetParams) => Promise<void>;
   onClearContent?: () => void;
   
+  // 📊 Configuration data (should come from WidgetStore/Module)
+  topicConfigs?: Record<string, TopicConfig>;
+  topicCategories?: TopicCategory[];
+  defaultTopic?: string;
+  defaultTemplate?: string;
+  
   // Base UI props that can be passed directly
   triggeredInput?: string;
   outputHistory?: OutputHistoryItem[];
@@ -39,7 +45,7 @@ interface OmniWidgetProps {
   onBack?: () => void;
 }
 
-// Content Generation Arguments (copied from omni_sidebar.tsx)
+// Content Generation Arguments (should come from props/config)
 interface ContentGenerationArgs {
   topic: string;
   template: string;
@@ -50,7 +56,7 @@ interface ContentGenerationArgs {
   depth: 'shallow' | 'deep';
 }
 
-// Template configuration (copied from omni_sidebar.tsx)
+// Template configuration (should come from props/config)
 interface TemplateConfig {
   id: string;
   name: string;
@@ -59,11 +65,18 @@ interface TemplateConfig {
   promptTemplate: (args: ContentGenerationArgs) => string;
 }
 
-// Topic-specific configurations (copied from omni_sidebar.tsx)
+// Topic-specific configurations (should come from props/config)
 interface TopicConfig {
   name: string;
   description: string;
   templates: TemplateConfig[];
+}
+
+// Topic category for UI display (should come from props/config)
+interface TopicCategory {
+  id: string;
+  title: string;
+  icon: string;
 }
 
 /**
@@ -75,12 +88,16 @@ const OmniInputArea: React.FC<OmniWidgetProps> = ({
   lastParams,
   triggeredInput,
   onGenerateContent,
-  onClearContent
+  onClearContent,
+  topicConfigs = {},
+  topicCategories = [],
+  defaultTopic = 'custom',
+  defaultTemplate = 'general'
 }) => {
-  // Content Generation Arguments (exact copy from omni_sidebar.tsx)
+  // Content Generation Arguments (initialized with props)
   const [args, setArgs] = useState<ContentGenerationArgs>({
-    topic: 'custom',
-    template: 'general', // default template for custom topic
+    topic: defaultTopic,
+    template: defaultTemplate,
     subject: '',
     referenceUrls: [],
     referenceFiles: [],
@@ -88,535 +105,46 @@ const OmniInputArea: React.FC<OmniWidgetProps> = ({
     depth: 'deep'
   });
 
-  // Auto-fill input when triggered (exact copy from omni_sidebar.tsx)
+  // Auto-fill input when triggered and smart topic detection
   React.useEffect(() => {
     if (triggeredInput && triggeredInput !== args.subject) {
       setArgs(prev => ({ ...prev, subject: triggeredInput }));
       
-      // Smart topic detection (exact copy from omni_sidebar.tsx)
+      // Smart topic detection using available topicConfigs
       const input = triggeredInput.toLowerCase();
-      if (input.includes('business') || input.includes('sales')) setArgs(prev => ({ ...prev, topic: 'business' }));
-      else if (input.includes('education') || input.includes('learn')) setArgs(prev => ({ ...prev, topic: 'education' }));
-      else if (input.includes('tech') || input.includes('software')) setArgs(prev => ({ ...prev, topic: 'technology' }));
-      else if (input.includes('social') || input.includes('post')) setArgs(prev => ({ ...prev, topic: 'marketing' }));
-      else if (input.includes('health') || input.includes('wellness')) setArgs(prev => ({ ...prev, topic: 'health' }));
-      else if (input.includes('lifestyle') || input.includes('personal')) setArgs(prev => ({ ...prev, topic: 'lifestyle' }));
-      else if (input.includes('career') || input.includes('professional')) setArgs(prev => ({ ...prev, topic: 'professional' }));
-      else if (input.includes('news') || input.includes('current')) setArgs(prev => ({ ...prev, topic: 'news' }));
-      else if (input.includes('creative') || input.includes('story')) setArgs(prev => ({ ...prev, topic: 'creative' }));
-      else if (input.includes('science') || input.includes('research')) setArgs(prev => ({ ...prev, topic: 'science' }));
-      else setArgs(prev => ({ ...prev, topic: 'custom', template: 'general' }));
+      const availableTopics = Object.keys(topicConfigs);
+      
+      // Try to match keywords with available topics
+      let detectedTopic = defaultTopic;
+      for (const topicId of availableTopics) {
+        const keywords = ['business', 'education', 'tech', 'social', 'health', 'lifestyle', 'career', 'news', 'creative', 'science'];
+        if (keywords.some(keyword => input.includes(keyword) && topicId.includes(keyword))) {
+          detectedTopic = topicId;
+          break;
+        }
+      }
+      
+      setArgs(prev => ({ 
+        ...prev, 
+        topic: detectedTopic,
+        template: topicConfigs[detectedTopic]?.templates.find(t => t.default)?.id || defaultTemplate
+      }));
     }
-  }, [triggeredInput]);
+  }, [triggeredInput, topicConfigs, defaultTopic, defaultTemplate]);
 
-  // Topic Configurations with multiple templates (ALL 10 TOPICS) - exact copy from omni_sidebar.tsx
-  const topicConfigs: Record<string, TopicConfig> = {
-    custom: {
-      name: 'Custom',
-      description: 'General purpose content generation',
-      templates: [
-        {
-          id: 'general',
-          name: 'General Content',
-          description: 'All-purpose content creation',
-          default: true,
-          promptTemplate: (args) => `You are an expert content creator with research capabilities.
+  // Configuration validation and fallbacks
+  const safeTopicConfigs = topicConfigs || {};
+  const safeTopicCategories = topicCategories || [];
 
-TASK: Create content about "${args.subject}"
-DEPTH: ${args.depth} analysis
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-Begin your research and content creation now.`
-        },
-        {
-          id: 'research',
-          name: 'Research Report',
-          description: 'In-depth research and analysis',
-          promptTemplate: (args) => `You are a research analyst with access to comprehensive data sources.
-
-TASK: Create a detailed research report about "${args.subject}"
-DEPTH: ${args.depth} research analysis
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-RESEARCH DELIVERABLES:
-- Executive summary
-- Key findings and insights
-- Supporting data and evidence
-- Conclusions and recommendations
-
-Begin your comprehensive research now.`
-        }
-      ]
-    },
-    
-    business: {
-      name: 'Business & Commerce',
-      description: 'Market analysis, strategy, finance, case studies',
-      templates: [
-        {
-          id: 'market_analysis',
-          name: 'Market Analysis',
-          description: 'Market research and competitive analysis',
-          default: true,
-          promptTemplate: (args) => `You are a market research analyst with access to industry data and competitive intelligence.
-
-TASK: Create comprehensive market analysis about "${args.subject}"
-DEPTH: ${args.depth} market analysis
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-MARKET ANALYSIS FOCUS:
-- Market size and growth trends
-- Competitive landscape mapping
-- Key players and market share
-- Opportunities and threats
-
-DELIVERABLES:
-- Market overview and sizing
-- Competitive analysis
-- Growth opportunities
-- Strategic recommendations
-
-Begin your market research now.`
-        },
-        {
-          id: 'business_strategy',
-          name: 'Business Strategy',
-          description: 'Strategic planning and business development',
-          promptTemplate: (args) => `You are a business strategy consultant with expertise in strategic planning and business development.
-
-TASK: Create business strategy content about "${args.subject}"
-DEPTH: ${args.depth} strategic analysis
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-STRATEGY FOCUS:
-- Strategic objectives and goals
-- SWOT analysis
-- Implementation roadmap
-- Risk assessment and mitigation
-
-DELIVERABLES:
-- Strategic framework
-- Action plans
-- Success metrics
-- Implementation timeline
-
-Begin your strategic analysis now.`
-        },
-        {
-          id: 'financial_analysis',
-          name: 'Financial Analysis',
-          description: 'Financial modeling and investment analysis',
-          promptTemplate: (args) => `You are a financial analyst with expertise in financial modeling and investment analysis.
-
-TASK: Create financial analysis content about "${args.subject}"
-DEPTH: ${args.depth} financial analysis
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-FINANCIAL FOCUS:
-- Financial performance metrics
-- Valuation analysis
-- ROI and profitability
-- Financial projections
-
-DELIVERABLES:
-- Financial models
-- Performance analysis
-- Investment recommendations
-- Risk assessment
-
-Begin your financial analysis now.`
-        }
-      ]
-    },
-    
-    education: {
-      name: 'Education & Learning',
-      description: 'Tutorials, courses, research, learning materials',
-      templates: [
-        {
-          id: 'tutorial',
-          name: 'Tutorial',
-          description: 'Step-by-step instructional content',
-          default: true,
-          promptTemplate: (args: ContentGenerationArgs) => `You are an educational content developer specializing in tutorials and step-by-step instruction.
-
-TASK: Create tutorial content about "${args.subject}"
-DEPTH: ${args.depth} instructional experience
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-TUTORIAL FOCUS:
-- Clear step-by-step instructions
-- Learning objectives for each section
-- Practical examples and exercises
-- Progress checkpoints
-
-DELIVERABLES:
-- Structured tutorial with numbered steps
-- Examples and practice exercises
-- Prerequisites and requirements
-- Expected outcomes
-
-Begin creating the tutorial content now.`
-        },
-        {
-          id: 'course',
-          name: 'Course Material',
-          description: 'Comprehensive educational curriculum',
-          promptTemplate: (args: ContentGenerationArgs) => `You are a curriculum designer and educational content expert.
-
-TASK: Create course material about "${args.subject}"
-DEPTH: ${args.depth} educational curriculum
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-COURSE FOCUS:
-- Comprehensive curriculum structure
-- Learning modules and units
-- Assessment and evaluation methods
-- Interactive learning activities
-
-DELIVERABLES:
-- Course outline and syllabus
-- Module content and materials
-- Assignments and assessments
-- Resource recommendations
-
-Begin developing the course content now.`
-        }
-      ]
-    },
-    
-    technology: {
-      name: 'Technology & Innovation',
-      description: 'Tech reviews, analysis, guides, implementation',
-      templates: [
-        {
-          id: 'tech_review',
-          name: 'Tech Review',
-          description: 'Technology evaluation and comparison',
-          default: true,
-          promptTemplate: (args: ContentGenerationArgs) => `You are a technology analyst and product reviewer with expertise in emerging technologies.
-
-TASK: Create technology review about "${args.subject}"
-DEPTH: ${args.depth} technical review
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-REVIEW FOCUS:
-- Feature analysis and capabilities
-- Performance benchmarks
-- Pros and cons evaluation
-- Competitive comparison
-
-DELIVERABLES:
-- Comprehensive product review
-- Feature comparison matrix
-- Performance analysis
-- Recommendation summary
-
-Begin your technology review now.`
-        },
-        {
-          id: 'implementation_guide',
-          name: 'Implementation Guide',
-          description: 'Technical implementation and setup',
-          promptTemplate: (args: ContentGenerationArgs) => `You are a technical implementation specialist and systems architect.
-
-TASK: Create implementation guide for "${args.subject}"
-DEPTH: ${args.depth} implementation guide
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-IMPLEMENTATION FOCUS:
-- Step-by-step setup instructions
-- System requirements and dependencies
-- Configuration and customization
-- Testing and validation
-
-DELIVERABLES:
-- Detailed implementation steps
-- Code examples and configurations
-- Troubleshooting guide
-- Best practices and recommendations
-
-Begin creating the implementation guide now.`
-        }
-      ]
-    },
-    
-    marketing: {
-      name: 'Marketing & Media',
-      description: 'Campaigns, brand strategy, content marketing',
-      templates: [
-        {
-          id: 'campaign',
-          name: 'Campaign Strategy',
-          description: 'Marketing campaign planning and execution',
-          default: true,
-          promptTemplate: (args: ContentGenerationArgs) => `You are a marketing campaign strategist with expertise in multi-channel marketing.
-
-TASK: Create campaign strategy for "${args.subject}"
-DEPTH: ${args.depth} campaign analysis
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-CAMPAIGN FOCUS:
-- Target audience segmentation
-- Channel strategy and media mix
-- Creative messaging and positioning
-- Budget allocation and ROI projections
-
-Begin your campaign strategy development now.`
-        },
-        {
-          id: 'content_marketing',
-          name: 'Content Marketing',
-          description: 'Content strategy and creation',
-          promptTemplate: (args: ContentGenerationArgs) => `You are a content marketing specialist focused on engaging content creation.
-
-TASK: Create content marketing strategy for "${args.subject}"
-DEPTH: ${args.depth} content strategy
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-CONTENT FOCUS:
-- Content pillars and themes
-- Editorial calendar and distribution
-- Audience engagement strategies
-- Content performance metrics
-
-Begin your content marketing development now.`
-        }
-      ]
-    },
-    
-    health: {
-      name: 'Health & Wellness',
-      description: 'Medical info, wellness guides, health analysis',
-      templates: [
-        {
-          id: 'wellness_guide',
-          name: 'Wellness Guide',
-          description: 'Health and wellness guidance',
-          default: true,
-          promptTemplate: (args: ContentGenerationArgs) => `You are a health and wellness expert with access to medical research.
-
-TASK: Create wellness guide about "${args.subject}"
-DEPTH: ${args.depth} health analysis
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-WELLNESS FOCUS:
-- Evidence-based health information
-- Practical wellness strategies
-- Safety considerations and disclaimers
-- Professional recommendations
-
-Begin creating the wellness guide now.`
-        }
-      ]
-    },
-    
-    lifestyle: {
-      name: 'Lifestyle & Personal',
-      description: 'Personal development, productivity, lifestyle',
-      templates: [
-        {
-          id: 'productivity',
-          name: 'Productivity Guide',
-          description: 'Productivity tips and systems',
-          default: true,
-          promptTemplate: (args: ContentGenerationArgs) => `You are a productivity expert and personal development coach.
-
-TASK: Create productivity guide about "${args.subject}"
-DEPTH: ${args.depth} productivity analysis
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-PRODUCTIVITY FOCUS:
-- Time management strategies
-- Workflow optimization
-- Habit formation techniques
-- Work-life balance
-
-Begin creating the productivity guide now.`
-        }
-      ]
-    },
-    
-    professional: {
-      name: 'Professional & Career',
-      description: 'Career development, workplace skills, leadership',
-      templates: [
-        {
-          id: 'career_guide',
-          name: 'Career Guide',
-          description: 'Career development and advancement',
-          default: true,
-          promptTemplate: (args: ContentGenerationArgs) => `You are a career development expert and executive coach.
-
-TASK: Create career guide about "${args.subject}"
-DEPTH: ${args.depth} career analysis
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-CAREER FOCUS:
-- Professional development strategies
-- Leadership and management skills
-- Networking and relationship building
-- Career advancement tactics
-
-Begin creating the career guide now.`
-        }
-      ]
-    },
-    
-    news: {
-      name: 'News & Current Events',
-      description: 'Current events, analysis, reporting',
-      templates: [
-        {
-          id: 'news_analysis',
-          name: 'News Analysis',
-          description: 'Current events analysis and reporting',
-          default: true,
-          promptTemplate: (args: ContentGenerationArgs) => `You are a journalist and news analyst with access to current information sources.
-
-TASK: Create news analysis about "${args.subject}"
-DEPTH: ${args.depth} news analysis
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-NEWS FOCUS:
-- Factual reporting and verification
-- Multiple perspectives and sources
-- Context and background information
-- Impact assessment and implications
-
-Begin your news analysis now.`
-        }
-      ]
-    },
-    
-    creative: {
-      name: 'Creative & Artistic',
-      description: 'Creative writing, storytelling, artistic content',
-      templates: [
-        {
-          id: 'storytelling',
-          name: 'Storytelling',
-          description: 'Creative writing and narrative',
-          default: true,
-          promptTemplate: (args: ContentGenerationArgs) => `You are a creative writer and storytelling expert with artistic expertise.
-
-TASK: Create creative content about "${args.subject}"
-DEPTH: ${args.depth} creative exploration
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-CREATIVE FOCUS:
-- Original storytelling and narrative
-- Character development and plot
-- Artistic expression and creativity
-- Emotional resonance and engagement
-
-Begin your creative writing now.`
-        }
-      ]
-    },
-    
-    science: {
-      name: 'Science & Research',
-      description: 'Scientific research, analysis, explanations',
-      templates: [
-        {
-          id: 'research_paper',
-          name: 'Research Analysis',
-          description: 'Scientific research and analysis',
-          default: true,
-          promptTemplate: (args: ContentGenerationArgs) => `You are a scientific researcher and science communicator with access to peer-reviewed sources.
-
-TASK: Create scientific analysis about "${args.subject}"
-DEPTH: ${args.depth} scientific analysis
-
-REFERENCES PROVIDED:
-${args.referenceUrls.length > 0 ? '- URLs: ' + args.referenceUrls.join(', ') : ''}
-${args.referenceText ? '- Additional context: ' + args.referenceText : ''}
-
-SCIENTIFIC FOCUS:
-- Evidence-based research methodology
-- Peer-reviewed source verification
-- Clear scientific explanation
-- Proper citations and references
-
-Begin your scientific analysis now.`
-        }
-      ]
-    }
-  };
-  
-  // Topic Categories for UI (all 10 categories + custom) - exact copy from omni_sidebar.tsx
-  const topicCategories = [
-    { id: 'custom', title: 'Custom', icon: '⚡' },
-    { id: 'business', title: 'Business & Commerce', icon: '💼' },
-    { id: 'education', title: 'Education & Learning', icon: '📚' },
-    { id: 'technology', title: 'Technology & Innovation', icon: '💻' },
-    { id: 'marketing', title: 'Marketing & Media', icon: '📢' },
-    { id: 'health', title: 'Health & Wellness', icon: '⚕️' },
-    { id: 'lifestyle', title: 'Lifestyle & Personal', icon: '🌟' },
-    { id: 'professional', title: 'Professional & Career', icon: '👔' },
-    { id: 'news', title: 'News & Current Events', icon: '📰' },
-    { id: 'creative', title: 'Creative & Artistic', icon: '🎨' },
-    { id: 'science', title: 'Science & Research', icon: '🔬' },
-  ];
-
-  // Update args helper (exact copy from omni_sidebar.tsx)
+  // Update args helper using props configuration
   const updateArgs = (key: keyof ContentGenerationArgs, value: any) => {
     setArgs(prev => {
       const updated = { ...prev, [key]: value };
       
       // When topic changes, reset to default template
-      if (key === 'topic' && topicConfigs[value]) {
-        const defaultTemplate = topicConfigs[value].templates.find(t => t.default) || topicConfigs[value].templates[0];
-        updated.template = defaultTemplate?.id || 'general';
+      if (key === 'topic' && safeTopicConfigs[value]) {
+        const defaultTemplate = safeTopicConfigs[value].templates.find(t => t.default) || safeTopicConfigs[value].templates[0];
+        updated.template = typeof defaultTemplate === 'string' ? defaultTemplate : defaultTemplate?.id || '';
       }
       
       return updated;
@@ -645,63 +173,7 @@ Begin your scientific analysis now.`
     }
   };
   
-  // Generate topic-specific prompt template (exact copy from omni_sidebar.tsx)
-  const generatePromptTemplate = (args: ContentGenerationArgs): string => {
-    const topicConfig = topicConfigs[args.topic];
-    if (topicConfig) {
-      const template = topicConfig.templates.find(t => t.id === args.template);
-      if (template) {
-        return template.promptTemplate(args);
-      }
-    }
-    
-    // Fallback to custom general template
-    return topicConfigs['custom'].templates[0].promptTemplate(args);
-  };
-  
-  // Get current template info (exact copy from omni_sidebar.tsx)
-  const getCurrentTemplate = () => {
-    const topicConfig = topicConfigs[args.topic];
-    if (topicConfig) {
-      return topicConfig.templates.find(t => t.id === args.template);
-    }
-    return topicConfigs['custom'].templates[0];
-  };
-  
-  // 映射OmniWidget的复杂topic/template配置到MCP prompt的函数
-  const mapTopicTemplateToMCP = (topic: string, template: string) => {
-    // 基于topic和template的组合来确定最合适的MCP prompt
-    const combinations = {
-      // Business combinations
-      'business.market_analysis': { mcpTopic: 'market_analysis', templateId: 'market_analysis_prompt' },
-      'business.business_strategy': { mcpTopic: 'business', templateId: 'business_strategy_prompt' },
-      'business.financial_analysis': { mcpTopic: 'financial', templateId: 'financial_analysis_prompt' },
-      
-      // Education combinations  
-      'education.tutorial': { mcpTopic: 'education', templateId: 'course_material_prompt' },
-      'education.course': { mcpTopic: 'education', templateId: 'course_material_prompt' },
-      
-      // Marketing combinations
-      'marketing.campaign': { mcpTopic: 'marketing', templateId: 'content_marketing_prompt' },
-      'marketing.content_marketing': { mcpTopic: 'marketing', templateId: 'content_marketing_prompt' },
-      
-      // Health combinations
-      'health.wellness_guide': { mcpTopic: 'health', templateId: 'wellness_guide_prompt' },
-      
-      // Science combinations
-      'science.research_paper': { mcpTopic: 'science', templateId: 'research_paper_prompt' },
-      
-      // Technology combinations
-      'technology.tech_review': { mcpTopic: 'technology', templateId: 'general_content_prompt' },
-      'technology.implementation_guide': { mcpTopic: 'technology', templateId: 'general_content_prompt' },
-    };
-    
-    const key = `${topic}.${template}`;
-    return combinations[key as keyof typeof combinations] || { 
-      mcpTopic: topic, 
-      templateId: 'general_content_prompt' 
-    };
-  };
+  // Helper functions moved to business logic layer (WidgetStore/Module)
 
   const handleGenerate = async () => {
     if (!args.subject.trim() || !onGenerateContent || isGenerating) {
@@ -710,36 +182,22 @@ Begin your scientific analysis now.`
     }
 
     try {
-      // 获取当前模板生成的prompt (用于reference_text)
-      const generatedPrompt = generatePromptTemplate(args);
-      
-      // 映射topic和template到MCP配置
-      const mcpMapping = mapTopicTemplateToMCP(args.topic, args.template);
-      
-      console.log('⚡ OMNI: Selected topic:', args.topic);
-      console.log('⚡ OMNI: Selected template:', args.template);
-      console.log('⚡ OMNI: MCP mapping:', mcpMapping);
-      console.log('⚡ OMNI: Topic config exists:', !!topicConfigs[args.topic]);
-      console.log('⚡ OMNI: Template info:', getCurrentTemplate());
-      
-      const params: OmniWidgetParams & { 
-        referenceUrls?: string[]; 
-        referenceText?: string; 
-        actualTopic?: string;
-        templateId?: string;
-      } = {
-        prompt: args.subject, // 使用用户输入的subject而不是生成的prompt
+      // 简化的参数传递 - 业务逻辑由WidgetHandler/WidgetStore处理
+      const params: OmniWidgetParams = {
+        prompt: args.subject,
         contentType: args.topic as any,
         tone: 'professional',
         length: args.depth === 'deep' ? 'long' : 'medium',
-        // 添加MCP需要的参数
-        referenceUrls: args.referenceUrls,
-        referenceText: args.referenceText || generatedPrompt, // 使用生成的prompt作为reference
-        actualTopic: mcpMapping.mcpTopic,
-        templateId: mcpMapping.templateId
+        // 传递配置数据让业务层处理
+        metadata: {
+          referenceUrls: args.referenceUrls,
+          referenceText: args.referenceText,
+          template: args.template,
+          depth: args.depth
+        }
       };
       
-      console.log('⚡ OMNI: Final params for MCP:', params);
+      console.log('⚡ OMNI: Sending request to handler:', params);
       await onGenerateContent(params);
     } catch (error) {
       console.error('Generation failed:', error);
@@ -750,10 +208,10 @@ Begin your scientific analysis now.`
     <div className="space-y-4 p-3">
       {/* Compact Mode Header - like DreamWidget and HuntWidget */}
       <div className="flex items-center gap-3 p-2 bg-green-500/10 rounded border border-green-500/20">
-        <span className="text-lg">{topicCategories.find(t => t.id === args.topic)?.icon || '⚡'}</span>
+        <span className="text-lg">{safeTopicCategories.find(t => t.id === args.topic)?.icon || '⚡'}</span>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium text-white truncate">
-            {topicCategories.find(t => t.id === args.topic)?.title || 'Custom'}
+            {safeTopicCategories.find(t => t.id === args.topic)?.title || safeTopicConfigs[args.topic]?.name || 'Content Generation'}
           </div>
           <div className="flex gap-3 text-xs text-white/50">
             <span>{args.depth === 'deep' ? 'Deep Analysis' : 'Quick Overview'}</span>
@@ -773,11 +231,11 @@ Begin your scientific analysis now.`
         />
       </div>
 
-      {/* Topic Selection - 3x3 grid with scrolling for remaining topics */}
+      {/* Topic Selection - Dynamic based on props */}
       <div>
-        <div className="text-xs text-white/60 mb-2">🎯 Select Topic</div>
+        <div className="text-xs text-white/60 mb-2">🎯 Select Topic ({safeTopicCategories.length} available)</div>
         <div className="grid grid-cols-3 gap-1 max-h-24 overflow-y-auto">
-          {topicCategories.map((topic) => (
+          {safeTopicCategories.map((topic) => (
             <button
               key={topic.id}
               onClick={() => updateArgs('topic', topic.id)}
@@ -786,7 +244,7 @@ Begin your scientific analysis now.`
                   ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
                   : 'bg-white/5 border-white/10 hover:bg-white/10 text-white cursor-pointer'
               }`}
-              title={`${topic.title} - ${topicConfigs[topic.id]?.description || 'General purpose content'}`}
+              title={`${topic.title} - ${safeTopicConfigs[topic.id]?.description || 'Content generation'}`}
             >
               <div className="text-xs mb-0.5">{topic.icon}</div>
               <div className="text-xs font-medium truncate leading-tight">{topic.title.split(' ')[0]}</div>
@@ -858,8 +316,8 @@ Begin your scientific analysis now.`
           </>
         ) : (
           <>
-            <span>{topicCategories.find(t => t.id === args.topic)?.icon || '⚡'}</span>
-            Generate {topicConfigs[args.topic]?.name || 'Content'}
+            <span>{safeTopicCategories.find(t => t.id === args.topic)?.icon || '⚡'}</span>
+            Generate {safeTopicConfigs[args.topic]?.name || 'Content'}
           </>
         )}
       </button>
@@ -875,6 +333,10 @@ export const OmniWidget: React.FC<OmniWidgetProps> = ({
   generatedContent = null,
   lastParams = null,
   triggeredInput,
+  topicConfigs = {},
+  topicCategories = [],
+  defaultTopic = 'custom',
+  defaultTemplate = 'general',
   outputHistory = [],
   currentOutput = null,
   isStreaming = false,
@@ -1014,6 +476,10 @@ export const OmniWidget: React.FC<OmniWidgetProps> = ({
         triggeredInput={triggeredInput}
         onGenerateContent={onGenerateContent}
         onClearContent={onClearContent}
+        topicConfigs={topicConfigs}
+        topicCategories={topicCategories}
+        defaultTopic={defaultTopic}
+        defaultTemplate={defaultTemplate}
       />
     </BaseWidget>
   );

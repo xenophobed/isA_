@@ -30,13 +30,20 @@ export const UserButton: React.FC<UserButtonProps> = ({ onToggleDrawer }) => {
     return (
       <button
         onClick={() => login()}
-        className="w-full p-3 transition-colors rounded-lg flex items-center space-x-3 group hover:bg-white/10"
-        style={{ background: 'var(--glass-primary)' }}
+        className="w-full p-3 transition-all duration-300 rounded-lg flex items-center space-x-3 group hover:bg-white/5"
+        style={{ background: 'transparent' }}
         title="Sign In"
         disabled={isLoading}
       >
         {/* User Avatar - Not logged in */}
-        <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0" style={{ background: 'var(--glass-secondary)', color: 'var(--text-primary)' }}>
+        <div 
+          className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0" 
+          style={{ 
+            background: 'var(--color-accent)', 
+            color: 'white',
+            boxShadow: '0 2px 6px rgba(66, 133, 244, 0.2)'
+          }}
+        >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
           </svg>
@@ -54,7 +61,8 @@ export const UserButton: React.FC<UserButtonProps> = ({ onToggleDrawer }) => {
 
         {/* Sign In Icon */}
         <svg 
-          className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors flex-shrink-0" 
+          className="w-4 h-4 transition-colors flex-shrink-0" 
+          style={{ color: 'var(--text-muted)' }}
           fill="none" 
           stroke="currentColor" 
           viewBox="0 0 24 24"
@@ -74,27 +82,34 @@ export const UserButton: React.FC<UserButtonProps> = ({ onToggleDrawer }) => {
   return (
     <button
       onClick={onToggleDrawer}
-      className="w-full p-3 hover:bg-white/10 transition-colors rounded-lg flex items-center space-x-3 group"
+      className="w-full p-3 hover:bg-white/5 transition-all duration-300 rounded-lg flex items-center space-x-3 group"
       title="Account Settings"
     >
       {/* User Avatar */}
-      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+      <div 
+        className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+        style={{
+          background: 'linear-gradient(135deg, #4285f4 0%, #34a853 100%)',
+          boxShadow: '0 2px 6px rgba(66, 133, 244, 0.2)'
+        }}
+      >
         {auth0User?.name?.charAt(0)?.toUpperCase() || auth0User?.email?.charAt(0)?.toUpperCase() || '?'}
       </div>
 
       {/* User Info */}
       <div className="flex-1 text-left min-w-0">
-        <div className="text-sm font-medium text-white truncate">
+        <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
           {auth0User?.name || auth0User?.email || 'User'}
         </div>
-        <div className="text-xs text-gray-400">
+        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
           {credits} credits • {currentPlan}
         </div>
       </div>
 
       {/* Settings Icon */}
       <svg 
-        className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors flex-shrink-0" 
+        className="w-4 h-4 transition-colors flex-shrink-0" 
+        style={{ color: 'var(--text-muted)' }}
         fill="none" 
         stroke="currentColor" 
         viewBox="0 0 24 24"

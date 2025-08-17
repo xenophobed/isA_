@@ -174,6 +174,80 @@ export class ChatService {
     }
   }
 
+  /**
+   * Resume a chat session after HIL interrupt (based on actual 2025-08-16 tested API)
+   * @param sessionId - The session ID to resume
+   * @param userId - User ID 
+   * @param resumeValue - The user's response to the HIL interrupt
+   * @param token - Authentication token
+   * @param callbacks - Event callbacks for handling streaming responses
+   */
+  async resumeChat(
+    sessionId: string,
+    userId: string,
+    resumeValue: any,
+    token: string,
+    callbacks: SSEParserCallbacks
+  ): Promise<void> {
+    const startTime = Date.now();
+    
+    try {
+      logger.info(LogCategory.CHAT_FLOW, 'Starting chat resume request', {
+        sessionId,
+        userId,
+        resumeValueType: typeof resumeValue
+      });
+
+      // Prepare request body based on actual tested API format
+      const requestBody = JSON.stringify({
+        session_id: sessionId,
+        user_id: userId,
+        resume_value: resumeValue
+      });
+
+      const url = `${config.api.baseUrl}/api/chat/resume`;
+      
+      console.log('🔄 CHAT_SERVICE: HIL Resume request details:');
+      console.log('  URL:', url);
+      console.log('  Method: POST');
+      console.log('  Headers:', {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Authorization': `Bearer ${token.substring(0, 20)}...`
+      });
+      console.log('  Body:', requestBody);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Authorization': `Bearer ${token}`
+        },
+        body: requestBody
+      });
+
+      console.log('🔄 CHAT_SERVICE: Resume response status:', response.status);
+      console.log('🔄 CHAT_SERVICE: Resume response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('🔄 CHAT_SERVICE: Resume error response body:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+
+      // Process the streaming response with special handling for resume events
+      await this.processResumeStreamingResponse(response, callbacks, sessionId);
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(LogCategory.CHAT_FLOW, 'Chat resume failed', { error: errorMessage, sessionId });
+      callbacks.onError?.(new Error(`ChatService Resume: ${errorMessage}`));
+    }
+  }
+
   // ================================================================================
   // Private Methods - Streaming Request Handling
   // ================================================================================
@@ -310,43 +384,11 @@ export class ChatService {
             
             // Handle [DONE] marker
             if (dataContent === '[DONE]') {
-              // Pass accumulated content to onStreamComplete
               callbacks.onStreamComplete?.();
               continue;
             }
             
-            // Extract message content from message_stream events before passing to SSEParser
-            try {
-              const eventData = JSON.parse(dataContent);
-              if (eventData.type === 'message_stream' && eventData.content?.raw_message) {
-                let messageContent = eventData.content.raw_message;
-                
-                // Extract content from raw_message format: content="..." or content='...' additional_kwargs={} ...
-                const contentMatch = messageContent.match(/content='([^']*(?:\\'[^']*)*)'|content="([^"]*(?:\\"[^"]*)*)"/);
-                if (contentMatch) {
-                  messageContent = contentMatch[1] || contentMatch[2]; // 单引号或双引号
-                  // Unescape quotes
-                  messageContent = messageContent.replace(/\\"/g, '"').replace(/\\'/g, "'");
-                  console.log('📨 CHAT_SERVICE: Extracted content from raw_message:', messageContent.substring(0, 100) + '...');
-                }
-                
-                // Only process if we have actual content (skip empty or tool calls)
-                if (messageContent && messageContent.trim() && !messageContent.includes('tool_calls')) {
-                  console.log('📨 CHAT_SERVICE: Processing message content:', messageContent.substring(0, 100) + '...');
-                  
-                  // 🔥 CRITICAL FIX: Call onMessageComplete when we have extracted message content
-                  // This ensures all widgets can process their final response and complete their state
-                  if (callbacks.onMessageComplete) {
-                    console.log('📨 CHAT_SERVICE: Calling onMessageComplete with extracted content');
-                    callbacks.onMessageComplete(messageContent);
-                  }
-                }
-              }
-            } catch (parseError) {
-              // Continue with normal SSEParser processing for non-JSON data
-            }
-            
-            // Parse and handle SSE event using SSEParser
+            // Parse and handle SSE event using SSEParser (恢复简洁的架构)
             SSEParser.parseSSEEvent(dataContent, callbacks);
           }
         }
@@ -356,10 +398,134 @@ export class ChatService {
     }
   }
 
+  /**
+   * Process streaming response specifically for HIL resume operations
+   * Handles special resume event types based on actual 2025-08-16 test data
+   */
+  private async processResumeStreamingResponse(
+    response: Response,
+    callbacks: SSEParserCallbacks,
+    sessionId: string
+  ): Promise<void> {
+    if (!response.body) {
+      callbacks.onError?.(new Error('No response body for resume'));
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    try {
+      let resumeStarted = false;
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.trim() && line.startsWith('data: ')) {
+            const dataContent = line.slice(6).trim();
+            
+            // Handle [DONE] marker
+            if (dataContent === '[DONE]') {
+              callbacks.onStreamComplete?.();
+              continue;
+            }
+            
+            try {
+              const eventData = JSON.parse(dataContent);
+              
+              // Handle special resume event types based on actual API responses
+              if (eventData.type === 'resume_start') {
+                resumeStarted = true;
+                callbacks.onStreamStatus?.('🔄 Resuming execution...');
+                console.log('🔄 CHAT_SERVICE: Resume started for session:', eventData.session_id);
+                continue;
+              }
+              
+              if (eventData.type === 'resume_end') {
+                callbacks.onStreamStatus?.('✅ Resume completed');
+                console.log('🔄 CHAT_SERVICE: Resume completed for session:', eventData.session_id);
+                continue;
+              }
+              
+              // Mark events as resumed for proper handling
+              if (resumeStarted && eventData.session_id === sessionId) {
+                eventData.resumed = true;
+              }
+              
+              // Parse using standard SSEParser with resume context
+              SSEParser.parseSSEEvent(dataContent, callbacks);
+              
+            } catch (parseError) {
+              console.warn('🔄 CHAT_SERVICE: Failed to parse resume event:', parseError);
+              // Fallback to standard parsing
+              SSEParser.parseSSEEvent(dataContent, callbacks);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('🔄 CHAT_SERVICE: Resume streaming error:', error);
+      callbacks.onError?.(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      reader.releaseLock();
+    }
+  }
 
   // ================================================================================
   // Utility Methods
   // ================================================================================
+
+  /**
+   * Get execution status for a session/thread (based on actual 2025-08-16 tested API)
+   * @param sessionId - The session ID to check status for
+   * @param token - Authentication token
+   * @returns Promise with execution status data
+   */
+  async getExecutionStatus(sessionId: string, token: string): Promise<any> {
+    try {
+      const url = `${config.api.baseUrl}/api/execution/status/${sessionId}`;
+      
+      console.log('📊 CHAT_SERVICE: Getting execution status for session:', sessionId);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+
+      const statusData = await response.json();
+      
+      console.log('📊 CHAT_SERVICE: Execution status received:', statusData);
+      logger.info(LogCategory.CHAT_FLOW, 'Execution status retrieved', {
+        sessionId,
+        status: statusData.status,
+        currentNode: statusData.current_node,
+        checkpoints: statusData.checkpoints
+      });
+      
+      return statusData;
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(LogCategory.CHAT_FLOW, 'Failed to get execution status', { 
+        error: errorMessage,
+        sessionId
+      });
+      throw new Error(`ChatService Status: ${errorMessage}`);
+    }
+  }
 
   /**
    * Cancel all active requests

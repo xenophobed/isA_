@@ -25,6 +25,7 @@
  */
 
 import { ChatServiceCallbacks } from '../types/chatTypes';
+import { HILInterruptData, HILCheckpointData, HILExecutionStatusData } from '../types/aguiTypes';
 
 // ================================================================================
 // 类型定义
@@ -87,6 +88,8 @@ export interface AutonomousTaskUpdate {
   error?: string;
 }
 
+// HIL 类型现在从 aguiTypes.ts 导入
+
 export interface SSEParserCallbacks {
   onStreamStart?: (messageId: string, status?: string) => void;
   onStreamContent?: (content: string) => void;
@@ -105,6 +108,14 @@ export interface SSEParserCallbacks {
   // 🆕 Autonomous task callbacks
   onAutonomousTaskDetected?: (taskData: AutonomousTaskData) => void;
   onAutonomousTaskUpdate?: (taskId: string, update: AutonomousTaskUpdate) => void;
+  
+  // 🆕 HIL (Human-in-the-Loop) callbacks
+  onHILInterruptDetected?: (interrupt: HILInterruptData) => void;
+  onHILCheckpointCreated?: (checkpoint: HILCheckpointData) => void;
+  onHILExecutionStatusChanged?: (status: HILExecutionStatusData) => void;
+  onHILApprovalRequired?: (approval: any) => void;
+  onHILReviewRequired?: (review: any) => void;
+  onHILInputRequired?: (input: any) => void;
 }
 
 // ================================================================================
@@ -112,6 +123,35 @@ export interface SSEParserCallbacks {
 // ================================================================================
 
 export class SSEParser {
+  
+  // ================================================================================
+  // 全局HIL回调注册
+  // ================================================================================
+  
+  private static globalHILCallbacks: {
+    onHILInterruptDetected?: (interrupt: any) => void;
+    onHILCheckpointCreated?: (checkpoint: any) => void;
+    onHILExecutionStatusChanged?: (status: any) => void;
+    onHILApprovalRequired?: (approval: any) => void;
+    onHILReviewRequired?: (review: any) => void;
+    onHILInputRequired?: (input: any) => void;
+  } = {};
+  
+  public static registerGlobalHILCallbacks(callbacks: {
+    onHILInterruptDetected?: (interrupt: any) => void;
+    onHILCheckpointCreated?: (checkpoint: any) => void;
+    onHILExecutionStatusChanged?: (status: any) => void;
+    onHILApprovalRequired?: (approval: any) => void;
+    onHILReviewRequired?: (review: any) => void;
+    onHILInputRequired?: (input: any) => void;
+  }) {
+    this.globalHILCallbacks = { ...this.globalHILCallbacks, ...callbacks };
+    console.log('✅ SSE_PARSER: Global HIL callbacks registered:', Object.keys(callbacks));
+  }
+  
+  // ================================================================================
+  // 状态映射配置
+  // ================================================================================
   
   // 状态映射配置
   private static readonly WORKFLOW_STATUS_MAP: Record<string, string> = {
@@ -182,6 +222,25 @@ export class SSEParser {
           break;
         case 'credits':
           console.log('💰 SSE_PARSER: Credits event:', eventData.content);
+          break;
+        // 🆕 HIL (Human-in-the-Loop) 事件处理
+        case 'hil_interrupt':
+          this.handleHILInterruptEvent(eventData, callbacks);
+          break;
+        case 'hil_checkpoint':
+          this.handleHILCheckpointEvent(eventData, callbacks);
+          break;
+        case 'hil_status':
+          this.handleHILStatusEvent(eventData, callbacks);
+          break;
+        case 'hil_approval_required':
+          this.handleHILApprovalEvent(eventData, callbacks);
+          break;
+        case 'hil_review_required':
+          this.handleHILReviewEvent(eventData, callbacks);
+          break;
+        case 'hil_input_required':
+          this.handleHILInputEvent(eventData, callbacks);
           break;
         default:
           console.log('🔄 SSE_PARSER: Unknown event type:', eventType);
@@ -495,6 +554,53 @@ export class SSEParser {
         });
       }
       
+      // 🆕 检测ask_human工具调用并触发HIL中断
+      if (content.raw_message.includes('ask_human') && content.raw_message.includes('tool_calls')) {
+        console.log('🚨 SSE_PARSER: Detected ask_human tool call - triggering HIL interrupt');
+        
+        try {
+          // 提取工具调用信息
+          const toolCallMatch = content.raw_message.match(/tool_calls=\[(.*?)\]/);
+          if (toolCallMatch) {
+            // 尝试解析工具调用
+            const toolCallStr = toolCallMatch[1];
+            
+            // 简单的参数提取
+            const questionMatch = toolCallStr.match(/'question': '([^']+)'/);
+            const question = questionMatch ? questionMatch[1] : 'Human input required';
+            
+            // 创建HIL中断事件
+            const hilInterrupt = {
+              id: `hil_interrupt_${Date.now()}`,
+              type: 'input_validation' as const,
+              title: 'Human Input Required',
+              message: question,
+              timestamp: eventData.timestamp || new Date().toISOString(),
+              thread_id: 'current_session', // 将在ChatModule中被实际的session ID替换
+              data: {
+                question: question,
+                tool_name: 'ask_human',
+                context: extractedContent,
+                raw_tool_call: toolCallStr
+              }
+            };
+            
+            console.log('🚨 SSE_PARSER: Created HIL interrupt:', hilInterrupt);
+            
+            // 触发HIL中断回调（优先使用传入的回调，否则使用全局回调）
+            if (callbacks.onHILInterruptDetected) {
+              callbacks.onHILInterruptDetected(hilInterrupt);
+              callbacks.onStreamStatus?.(`⏸️ ${hilInterrupt.title}`);
+            } else if (this.globalHILCallbacks.onHILInterruptDetected) {
+              this.globalHILCallbacks.onHILInterruptDetected(hilInterrupt);
+              callbacks.onStreamStatus?.(`⏸️ ${hilInterrupt.title}`);
+            }
+          }
+        } catch (error) {
+          console.error('❌ SSE_PARSER: Failed to parse ask_human tool call:', error);
+        }
+      }
+      
       // 检查其他类型的artifacts (JSON、数据等)
       try {
         // 尝试解析结构化数据
@@ -528,6 +634,100 @@ export class SSEParser {
     const data = (eventData as any).data;
     
     console.log(`📊 SSE_PARSER: Graph update: ${content}`);
+    
+    // 🆕 优先检测真实的__interrupt__格式 (基于2025-08-16测试文档)
+    if (data && data.__interrupt__) {
+      const interruptData = data.__interrupt__;
+      console.log('🚨 SSE_PARSER: Real HIL interrupt detected in graph_update:', interruptData);
+      
+      // 转换为AGUI标准格式的HIL中断事件
+      const hilInterrupt = {
+        id: `hil_interrupt_${Date.now()}`,
+        type: interruptData.type === 'ask_human' ? 'ask_human' as const : 
+              interruptData.type === 'authorization' ? 'authorization' as const : 
+              'input_validation' as const,
+        title: interruptData.type === 'ask_human' ? 'Human Input Required' : 
+               interruptData.type === 'authorization' ? 'Authorization Required' : 
+               'Human Approval Required',
+        message: interruptData.question || interruptData.instruction || 'Human interaction required',
+        timestamp: interruptData.timestamp || eventData.timestamp || new Date().toISOString(),
+        thread_id: (eventData as any).session_id || 'current_session',
+        data: {
+          question: interruptData.question || '',
+          tool_name: interruptData.tool_name || '',
+          tool_args: interruptData.tool_args || {},
+          context: interruptData.context || '',
+          user_id: interruptData.user_id || 'default',
+          instruction: interruptData.instruction || '',
+          original_response: interruptData.original_response || {},
+          // 保留原始数据以备调试
+          raw_interrupt: interruptData
+        }
+      };
+      
+      console.log('🚨 SSE_PARSER: Created AGUI HIL interrupt from real interrupt:', hilInterrupt);
+      
+      // 触发HIL中断回调
+      if (callbacks.onHILInterruptDetected) {
+        callbacks.onHILInterruptDetected(hilInterrupt);
+        callbacks.onStreamStatus?.(`⏸️ ${hilInterrupt.title}`);
+      } else if (this.globalHILCallbacks.onHILInterruptDetected) {
+        this.globalHILCallbacks.onHILInterruptDetected(hilInterrupt);
+        callbacks.onStreamStatus?.(`⏸️ ${hilInterrupt.title}`);
+      }
+      
+      return; // 检测到真实HIL中断后立即返回
+    }
+    
+    // 🆕 检测graph_update中的ask_human工具调用 (fallback支持)
+    if (data) {
+      for (const [nodeKey, nodeValue] of Object.entries(data)) {
+        if (nodeValue && typeof nodeValue === 'object' && 'messages' in nodeValue) {
+          const messages = (nodeValue as any).messages;
+          if (Array.isArray(messages)) {
+            for (const message of messages) {
+              if (message.tool_calls && Array.isArray(message.tool_calls)) {
+                for (const toolCall of message.tool_calls) {
+                  if (toolCall.name === 'ask_human') {
+                    console.log('🚨 SSE_PARSER: ask_human tool call detected in graph_update');
+                    
+                    // 创建HIL中断事件
+                    const hilInterrupt = {
+                      id: `hil_interrupt_${Date.now()}`,
+                      type: 'input_validation' as const,
+                      title: 'Human Input Required',
+                      message: toolCall.args?.question || 'Human input required',
+                      timestamp: eventData.timestamp || new Date().toISOString(),
+                      thread_id: 'current_session',
+                      data: {
+                        question: toolCall.args?.question || 'Human input required',
+                        tool_name: 'ask_human',
+                        tool_call_id: toolCall.id,
+                        context: '',
+                        raw_tool_call: JSON.stringify(toolCall)
+                      }
+                    };
+                    
+                    console.log('🚨 SSE_PARSER: Created HIL interrupt from graph_update:', hilInterrupt);
+                    
+                    // 触发HIL中断回调
+                    if (callbacks.onHILInterruptDetected) {
+                      callbacks.onHILInterruptDetected(hilInterrupt);
+                      callbacks.onStreamStatus?.(`⏸️ ${hilInterrupt.title}`);
+                    } else if (this.globalHILCallbacks.onHILInterruptDetected) {
+                      this.globalHILCallbacks.onHILInterruptDetected(hilInterrupt);
+                      callbacks.onStreamStatus?.(`⏸️ ${hilInterrupt.title}`);
+                    }
+                    
+                    return; // 检测到ask_human后立即返回，不继续处理其他逻辑
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
     
     try {
       // 尝试解析content作为JSON来获取任务列表
@@ -629,6 +829,160 @@ export class SSEParser {
     const content = (eventData as any).content;
     console.error('❌ SSE_PARSER: Error event:', content);
     callbacks.onError?.(new Error(`API Error: ${content}`));
+  }
+
+  // ================================================================================
+  // 🆕 HIL (Human-in-the-Loop) 事件处理方法
+  // ================================================================================
+
+  /**
+   * 处理HIL中断检测事件
+   */
+  private static handleHILInterruptEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
+    console.log('⏸️ SSE_PARSER: HIL interrupt detected:', eventData);
+    
+    const interruptData = (eventData as any).content || (eventData as any).data;
+    
+    if (interruptData && callbacks.onHILInterruptDetected) {
+      const hilInterrupt: HILInterruptData = {
+        id: interruptData.id || `interrupt_${Date.now()}`,
+        type: interruptData.type || 'approval',
+        timestamp: eventData.timestamp || new Date().toISOString(),
+        thread_id: interruptData.thread_id || 'unknown',
+        title: interruptData.title || 'Human intervention required',
+        message: interruptData.message || 'Please review and approve the next action',
+        data: interruptData.data || {},
+        reason: interruptData.reason,
+        tool_name: interruptData.tool_name,
+        tool_args: interruptData.tool_args
+      };
+      
+      callbacks.onHILInterruptDetected(hilInterrupt);
+      callbacks.onStreamStatus?.(`⏸️ ${hilInterrupt.title}`);
+      
+      console.log('⏸️ SSE_PARSER: HIL interrupt processed:', hilInterrupt.id);
+    }
+  }
+
+  /**
+   * 处理HIL检查点创建事件
+   */
+  private static handleHILCheckpointEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
+    console.log('📍 SSE_PARSER: HIL checkpoint created:', eventData);
+    
+    const checkpointData = (eventData as any).content || (eventData as any).data;
+    
+    if (checkpointData && callbacks.onHILCheckpointCreated) {
+      const hilCheckpoint: HILCheckpointData = {
+        checkpoint_id: checkpointData.checkpoint_id || `checkpoint_${Date.now()}`,
+        thread_id: checkpointData.thread_id || 'unknown',
+        node: checkpointData.node || 'unknown_node',
+        timestamp: eventData.timestamp || new Date().toISOString(),
+        state_summary: checkpointData.state_summary || 'Checkpoint created',
+        can_rollback: checkpointData.can_rollback !== false // 默认为true
+      };
+      
+      callbacks.onHILCheckpointCreated(hilCheckpoint);
+      callbacks.onStreamStatus?.(`📍 Checkpoint: ${hilCheckpoint.node}`);
+      
+      console.log('📍 SSE_PARSER: HIL checkpoint processed:', hilCheckpoint.checkpoint_id);
+    }
+  }
+
+  /**
+   * 处理HIL执行状态变化事件
+   */
+  private static handleHILStatusEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
+    console.log('📊 SSE_PARSER: HIL status update:', eventData);
+    
+    const statusData = (eventData as any).content || (eventData as any).data;
+    
+    if (statusData && callbacks.onHILExecutionStatusChanged) {
+      const hilStatus: HILExecutionStatusData = {
+        thread_id: statusData.thread_id || 'unknown',
+        status: statusData.status || 'ready',
+        current_node: statusData.current_node || 'unknown',
+        interrupts: statusData.interrupts || [],
+        checkpoints: statusData.checkpoints || 0,
+        durable: statusData.durable !== false, // 默认为true
+        last_checkpoint: statusData.last_checkpoint
+      };
+      
+      callbacks.onHILExecutionStatusChanged(hilStatus);
+      
+      // 更新流式状态显示
+      const statusText = this.formatExecutionStatus(hilStatus);
+      callbacks.onStreamStatus?.(statusText);
+      
+      console.log('📊 SSE_PARSER: HIL status processed:', hilStatus.status);
+    }
+  }
+
+  /**
+   * 处理HIL审批请求事件
+   */
+  private static handleHILApprovalEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
+    console.log('✋ SSE_PARSER: HIL approval required:', eventData);
+    
+    const approvalData = (eventData as any).content || (eventData as any).data;
+    
+    if (approvalData && callbacks.onHILApprovalRequired) {
+      callbacks.onHILApprovalRequired(approvalData);
+      callbacks.onStreamStatus?.(`✋ Approval needed: ${approvalData.title || 'Action requires approval'}`);
+      
+      console.log('✋ SSE_PARSER: HIL approval processed:', approvalData.id);
+    }
+  }
+
+  /**
+   * 处理HIL审查请求事件
+   */
+  private static handleHILReviewEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
+    console.log('👁️ SSE_PARSER: HIL review required:', eventData);
+    
+    const reviewData = (eventData as any).content || (eventData as any).data;
+    
+    if (reviewData && callbacks.onHILReviewRequired) {
+      callbacks.onHILReviewRequired(reviewData);
+      callbacks.onStreamStatus?.(`👁️ Review needed: ${reviewData.title || 'Content requires review'}`);
+      
+      console.log('👁️ SSE_PARSER: HIL review processed:', reviewData.id);
+    }
+  }
+
+  /**
+   * 处理HIL输入请求事件
+   */
+  private static handleHILInputEvent(eventData: SSEEventData, callbacks: SSEParserCallbacks): void {
+    console.log('📝 SSE_PARSER: HIL input required:', eventData);
+    
+    const inputData = (eventData as any).content || (eventData as any).data;
+    
+    if (inputData && callbacks.onHILInputRequired) {
+      callbacks.onHILInputRequired(inputData);
+      callbacks.onStreamStatus?.(`📝 Input needed: ${inputData.question || 'Additional information required'}`);
+      
+      console.log('📝 SSE_PARSER: HIL input processed:', inputData.id);
+    }
+  }
+
+  /**
+   * 格式化执行状态为用户友好的文本
+   */
+  private static formatExecutionStatus(status: HILExecutionStatusData): string {
+    const statusEmojis = {
+      ready: '✅',
+      running: '⚡',
+      interrupted: '⏸️',
+      completed: '🎉',
+      error: '❌'
+    };
+    
+    const emoji = statusEmojis[status.status] || '🔄';
+    const nodeText = status.current_node !== 'unknown' ? ` (${status.current_node})` : '';
+    const interruptText = status.interrupts.length > 0 ? ` - ${status.interrupts.length} interrupts` : '';
+    
+    return `${emoji} Status: ${status.status}${nodeText}${interruptText}`;
   }
 }
 

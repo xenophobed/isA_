@@ -24,6 +24,7 @@ import { TaskProgress, TaskItem } from '../../../api/SSEParser';
 export interface ChatEmbeddedTaskPanelProps {
   className?: string;
   initialCollapsed?: boolean;
+  compact?: boolean;
   onTaskAction?: (taskId: string, action: 'pause' | 'resume' | 'cancel') => void;
 }
 

@@ -16,7 +16,7 @@
  * - 可扩展：易于添加新的按钮类型
  */
 
-import React, { memo, forwardRef } from 'react';
+import React, { memo, forwardRef, useMemo } from 'react';
 
 // ================================================================================
 // 类型定义
@@ -50,142 +50,88 @@ export interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonE
   onlyIcon?: boolean;           // 仅显示图标
   tooltipText?: string;         // 工具提示文本
   children?: React.ReactNode;   // 按钮内容
+  // Accessibility props
+  'aria-label'?: string;        // ARIA label
+  'aria-describedby'?: string;  // ARIA description reference
+  'aria-expanded'?: boolean;    // For toggle buttons
+  'aria-pressed'?: boolean;     // For toggle state
+  'aria-controls'?: string;     // Controls relationship
+  role?: string;                // Custom role
 }
 
 // ================================================================================
 // 样式配置
 // ================================================================================
 
-const getVariantClasses = (variant: ButtonVariant): string => {
-  const variants = {
-    primary: `
-      bg-gradient-to-r from-blue-500 to-purple-600
-      hover:from-blue-600 hover:to-purple-700
-      border-0
-      text-white font-semibold
-      shadow-lg hover:shadow-xl
-      hover:shadow-blue-500/30
-      active:scale-95
-    `,
-    secondary: `
-      bg-white/8 backdrop-blur-lg
-      hover:bg-white/12
-      border border-white/20 hover:border-white/30
-      text-white font-medium
-      hover:shadow-lg hover:shadow-white/10
-      active:scale-95
-    `,
-    success: `
-      bg-gradient-to-r from-green-500 to-emerald-600
-      hover:from-green-600 hover:to-emerald-700
-      border-0
-      text-white font-semibold
-      shadow-lg hover:shadow-xl
-      hover:shadow-green-500/30
-      active:scale-95
-    `,
-    danger: `
-      bg-gradient-to-r from-red-500 to-pink-600
-      hover:from-red-600 hover:to-pink-700
-      border-0
-      text-white font-semibold
-      shadow-lg hover:shadow-xl
-      hover:shadow-red-500/30
-      active:scale-95
-    `,
-    warning: `
-      bg-gradient-to-r from-orange-500 to-yellow-600
-      hover:from-orange-600 hover:to-yellow-700
-      border-0
-      text-white font-semibold
-      shadow-lg hover:shadow-xl
-      hover:shadow-orange-500/30
-      active:scale-95
-    `,
-    ghost: `
-      bg-transparent hover:bg-white/8
-      border border-transparent hover:border-white/20
-      text-white/80 hover:text-white
-      hover:shadow-md
-      active:scale-95
-    `,
-    link: `
-      bg-transparent hover:bg-blue-500/10
-      border-0
-      text-blue-400 hover:text-blue-300
-      underline hover:no-underline
-      active:scale-95
-    `,
-    icon: `
-      bg-white/8 hover:bg-white/15
-      border border-white/20 hover:border-white/30
-      text-white/90 hover:text-white
-      hover:shadow-md
-      active:scale-95
-    `
-  };
+// Optimized variant classes using design system tokens
+const VARIANT_CLASSES = {
+  primary: 'bg-gradient-secondary text-white font-semibold border-0 shadow-lg hover:shadow-xl hover:shadow-primary/30 interactive-scale',
+  secondary: 'glass-secondary text-white font-medium hover:shadow-lg hover:shadow-white/10 interactive-scale',
+  success: 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold border-0 shadow-lg hover:shadow-xl hover:shadow-green-500/30 interactive-scale',
+  danger: 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-semibold border-0 shadow-lg hover:shadow-xl hover:shadow-red-500/30 interactive-scale',
+  warning: 'bg-gradient-to-r from-orange-500 to-yellow-600 hover:from-orange-600 hover:to-yellow-700 text-white font-semibold border-0 shadow-lg hover:shadow-xl hover:shadow-orange-500/30 interactive-scale',
+  ghost: 'bg-transparent hover:bg-white/8 border border-transparent hover:border-glass-border-hover text-white/80 hover:text-white hover:shadow-md interactive-scale',
+  link: 'bg-transparent hover:bg-primary/10 border-0 text-primary hover:text-primary-hover underline hover:no-underline interactive-scale',
+  icon: 'glass-secondary text-white/90 hover:text-white hover:shadow-md interactive-scale'
+} as const;
 
-  return variants[variant].replace(/\s+/g, ' ').trim();
+const getVariantClasses = (variant: ButtonVariant): string => {
+  return VARIANT_CLASSES[variant];
 };
+
+// Optimized size classes using design system tokens
+const SIZE_CLASSES = {
+  icon: {
+    xs: 'w-6 h-6 p-xs',
+    sm: 'w-8 h-8 p-sm',
+    md: 'w-10 h-10 p-md',
+    lg: 'w-12 h-12 p-lg',
+    xl: 'w-14 h-14 p-xl'
+  },
+  button: {
+    xs: 'px-md py-xs text-xs',
+    sm: 'px-lg py-sm text-sm',
+    md: 'px-xl py-md text-base',
+    lg: 'px-2xl py-lg text-lg',
+    xl: 'px-3xl py-xl text-xl'
+  }
+} as const;
 
 const getSizeClasses = (size: ButtonSize, onlyIcon: boolean): string => {
-  if (onlyIcon) {
-    const iconSizes = {
-      xs: 'w-6 h-6 p-1',
-      sm: 'w-8 h-8 p-1.5',
-      md: 'w-10 h-10 p-2',
-      lg: 'w-12 h-12 p-2.5',
-      xl: 'w-14 h-14 p-3'
-    };
-    return iconSizes[size];
-  }
-
-  const sizes = {
-    xs: 'px-2 py-1 text-xs',
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-base',
-    lg: 'px-6 py-2.5 text-lg',
-    xl: 'px-8 py-3 text-xl'
-  };
-
-  return sizes[size];
+  return onlyIcon ? SIZE_CLASSES.icon[size] : SIZE_CLASSES.button[size];
 };
 
+// Optimized state classes
+const STATE_CLASSES = {
+  normal: '',
+  loading: 'opacity-80 cursor-wait pointer-events-none',
+  disabled: 'opacity-50 cursor-not-allowed pointer-events-none',
+  pressed: 'scale-95'
+} as const;
+
 const getStateClasses = (state: ButtonState, loading: boolean): string => {
-  if (loading) {
-    return 'opacity-80 cursor-wait pointer-events-none';
-  }
-
-  const states = {
-    normal: '',
-    loading: 'opacity-80 cursor-wait pointer-events-none',
-    disabled: 'opacity-50 cursor-not-allowed pointer-events-none',
-    pressed: 'scale-95'
-  };
-
-  return states[state];
+  if (loading) return STATE_CLASSES.loading;
+  return STATE_CLASSES[state];
 };
 
 // ================================================================================
 // 子组件
 // ================================================================================
 
-// 加载动画组件
-const LoadingSpinner: React.FC<{ size: ButtonSize }> = memo(({ size }) => {
-  const sizeMap = {
-    xs: 'w-3 h-3',
-    sm: 'w-4 h-4',
-    md: 'w-4 h-4',
-    lg: 'w-5 h-5',
-    xl: 'w-6 h-6'
-  };
+// Optimized loading spinner with design system
+const SPINNER_SIZES = {
+  xs: 'w-3 h-3',
+  sm: 'w-4 h-4', 
+  md: 'w-4 h-4',
+  lg: 'w-5 h-5',
+  xl: 'w-6 h-6'
+} as const;
 
-  return (
-    <div className={`${sizeMap[size]} animate-spin`}>
-      <div className="w-full h-full border-2 border-transparent border-t-current rounded-full" />
-    </div>
-  );
-});
+const LoadingSpinner: React.FC<{ size: ButtonSize }> = memo(({ size }) => (
+  <div className={`${SPINNER_SIZES[size]} animate-spin`}>
+    <div className="w-full h-full border-2 border-transparent border-t-current rounded-full" />
+  </div>
+));
 
 // ================================================================================
 // 主组件
@@ -213,49 +159,32 @@ export const Button = memo(forwardRef<HTMLButtonElement, ButtonProps>(({
   const finalState = disabled ? 'disabled' : loading ? 'loading' : state;
   const isLoading = loading || finalState === 'loading';
 
-  // 构建类名
-  const baseClasses = `
-    inline-flex items-center justify-center
-    rounded-xl
-    transition-all duration-200 ease-out
-    focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-2 focus:ring-offset-transparent
-    font-medium
-    select-none
-    backdrop-blur-md
-    transform hover:scale-105
-  `;
+  // Optimized class building using useMemo
+  const finalClassName = useMemo(() => {
+    const baseClasses = 'layout-center rounded-xl transition-all duration-normal ease-out focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-transparent font-medium select-none backdrop-blur-md';
+    
+    const classes = [
+      baseClasses,
+      getVariantClasses(variant),
+      getSizeClasses(size, onlyIcon),
+      getStateClasses(finalState, isLoading),
+      fullWidth && 'w-full',
+      rounded && 'rounded-full',
+      elevated && 'shadow-2xl hover:shadow-3xl',
+      className
+    ];
 
-  const variantClasses = getVariantClasses(variant);
-  const sizeClasses = getSizeClasses(size, onlyIcon);
-  const stateClasses = getStateClasses(finalState, isLoading);
-  
-  const conditionalClasses = [
-    fullWidth && 'w-full',
-    rounded && 'rounded-full',
-    elevated && 'shadow-2xl hover:shadow-3xl',
-    onlyIcon && 'rounded-xl'
-  ].filter(Boolean).join(' ');
+    return classes.filter(Boolean).join(' ');
+  }, [variant, size, onlyIcon, finalState, isLoading, fullWidth, rounded, elevated, className]);
 
-  const finalClassName = `
-    ${baseClasses}
-    ${variantClasses}
-    ${sizeClasses}
-    ${stateClasses}
-    ${conditionalClasses}
-    ${className}
-  `.replace(/\s+/g, ' ').trim();
-
-  // 渲染内容
-  const renderContent = () => {
-    // 仅图标模式
+  // Optimized content rendering with useMemo
+  const buttonContent = useMemo(() => {
+    // Icon-only mode
     if (onlyIcon) {
-      if (isLoading) {
-        return <LoadingSpinner size={size} />;
-      }
-      return icon;
+      return isLoading ? <LoadingSpinner size={size} /> : icon;
     }
 
-    // 常规模式
+    // Regular mode
     const content = isLoading && loadingText ? loadingText : children;
     const displayIcon = isLoading ? <LoadingSpinner size={size} /> : icon;
 
@@ -266,19 +195,65 @@ export const Button = memo(forwardRef<HTMLButtonElement, ButtonProps>(({
     return (
       <>
         {iconPosition === 'left' && (
-          <span className={content ? 'mr-2' : ''}>
+          <span className={content ? 'mr-md' : ''}>
             {displayIcon}
           </span>
         )}
         {content}
         {iconPosition === 'right' && (
-          <span className={content ? 'ml-2' : ''}>
+          <span className={content ? 'ml-md' : ''}>
             {displayIcon}
           </span>
         )}
       </>
     );
-  };
+  }, [onlyIcon, isLoading, size, icon, loadingText, children, iconPosition]);
+
+  // Enhanced accessibility attributes
+  const accessibilityProps = useMemo(() => {
+    const ariaProps: Record<string, any> = {};
+    
+    // Set aria-label for icon-only buttons or if explicitly provided
+    if (onlyIcon && !props['aria-label'] && !tooltipText) {
+      ariaProps['aria-label'] = 'Button';
+    } else if (props['aria-label']) {
+      ariaProps['aria-label'] = props['aria-label'];
+    }
+    
+    // Loading state accessibility
+    if (isLoading) {
+      ariaProps['aria-busy'] = true;
+      ariaProps['aria-live'] = 'polite';
+      if (loadingText) {
+        ariaProps['aria-label'] = loadingText;
+      }
+    }
+    
+    // Disabled state
+    if (disabled) {
+      ariaProps['aria-disabled'] = true;
+    }
+    
+    // Toggle button states
+    if (props['aria-pressed'] !== undefined) {
+      ariaProps['aria-pressed'] = props['aria-pressed'];
+    }
+    
+    if (props['aria-expanded'] !== undefined) {
+      ariaProps['aria-expanded'] = props['aria-expanded'];
+    }
+    
+    // Other ARIA props
+    if (props['aria-describedby']) {
+      ariaProps['aria-describedby'] = props['aria-describedby'];
+    }
+    
+    if (props['aria-controls']) {
+      ariaProps['aria-controls'] = props['aria-controls'];
+    }
+    
+    return ariaProps;
+  }, [onlyIcon, props, tooltipText, isLoading, loadingText, disabled]);
 
   return (
     <button
@@ -286,9 +261,11 @@ export const Button = memo(forwardRef<HTMLButtonElement, ButtonProps>(({
       className={finalClassName}
       disabled={disabled || isLoading}
       title={tooltipText}
+      role={props.role || 'button'}
+      {...accessibilityProps}
       {...props}
     >
-      {renderContent()}
+      {buttonContent}
     </button>
   );
 }));

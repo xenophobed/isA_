@@ -61,7 +61,13 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
           <button
             onClick={onNewSession}
             disabled={isLoading}
-            className="p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 rounded-lg text-white text-sm transition-colors flex items-center gap-1"
+            className="p-2 rounded-lg text-sm transition-all flex items-center gap-1 transform hover:scale-105 active:scale-95"
+            style={{
+              background: 'var(--color-accent)',
+              color: 'white',
+              boxShadow: '0 2px 8px rgba(66, 133, 244, 0.3)',
+              opacity: isLoading ? 0.6 : 1
+            }}
             title="New Chat Session"
           >
             {isLoading ? (

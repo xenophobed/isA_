@@ -16,7 +16,7 @@
  * - 用户体验：流畅的动画和交互
  */
 
-import React, { memo, useEffect, useRef, useCallback, forwardRef } from 'react';
+import React, { memo, useEffect, useRef, useCallback, forwardRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Button, PrimaryButton, SecondaryButton } from './Button';
 
@@ -55,6 +55,11 @@ export interface ModalProps {
   footerClassName?: string;          // 底部类名
   onAfterOpen?: () => void;          // 打开后回调
   onAfterClose?: () => void;         // 关闭后回调
+  // Accessibility props
+  'aria-label'?: string;             // ARIA label
+  'aria-describedby'?: string;       // ARIA description
+  'aria-labelledby'?: string;        // ARIA label reference
+  initialFocus?: React.RefObject<HTMLElement>; // Initial focus element
 }
 
 export interface ConfirmModalProps {
@@ -74,48 +79,53 @@ export interface ConfirmModalProps {
 // 样式配置
 // ================================================================================
 
-const getSizeClasses = (size: ModalSize): string => {
-  const sizes = {
-    xs: 'max-w-xs',
-    sm: 'max-w-sm', 
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-2xl',
-    full: 'max-w-full w-full h-full'
-  };
+// Optimized size and variant classes using design system
+const SIZE_CLASSES = {
+  xs: 'max-w-xs',
+  sm: 'max-w-sm', 
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-2xl',
+  full: 'max-w-full w-full h-full'
+} as const;
 
-  return sizes[size];
-};
+const VARIANT_CLASSES = {
+  default: '',
+  confirmation: 'text-center',
+  alert: 'text-center',
+  form: '',
+  image: 'p-0 bg-transparent border-0',
+  drawer: 'h-full max-h-full rounded-none'
+} as const;
 
-const getVariantClasses = (variant: ModalVariant): string => {
-  const variants = {
-    default: '',
-    confirmation: 'text-center',
-    alert: 'text-center',
-    form: '',
-    image: 'p-0 bg-transparent border-0',
-    drawer: 'h-full max-h-full rounded-none'
-  };
-
-  return variants[variant];
-};
+const getSizeClasses = (size: ModalSize): string => SIZE_CLASSES[size];
+const getVariantClasses = (variant: ModalVariant): string => VARIANT_CLASSES[variant];
 
 // ================================================================================
 // Hooks
 // ================================================================================
 
-// 焦点管理Hook
-const useFocusTrap = (isOpen: boolean, modalRef: React.RefObject<HTMLElement>) => {
+// Enhanced focus management Hook with accessibility improvements
+const useFocusTrap = (
+  isOpen: boolean, 
+  modalRef: React.RefObject<HTMLElement>,
+  initialFocus?: React.RefObject<HTMLElement>
+) => {
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
 
     const modal = modalRef.current;
     if (!modal) return;
 
-    // 获取可聚焦元素
+    // Store the previously focused element
+    previousFocusRef.current = document.activeElement as HTMLElement;
+
+    // 获取可聚焦元素 (enhanced selector)
     const getFocusableElements = () => {
       return modal.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]):not([disabled]), [contenteditable="true"]'
       ) as NodeListOf<HTMLElement>;
     };
 
@@ -123,11 +133,25 @@ const useFocusTrap = (isOpen: boolean, modalRef: React.RefObject<HTMLElement>) =
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
 
-    // 聚焦第一个元素
-    firstElement?.focus();
+    // Focus initial element or first focusable element
+    const elementToFocus = initialFocus?.current || firstElement;
+    elementToFocus?.focus();
 
     const handleTabKey = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
+
+      // If no focusable elements, prevent default
+      if (focusableElements.length === 0) {
+        e.preventDefault();
+        return;
+      }
+
+      // Handle single focusable element
+      if (focusableElements.length === 1) {
+        e.preventDefault();
+        firstElement.focus();
+        return;
+      }
 
       if (e.shiftKey) {
         if (document.activeElement === firstElement) {
@@ -143,15 +167,22 @@ const useFocusTrap = (isOpen: boolean, modalRef: React.RefObject<HTMLElement>) =
     };
 
     document.addEventListener('keydown', handleTabKey);
-    return () => document.removeEventListener('keydown', handleTabKey);
-  }, [isOpen, modalRef]);
+    
+    return () => {
+      document.removeEventListener('keydown', handleTabKey);
+      // Restore focus to previous element when modal closes
+      if (previousFocusRef.current) {
+        previousFocusRef.current.focus();
+      }
+    };
+  }, [isOpen, modalRef, initialFocus]);
 };
 
 // ================================================================================
 // 子组件
 // ================================================================================
 
-// 遮罩层组件
+// Optimized overlay component
 const Overlay: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -160,42 +191,25 @@ const Overlay: React.FC<{
   zIndex: number;
 }> = memo(({ isOpen, onClose, maskClosable, className = '', zIndex }) => {
   const handleClick = useCallback(() => {
-    if (maskClosable) {
-      onClose();
-    }
+    if (maskClosable) onClose();
   }, [maskClosable, onClose]);
 
   if (!isOpen) return null;
 
   return (
     <div
-      className={`
-        fixed inset-0 backdrop-blur-sm
-        transition-opacity duration-300 ease-out
-        ${className}
-      `}
-      style={{ 
-        background: 'var(--glass-primary)',
-        zIndex 
-      }}
+      className={`fixed inset-0 glass-primary backdrop-blur-sm transition-opacity duration-slow ease-out ${className}`}
+      style={{ zIndex }}
       onClick={handleClick}
     />
   );
 });
 
-// 关闭按钮组件
+// Optimized close button component
 const CloseButton: React.FC<{ onClose: () => void }> = memo(({ onClose }) => (
   <button
     onClick={onClose}
-    className="
-      absolute top-4 right-4 w-8 h-8 
-      bg-white/10 hover:bg-white/20 
-      border border-white/20 hover:border-white/30
-      rounded-lg transition-all duration-200
-      flex items-center justify-center
-      text-white/70 hover:text-white
-      z-10
-    "
+    className="absolute top-lg right-lg w-8 h-8 glass-secondary hover:bg-white/20 border-glass-border hover:border-glass-border-hover rounded-lg transition-all duration-normal layout-center text-white/70 hover:text-white z-10 interactive"
     aria-label="关闭弹窗"
   >
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -228,12 +242,16 @@ export const Modal = memo(forwardRef<HTMLDivElement, ModalProps>(({
   headerClassName = '',
   footerClassName = '',
   onAfterOpen,
-  onAfterClose
+  onAfterClose,
+  initialFocus,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
+  'aria-describedby': ariaDescribedBy
 }, ref) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // 焦点管理
-  useFocusTrap(isOpen, modalRef);
+  // Enhanced focus management with accessibility
+  useFocusTrap(isOpen, modalRef, initialFocus);
 
   // 键盘事件处理
   useEffect(() => {
@@ -298,21 +316,22 @@ export const Modal = memo(forwardRef<HTMLDivElement, ModalProps>(({
         <div
           ref={modalRef}
           className={`
-            backdrop-blur-lg rounded-xl shadow-2xl
-            transform transition-all duration-300 ease-out
+            glass-primary backdrop-blur-lg rounded-2xl shadow-2xl
+            transform transition-all duration-slow ease-out
             ${getSizeClasses(size)}
             ${getVariantClasses(variant)}
-            ${isOpen ? 'translate-y-0' : 'translate-y-4'}
+            ${isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-lg opacity-0 scale-95'}
             ${className}
           `}
           style={{
-            background: 'var(--glass-primary)',
-            border: '1px solid var(--glass-border)',
-            boxShadow: '0 8px 32px var(--accent-soft)20, 0 0 40px var(--accent-muted)10'
+            boxShadow: 'var(--shadow-2xl), 0 0 40px var(--color-primary)20'
           }}
           role="dialog"
           aria-modal="true"
-          aria-labelledby={title ? 'modal-title' : undefined}
+          aria-labelledby={ariaLabelledBy || (title ? 'modal-title' : undefined)}
+          aria-describedby={ariaDescribedBy}
+          aria-label={ariaLabel}
+          tabIndex={-1}
         >
           {/* 关闭按钮 */}
           {closable && variant !== 'image' && (
@@ -321,11 +340,10 @@ export const Modal = memo(forwardRef<HTMLDivElement, ModalProps>(({
 
           {/* 头部 */}
           {title && (
-            <div className={`px-6 py-4 ${headerClassName}`} style={{ borderBottom: '1px solid var(--glass-border)' }}>
+            <div className={`px-2xl py-xl border-b border-glass-border ${headerClassName}`}>
               <h2 
                 id="modal-title"
-                className="text-lg font-semibold"
-                style={{ color: 'var(--text-primary)' }}
+                className="text-lg font-semibold text-primary"
               >
                 {title}
               </h2>
@@ -334,8 +352,8 @@ export const Modal = memo(forwardRef<HTMLDivElement, ModalProps>(({
 
           {/* 内容区域 */}
           <div className={`
-            ${title ? 'px-6 py-4' : 'p-6'}
-            ${footer ? 'pb-4' : ''}
+            ${title ? 'px-2xl py-xl' : 'p-2xl'}
+            ${footer ? 'pb-lg' : ''}
             ${bodyClassName}
           `}>
             {children}
@@ -343,7 +361,7 @@ export const Modal = memo(forwardRef<HTMLDivElement, ModalProps>(({
 
           {/* 底部 */}
           {footer && (
-            <div className={`px-6 py-4 border-t border-white/10 ${footerClassName}`}>
+            <div className={`px-2xl py-xl border-t border-glass-border ${footerClassName}`}>
               {footer}
             </div>
           )}
@@ -416,7 +434,7 @@ export const ConfirmModal: React.FC<ModalProps & ConfirmModalProps> = ({
       variant="confirmation"
       size="sm"
       footer={
-        <div className="flex gap-3 justify-center">
+        <div className="layout-center gap-lg">
           <SecondaryButton
             onClick={handleCancel}
             {...cancelButtonProps}
@@ -435,9 +453,9 @@ export const ConfirmModal: React.FC<ModalProps & ConfirmModalProps> = ({
     >
       <div className="text-center">
         {getIcon()}
-        <h3 className="text-lg font-medium text-white mb-2">{title}</h3>
+        <h3 className="text-lg font-medium text-primary mb-md">{title}</h3>
         {content && (
-          <div className="text-white/80">
+          <div className="text-secondary">
             {content}
           </div>
         )}
@@ -458,13 +476,14 @@ export const ImageModal: React.FC<ModalProps & { src: string; alt?: string }> = 
       variant="image"
       size="full"
       closable={true}
-      className="flex items-center justify-center"
+      className="layout-center"
     >
       <div className="relative max-w-full max-h-full">
         <img
           src={src}
           alt={alt}
-          className="max-w-full max-h-full object-contain rounded-lg"
+          className="max-w-full max-h-full object-contain rounded-xl animate-scale-in"
+          loading="lazy"
         />
       </div>
     </Modal>

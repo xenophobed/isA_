@@ -19,34 +19,442 @@ a {
   box-sizing: border-box;
 }
 
-/* Elegant Dark System - Inspired by Luma Dream Machine */
+/* ============================================================================
+ * DESIGN SYSTEM - Unified Design Tokens (Dark Theme Default)
+ * ============================================================================ */
 :root {
+  /* Color System - Base Tokens */
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-300: #cbd5e1;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+  --color-neutral-950: #020617;
+
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-indigo-500: #6366f1;
+  --color-indigo-600: #4f46e5;
+  --color-purple-500: #8b5cf6;
+  --color-purple-600: #7c3aed;
+  --color-violet-500: #a855f7;
+  --color-violet-600: #9333ea;
+
+  /* Semantic Color Tokens */
+  --color-primary: var(--color-indigo-500);
+  --color-primary-hover: var(--color-indigo-600);
+  --color-secondary: var(--color-purple-500);
+  --color-secondary-hover: var(--color-purple-600);
+  --color-accent: var(--color-violet-500);
+  --color-accent-hover: var(--color-violet-600);
+
+  /* Background System */
   --gradient-primary: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
-  --gradient-secondary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
-  --gradient-tertiary: linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #8b5cf6 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 50%, var(--color-accent) 100%);
+  --gradient-tertiary: linear-gradient(135deg, var(--color-blue-500) 0%, var(--color-primary) 50%, var(--color-secondary) 100%);
   --gradient-surface: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
   --gradient-overlay: linear-gradient(135deg, rgba(99, 102, 241, 0.02) 0%, rgba(139, 92, 246, 0.02) 100%);
+
+  /* Glass System */
   --glass-primary: rgba(15, 15, 35, 0.8);
   --glass-secondary: rgba(26, 26, 46, 0.9);
+  --glass-tertiary: rgba(30, 41, 59, 0.7);
   --glass-border: rgba(99, 102, 241, 0.1);
-  --accent-soft: #6366f1;
-  --accent-muted: #8b5cf6;
-  --accent-subtle: #a855f7;
-  --text-primary: #f8fafc;
-  --text-secondary: #e2e8f0;
-  --text-muted: #94a3b8;
+  --glass-border-hover: rgba(99, 102, 241, 0.2);
+  --glass-border-active: rgba(99, 102, 241, 0.3);
+  --glass-border-focused: rgba(99, 102, 241, 0.4);
+  --glass-border-subtle: rgba(255, 255, 255, 0.05);
+  --glass-border-strong: rgba(99, 102, 241, 0.5);
+
+  /* Text System */
+  --text-primary: var(--color-neutral-50);
+  --text-secondary: var(--color-neutral-200);
+  --text-muted: var(--color-neutral-400);
+  --text-disabled: var(--color-neutral-600);
+  --text-high-contrast: #ffffff;
+  --text-inverse: var(--color-neutral-900);
+  --text-accent: var(--color-primary);
+  --text-success: #10b981;
+  --text-warning: #f59e0b;
+  --text-danger: #ef4444;
+
+  /* Spacing System */
+  --space-xs: 0.25rem;    /* 4px */
+  --space-sm: 0.5rem;     /* 8px */
+  --space-md: 0.75rem;    /* 12px */
+  --space-lg: 1rem;       /* 16px */
+  --space-xl: 1.25rem;    /* 20px */
+  --space-2xl: 1.5rem;    /* 24px */
+  --space-3xl: 2rem;      /* 32px */
+  --space-4xl: 2.5rem;    /* 40px */
+  --space-5xl: 3rem;      /* 48px */
+
+  /* Border Radius System */
+  --radius-xs: 0.25rem;   /* 4px */
+  --radius-sm: 0.5rem;    /* 8px */
+  --radius-md: 0.75rem;   /* 12px */
+  --radius-lg: 1rem;      /* 16px */
+  --radius-xl: 1.25rem;   /* 20px */
+  --radius-2xl: 1.5rem;   /* 24px */
+  --radius-full: 9999px;
+
+  /* Shadow System */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --shadow-glow: 0 0 20px var(--color-primary), 0 0 40px var(--color-primary);
+  --shadow-glow-secondary: 0 0 20px var(--color-secondary), 0 0 40px var(--color-secondary);
+
+  /* Animation System */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+  --easing-ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-ease-in-out: cubic-bezier(0.4, 0, 0.6, 1);
+  --easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --easing-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --easing-smooth: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  /* Component Specific */
   --bottom-area-height: 80px;
+  --bottom-area-height-mobile: 70px;
+  --sidebar-width: 16.67%;
+  --sidebar-width-expanded: 25%;
+
+  /* Legacy aliases for backward compatibility */
+  --accent-soft: var(--color-primary);
+  --accent-muted: var(--color-secondary);
+  --accent-subtle: var(--color-accent);
 }
 
+/* ============================================================================
+ * LIGHT THEME - Override variables for light mode
+ * ============================================================================ */
+[data-theme="light"] {
+  /* Base colors - Gemini-inspired clean design */
+  --color-background: #ffffff;
+  --color-surface: #f8f9fa;
+  --color-surface-secondary: #f1f3f4;
+  --color-surface-tertiary: #e8eaed;
+  
+  /* Text colors - High contrast like Gemini */
+  --text-primary: #0d1421;
+  --text-secondary: #3c4043;
+  --text-muted: #5f6368;
+  --text-disabled: #9aa0a6;
+  --text-inverse: #ffffff;
+  
+  /* Background System - Gemini-style clean gradients */
+  --gradient-primary: linear-gradient(135deg, #ffffff 0%, #f8f9fa 50%, #f1f3f4 100%);
+  --gradient-secondary: linear-gradient(135deg, #4285f4 0%, #34a853 20%, #fbbc04 40%, #ea4335 60%, #9c27b0 80%, #ff6d01 100%);
+  --gradient-tertiary: linear-gradient(135deg, #4285f4 0%, #1a73e8 50%, #1565c0 100%);
+  --gradient-surface: linear-gradient(135deg, rgba(66, 133, 244, 0.04) 0%, rgba(52, 168, 83, 0.04) 100%);
+  --gradient-overlay: linear-gradient(135deg, rgba(66, 133, 244, 0.02) 0%, rgba(52, 168, 83, 0.02) 100%);
+
+  /* Glass System - Clean and minimal */
+  --glass-primary: rgba(255, 255, 255, 0.9);
+  --glass-secondary: rgba(248, 249, 250, 0.85);
+  --glass-tertiary: rgba(241, 243, 244, 0.8);
+  --glass-border: rgba(66, 133, 244, 0.12);
+  --glass-border-hover: rgba(66, 133, 244, 0.18);
+  --glass-border-active: rgba(66, 133, 244, 0.24);
+  --glass-border-subtle: rgba(66, 133, 244, 0.06);
+  
+  /* Accent colors - Gemini blue as primary */
+  --color-accent: #4285f4;
+  --accent-soft: rgba(66, 133, 244, 0.08);
+  --accent-medium: rgba(66, 133, 244, 0.12);
+  --accent-strong: rgba(66, 133, 244, 0.16);
+  
+  /* Shadows - Soft, natural like Gemini */
+  --shadow-sm: 0 1px 3px rgba(60, 64, 67, 0.08);
+  --shadow-md: 0 2px 8px rgba(60, 64, 67, 0.1);
+  --shadow-lg: 0 4px 16px rgba(60, 64, 67, 0.12);
+  --shadow-xl: 0 8px 32px rgba(60, 64, 67, 0.15);
+
+  /* Status colors for light theme */
+  --text-success: #137333;
+  --text-warning: #b06000;
+  --text-danger: #c5221f;
+}
+
+/* Default dark theme body styles */
+body {
+  color: var(--text-primary);
+  background: var(--gradient-primary);
+  min-height: 100vh;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* System preference for dark mode */
 @media (prefers-color-scheme: dark) {
   html {
     color-scheme: dark;
   }
-  body {
-    color: white;
-    background: var(--gradient-primary);
-    min-height: 100vh;
-  }
+}
+
+/* Light theme body overrides */
+[data-theme="light"] body {
+  color: var(--text-primary);
+  background: var(--gradient-primary);
+}
+
+/* Light theme specific enhancements */
+[data-theme="light"] {
+  /* Input area specific styling for light theme */
+}
+
+[data-theme="light"] .input-area-container {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(66, 133, 244, 0.12) !important;
+  box-shadow: 0 2px 8px rgba(60, 64, 67, 0.08), 0 1px 3px rgba(60, 64, 67, 0.1) !important;
+}
+
+[data-theme="light"] .user-area-container {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(66, 133, 244, 0.08) !important;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.05) !important;
+}
+
+[data-theme="light"] .user-area-container:hover {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(66, 133, 244, 0.12) !important;
+  box-shadow: 0 2px 8px rgba(60, 64, 67, 0.08) !important;
+}
+
+[data-theme="light"] .widget-management-area {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(66, 133, 244, 0.08) !important;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.05) !important;
+}
+
+[data-theme="light"] .widget-management-area:hover {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(66, 133, 244, 0.12) !important;
+  box-shadow: 0 2px 8px rgba(60, 64, 67, 0.08) !important;
+}
+
+/* ============================================================================
+ * LIGHT THEME TEXT COLOR FIXES - Fix white/gray text visibility
+ * ============================================================================ */
+
+/* Base white text variations */
+[data-theme="light"] .text-white {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .text-gray-300 {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .text-gray-400 {
+  color: var(--text-muted) !important;
+}
+
+/* Hover effects for light theme */
+[data-theme="light"] .group-hover\:text-white {
+  color: var(--text-muted);
+}
+
+[data-theme="light"] .group-hover\:text-white:hover {
+  color: var(--text-primary) !important;
+}
+
+/* Secondary text classes */
+[data-theme="light"] .text-secondary {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="light"] .text-muted {
+  color: var(--text-muted) !important;
+}
+
+/* White text with opacity variations */
+[data-theme="light"] .text-white\/40 {
+  color: var(--text-disabled) !important;
+}
+
+[data-theme="light"] .text-white\/60 {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="light"] .text-white\/70 {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="light"] .text-white\/80 {
+  color: var(--text-primary) !important;
+}
+
+/* Specific gray variations */
+[data-theme="light"] .text-gray-500 {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="light"] .text-gray-600 {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="light"] .text-gray-700 {
+  color: var(--text-primary) !important;
+}
+
+/* Status colors - Gemini brand colors */
+[data-theme="light"] .text-green-400 {
+  color: #34a853 !important;
+}
+
+[data-theme="light"] .text-blue-400 {
+  color: #4285f4 !important;
+}
+
+[data-theme="light"] .text-orange-400 {
+  color: #ff6d01 !important;
+}
+
+[data-theme="light"] .text-yellow-400 {
+  color: #fbbc04 !important;
+}
+
+[data-theme="light"] .text-purple-400 {
+  color: #9c27b0 !important;
+}
+
+[data-theme="light"] .text-red-400 {
+  color: #ea4335 !important;
+}
+
+/* Fix any hardcoded white backgrounds that should be transparent or light */
+[data-theme="light"] .bg-white\/5 {
+  background-color: rgba(66, 133, 244, 0.02) !important;
+}
+
+[data-theme="light"] .bg-white\/10 {
+  background-color: rgba(66, 133, 244, 0.04) !important;
+}
+
+/* Gemini-style accent colors for status indicators */
+[data-theme="light"] .bg-green-400 {
+  background-color: #34a853 !important;
+}
+
+[data-theme="light"] .bg-blue-400 {
+  background-color: #4285f4 !important;
+}
+
+[data-theme="light"] .bg-yellow-400 {
+  background-color: #fbbc04 !important;
+}
+
+[data-theme="light"] .bg-red-400 {
+  background-color: #ea4335 !important;
+}
+
+[data-theme="light"] .bg-purple-400 {
+  background-color: #9c27b0 !important;
+}
+
+/* Ensure borders are visible in light theme */
+[data-theme="light"] .border-white\/10 {
+  border-color: rgba(66, 133, 244, 0.08) !important;
+}
+
+[data-theme="light"] .border-white\/20 {
+  border-color: rgba(66, 133, 244, 0.12) !important;
+}
+
+/* Gemini-style card and panel styling */
+[data-theme="light"] .glass-primary {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(66, 133, 244, 0.08) !important;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.05) !important;
+}
+
+[data-theme="light"] .glass-secondary {
+  background: rgba(248, 249, 250, 0.85) !important;
+  border: 1px solid rgba(66, 133, 244, 0.06) !important;
+}
+
+/* Session item styling for light theme */
+[data-theme="light"] .bg-blue-500\/20 {
+  background-color: rgba(66, 133, 244, 0.08) !important;
+}
+
+[data-theme="light"] .border-blue-500\/50 {
+  border-color: rgba(66, 133, 244, 0.12) !important;
+}
+
+[data-theme="light"] .shadow-blue-500\/10 {
+  box-shadow: 0 2px 8px rgba(66, 133, 244, 0.08) !important;
+}
+
+[data-theme="light"] .text-blue-300 {
+  color: #1a73e8 !important;
+}
+
+/* Fix input placeholder color in light theme */
+[data-theme="light"] .chat-input::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 0.8 !important;
+}
+
+/* Chat input styling for light theme - Gemini style */
+[data-theme="light"] .chat-input {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(66, 133, 244, 0.12) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.08) !important;
+}
+
+[data-theme="light"] .chat-input:focus {
+  border-color: rgba(66, 133, 244, 0.24) !important;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.08), 0 0 0 3px rgba(66, 133, 244, 0.08) !important;
+}
+
+/* Message bubbles for light theme */
+[data-theme="light"] .glass-primary {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(66, 133, 244, 0.08) !important;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.05) !important;
+}
+
+/* User message bubble styling */
+[data-theme="light"] .user-message {
+  background: linear-gradient(135deg, #4285f4 0%, #1a73e8 100%) !important;
+  color: white !important;
+  box-shadow: 0 2px 8px rgba(66, 133, 244, 0.2) !important;
+}
+
+/* Button styling for light theme */
+[data-theme="light"] .glass-button {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(66, 133, 244, 0.12) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.08) !important;
+}
+
+[data-theme="light"] .glass-button:hover {
+  background: rgba(248, 249, 250, 0.95) !important;
+  border-color: rgba(66, 133, 244, 0.18) !important;
+  box-shadow: 0 2px 6px rgba(60, 64, 67, 0.1) !important;
+}
+
+/* Fix any other common UI text elements */
+[data-theme="light"] .text-center {
+  color: inherit;
+}
+
+[data-theme="light"] .animate-pulse {
+  color: inherit;
 }
 
 /* ============================================================================
@@ -59,7 +467,7 @@ a {
   --bottom-area-height-mobile: 70px;
 }
 
-/* InputAreaLayout - Elegant Dark Container with Fixed Height */
+/* InputAreaLayout - Floating Modern Container with Max Width */
 div.input-area-container {
   padding: 16px 20px !important;
   background: var(--glass-primary) !important;
@@ -73,6 +481,22 @@ div.input-area-container {
   position: relative !important;
   box-shadow: 0 8px 32px var(--accent-soft)20 !important;
   border-radius: 20px !important;
+  margin: 0 auto 16px auto !important; /* 居中显示，底部间距 */
+  max-width: 800px !important; /* 限制最大宽度 */
+  width: calc(100% - 32px) !important; /* 左右各16px间距 */
+}
+
+/* 超大屏幕适配 */
+@media (min-width: 1400px) {
+  div.input-area-container {
+    max-width: 1000px !important; /* 超大屏幕可以稍微宽一点 */
+  }
+}
+
+@media (min-width: 1920px) {
+  div.input-area-container {
+    max-width: 1200px !important; /* 4K屏幕的合理宽度 */
+  }
 }
 
 /* Mobile responsive adjustments */
@@ -82,6 +506,9 @@ div.input-area-container {
     min-height: var(--bottom-area-height-mobile) !important;
     max-height: var(--bottom-area-height-mobile) !important;
     border-radius: 16px !important;
+    max-width: none !important; /* 移动端移除最大宽度限制 */
+    width: calc(100% - 16px) !important; /* 移动端减少边距 */
+    margin: 0 auto 8px auto !important; /* 移动端减少底部间距 */
   }
 }
 
@@ -292,19 +719,28 @@ div.input-area-container .suggestions-panel {
   }
 }
 
-/* User Area Container - 统一样式 */
+/* User Area Container - 轻量化设计 */
 .user-area-container {
   min-height: var(--bottom-area-height) !important;
   max-height: var(--bottom-area-height) !important;
-  background: var(--glass-primary) !important;
-  backdrop-filter: blur(20px) saturate(120%) !important;
-  border: 1px solid var(--glass-border) !important;
+  background: var(--glass-tertiary) !important;
+  backdrop-filter: blur(10px) saturate(110%) !important; 
+  border: 1px solid var(--glass-border-subtle) !important;
   border-radius: 20px !important;
-  box-shadow: 0 8px 32px var(--accent-soft)20 !important;
+  box-shadow: var(--shadow-md) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   padding: 16px 20px !important;
+  margin: 0 16px 16px 16px !important; /* 添加间距 */
+  transition: all 0.3s ease !important; /* 添加过渡效果 */
+}
+
+/* 悬停效果 */
+.user-area-container:hover {
+  background: var(--glass-secondary) !important;
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--shadow-lg) !important;
 }
 
 @media (max-width: 768px) {
@@ -340,19 +776,28 @@ div.input-area-container .suggestions-panel {
   }
 }
 
-/* Widget Management Area - 统一样式 */
+/* Widget Management Area - 轻量化设计 */
 .widget-management-area {
   min-height: var(--bottom-area-height) !important;
   max-height: var(--bottom-area-height) !important;
-  background: var(--glass-primary) !important;
-  backdrop-filter: blur(20px) saturate(120%) !important;
-  border: 1px solid var(--glass-border) !important;
+  background: var(--glass-tertiary) !important;
+  backdrop-filter: blur(10px) saturate(110%) !important;
+  border: 1px solid var(--glass-border-subtle) !important;
   border-radius: 20px !important;
-  box-shadow: 0 8px 32px var(--accent-soft)20 !important;
+  box-shadow: var(--shadow-md) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   padding: 16px 20px !important;
+  margin: 0 16px 16px 16px !important; /* 添加间距 */
+  transition: all 0.3s ease !important; /* 添加过渡效果 */
+}
+
+/* 悬停效果 */
+.widget-management-area:hover {
+  background: var(--glass-secondary) !important;
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--shadow-lg) !important;
 }
 
 @media (max-width: 768px) {

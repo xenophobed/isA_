@@ -20,7 +20,7 @@
  * - 在新架构中被ChatContentLayout使用
  * - 不处理业务逻辑，只负责消息的视觉呈现
  */
-import React, { memo, useEffect, useState } from 'react';
+import React, { memo, useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { ChatMessage, ArtifactMessage } from '../../../types/chatTypes';
 import { ArtifactComponent } from './ArtifactComponent';
 import { ArtifactMessageComponent } from './ArtifactMessageComponent';
@@ -47,8 +47,59 @@ export interface MessageListProps {
   isLoading?: boolean;
   isTyping?: boolean;
   onSendMessage?: (message: string) => void;
-  // Message actions will be implemented later
+  // Virtual scrolling properties
+  virtualized?: boolean;
+  itemHeight?: number;
+  containerHeight?: number;
+  overscan?: number;
 }
+
+// Virtual scrolling hook for performance optimization
+const useVirtualScrolling = (
+  items: any[],
+  containerHeight: number,
+  itemHeight: number,
+  overscan: number = 5
+) => {
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const visibleRange = useMemo(() => {
+    const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
+    const endIndex = Math.min(
+      items.length - 1,
+      Math.ceil((scrollTop + containerHeight) / itemHeight) + overscan
+    );
+    return { startIndex, endIndex };
+  }, [scrollTop, containerHeight, itemHeight, overscan, items.length]);
+
+  const visibleItems = useMemo(() => {
+    return items.slice(visibleRange.startIndex, visibleRange.endIndex + 1).map((item, index) => ({
+      ...item,
+      virtualIndex: visibleRange.startIndex + index,
+      style: {
+        position: 'absolute' as const,
+        top: (visibleRange.startIndex + index) * itemHeight,
+        height: itemHeight,
+        width: '100%'
+      }
+    }));
+  }, [items, visibleRange, itemHeight]);
+
+  const totalHeight = items.length * itemHeight;
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setScrollTop(e.currentTarget.scrollTop);
+  }, []);
+
+  return {
+    containerRef,
+    visibleItems,
+    totalHeight,
+    handleScroll,
+    visibleRange
+  };
+};
 
 /**
  * MessageList - Pure UI component for displaying chat messages
@@ -64,9 +115,23 @@ export const MessageList = memo<MessageListProps>(({
   messages = [],
   isLoading = false,
   isTyping = false,
-  onSendMessage
+  onSendMessage,
+  // Virtual scrolling props
+  virtualized = false,
+  itemHeight = 120,
+  containerHeight = 400,
+  overscan = 5,
 }) => {
-  // 完全禁用日志以解决无限循环问题
+  // Virtual scrolling setup
+  const virtualScroll = useVirtualScrolling(
+    messages,
+    containerHeight,
+    itemHeight,
+    overscan
+  );
+  
+  // Determine which messages to render
+  const messagesToRender = virtualized ? virtualScroll.visibleItems : messages;
   
   // useEffect(() => {
   //   if (process.env.NODE_ENV === 'development') {
@@ -121,7 +186,7 @@ export const MessageList = memo<MessageListProps>(({
                    artifactMessage.artifact.widgetType === 'knowledge' ? '🧠' :
                    artifactMessage.artifact.widgetType === 'data_scientist' ? '📊' : '🤖'}
                 </div>
-                <span className="ml-2 text-sm font-medium text-gray-300">
+                <span className="ml-2 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                   {artifactMessage.artifact.widgetName || artifactMessage.artifact.widgetType}
                 </span>
               </div>
@@ -172,7 +237,7 @@ export const MessageList = memo<MessageListProps>(({
                 }}>
                   {appIcon}
                 </div>
-                <span className="ml-2 text-sm font-medium text-gray-300">{appName}</span>
+                <span className="ml-2 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{appName}</span>
                 {isStreaming && (
                   <div className="ml-3 flex items-center space-x-2 bg-white/5 px-3 py-1 rounded-full border border-white/10">
                     <div className="flex space-x-1">
@@ -180,11 +245,23 @@ export const MessageList = memo<MessageListProps>(({
                       <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-pulse delay-75 shadow-sm shadow-blue-300/30"></div>
                       <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-pulse delay-150 shadow-sm shadow-blue-200/20"></div>
                     </div>
-                    <span className="text-white/70 text-xs font-medium">
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
                       {message.streamingStatus || 'Processing...'}
                     </span>
                   </div>
                 )}
+                
+                {/* Compact Task Progress in artifact header - always show for AI messages */}
+                <div className="ml-3">
+                  <TaskProgressMessage 
+                    messageId={message.id}
+                    compact={true}
+                    showControls={false}
+                    inline={true}
+                    isStreaming={isStreaming}
+                    className="text-xs"
+                  />
+                </div>
               </div>
             )}
             
@@ -252,9 +329,23 @@ export const MessageList = memo<MessageListProps>(({
                     <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-pulse delay-75 shadow-sm shadow-blue-300/30"></div>
                     <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-pulse delay-150 shadow-sm shadow-blue-200/20"></div>
                   </div>
-                  <span className="text-white/70 text-xs font-medium">
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
                     {message.streamingStatus}
                   </span>
+                </div>
+              )}
+              
+              {/* Compact Task Progress in message header - always show for AI messages */}
+              {message.role === 'assistant' && (
+                <div className="ml-3">
+                  <TaskProgressMessage 
+                    messageId={message.id}
+                    compact={true}
+                    showControls={false}
+                    inline={true}
+                    isStreaming={isStreaming}
+                    className="text-xs"
+                  />
                 </div>
               )}
             </div>
@@ -302,89 +393,108 @@ export const MessageList = memo<MessageListProps>(({
                   <div className="w-2 h-2 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-bounce delay-100 shadow-md shadow-blue-300/30"></div>
                   <div className="w-2 h-2 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-bounce delay-200 shadow-sm shadow-blue-200/20"></div>
                 </div>
-                <span className="text-white/60 text-xs">Processing...</span>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Processing...</span>
               </div>
             ) : null}
           </div>
           
-          {/* Task Progress Display for streaming assistant messages */}
-          {message.role === 'assistant' && isStreaming && (
-            <TaskProgressMessage 
-              messageId={message.id}
-              compact={true}
-              showControls={true}
-              className="mt-2 ml-10"
-            />
-          )}
         </div>
+      </div>
+    );
+  };
+
+  // Render virtual or regular content
+  const renderContent = () => {
+    if (virtualized) {
+      return (
+        <div
+          ref={virtualScroll.containerRef}
+          className={`conversation-stream ${className}`}
+          style={{
+            height: containerHeight,
+            overflow: 'auto',
+            position: 'relative'
+          }}
+          onScroll={virtualScroll.handleScroll}
+        >
+          <div style={{ height: virtualScroll.totalHeight, position: 'relative' }}>
+            {messagesToRender.map((message, index) => (
+              <div key={`${message.id}-virtual-${message.virtualIndex}`} style={message.style}>
+                {renderMessage(message, message.virtualIndex)}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={`conversation-stream ${className}`}>
+        {/* Dynamic Widget-Driven Welcome */}
+        {messages.length === 0 && (
+          <ChatWelcome onSendMessage={onSendMessage} />
+        )}
+
+        {/* Messages - Regular rendering */}
+        {messagesToRender.map((message, index) => (
+          <div key={`${message.id}-${index}`}>
+            {renderMessage(message, index)}
+          </div>
+        ))}
       </div>
     );
   };
 
   return (
     <TaskHandler>
-      <div className={`conversation-stream ${className}`}>
-      
-      {/* Dynamic Widget-Driven Welcome */}
-      {messages.length === 0 && (
-        <ChatWelcome onSendMessage={onSendMessage} />
-      )}
+      <div className={virtualized ? '' : 'relative'}>
+        {renderContent()}
 
-      {/* Messages - 现在包含流式消息 */}
-      {messages.map((message, index) => (
-        <div key={`${message.id}-${index}`}>
-          {renderMessage(message, index)}
-        </div>
-      ))}
+        {/* Show additional content only in non-virtualized mode or append to container */}
+        {!virtualized && (
+          <>
 
-      {/* Chat Embedded Task Panel - Persistent task execution display */}
-      <ChatEmbeddedTaskPanel 
-        className="mb-6"
-        initialCollapsed={false}
-        onTaskAction={(taskId, action) => {
-          console.log(`Task ${action} requested for task ${taskId}`);
-        }}
-      />
-
-      {/* Typing indicator - 只在没有流式消息时显示 */}
-      {isTyping && !messages.some(m => m.isStreaming) && (
-        <div className="flex justify-start mb-4">
-          <div className="max-w-[80%]">
-            {showAvatars && (
-              <div className="flex items-center mb-2">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: 'var(--glass-secondary)', color: 'var(--text-primary)' }}>
-                  AI
+            {/* Typing indicator */}
+            {isTyping && !messages.some(m => m.isStreaming) && (
+              <div className="flex justify-start mb-4">
+                <div className="max-w-[80%]">
+                  {showAvatars && (
+                    <div className="flex items-center mb-2">
+                      <div className="w-8 h-8 rounded-full layout-center text-sm font-bold glass-secondary text-primary">
+                        AI
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="p-lg rounded-xl glass-primary border border-glass-border">
+                    <div className="layout-start space-x-2">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-bounce shadow-lg shadow-blue-400/50"></div>
+                        <div className="w-2 h-2 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-bounce delay-100 shadow-md shadow-blue-300/30"></div>
+                        <div className="w-2 h-2 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-bounce delay-200 shadow-sm shadow-blue-200/20"></div>
+                      </div>
+                      <span className="text-sm" style={{ color: 'var(--text-muted)' }}>AI is typing...</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
-            
-            <div className="p-3 rounded-lg" style={{ background: 'var(--glass-primary)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
-              <div className="flex items-center space-x-2">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-bounce shadow-lg shadow-blue-400/50"></div>
-                  <div className="w-2 h-2 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-bounce delay-100 shadow-md shadow-blue-300/30"></div>
-                  <div className="w-2 h-2 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-bounce delay-200 shadow-sm shadow-blue-200/20"></div>
-                </div>
-                <span className="text-white/70 text-sm">AI is typing...</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Loading indicator - 只在没有流式消息时显示 */}
-      {isLoading && !isTyping && !messages.some(m => m.isStreaming) && (
-        <div className="text-center py-4">
-          <div className="flex items-center justify-center space-x-2">
-            <div className="flex space-x-1">
-              <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-bounce shadow-lg shadow-blue-400/50"></div>
-              <div className="w-3 h-3 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-bounce delay-100 shadow-md shadow-blue-300/30"></div>
-              <div className="w-3 h-3 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-bounce delay-200 shadow-sm shadow-blue-200/20"></div>
-            </div>
-            <span className="text-white/60 text-sm font-medium">Processing your request...</span>
-          </div>
-        </div>
-      )}
+            {/* Loading indicator */}
+            {isLoading && !isTyping && !messages.some(m => m.isStreaming) && (
+              <div className="text-center py-xl">
+                <div className="layout-center space-x-2">
+                  <div className="flex space-x-1">
+                    <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-bounce shadow-lg shadow-blue-400/50"></div>
+                    <div className="w-3 h-3 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-bounce delay-100 shadow-md shadow-blue-300/30"></div>
+                    <div className="w-3 h-3 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-bounce delay-200 shadow-sm shadow-blue-200/20"></div>
+                  </div>
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Processing your request...</span>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </TaskHandler>
   );
