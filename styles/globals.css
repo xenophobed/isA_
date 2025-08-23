@@ -160,14 +160,15 @@ a {
   --gradient-surface: linear-gradient(135deg, rgba(66, 133, 244, 0.04) 0%, rgba(52, 168, 83, 0.04) 100%);
   --gradient-overlay: linear-gradient(135deg, rgba(66, 133, 244, 0.02) 0%, rgba(52, 168, 83, 0.02) 100%);
 
-  /* Glass System - Clean and minimal */
-  --glass-primary: rgba(255, 255, 255, 0.9);
-  --glass-secondary: rgba(248, 249, 250, 0.85);
-  --glass-tertiary: rgba(241, 243, 244, 0.8);
-  --glass-border: rgba(66, 133, 244, 0.12);
-  --glass-border-hover: rgba(66, 133, 244, 0.18);
-  --glass-border-active: rgba(66, 133, 244, 0.24);
-  --glass-border-subtle: rgba(66, 133, 244, 0.06);
+  /* Glass System - Enhanced for better light theme visibility */
+  --glass-primary: rgba(255, 255, 255, 0.95);
+  --glass-secondary: rgba(248, 249, 250, 0.9);
+  --glass-tertiary: rgba(241, 243, 244, 0.85);
+  --glass-border: rgba(66, 133, 244, 0.15);
+  --glass-border-hover: rgba(66, 133, 244, 0.22);
+  --glass-border-active: rgba(66, 133, 244, 0.28);
+  --glass-border-subtle: rgba(66, 133, 244, 0.08);
+  --glass-border-focused: rgba(66, 133, 244, 0.25);
   
   /* Accent colors - Gemini blue as primary */
   --color-accent: #4285f4;
@@ -175,16 +176,26 @@ a {
   --accent-medium: rgba(66, 133, 244, 0.12);
   --accent-strong: rgba(66, 133, 244, 0.16);
   
-  /* Shadows - Soft, natural like Gemini */
-  --shadow-sm: 0 1px 3px rgba(60, 64, 67, 0.08);
-  --shadow-md: 0 2px 8px rgba(60, 64, 67, 0.1);
-  --shadow-lg: 0 4px 16px rgba(60, 64, 67, 0.12);
-  --shadow-xl: 0 8px 32px rgba(60, 64, 67, 0.15);
+  /* Enhanced Shadows - Better visibility in light theme */
+  --shadow-sm: 0 1px 3px rgba(60, 64, 67, 0.12), 0 0 0 1px rgba(66, 133, 244, 0.05);
+  --shadow-md: 0 2px 8px rgba(60, 64, 67, 0.15), 0 0 0 1px rgba(66, 133, 244, 0.08);
+  --shadow-lg: 0 4px 16px rgba(60, 64, 67, 0.18), 0 0 0 1px rgba(66, 133, 244, 0.1);
+  --shadow-xl: 0 8px 32px rgba(60, 64, 67, 0.22), 0 0 0 1px rgba(66, 133, 244, 0.12);
+  --shadow-accent: 0 2px 8px rgba(66, 133, 244, 0.15), 0 0 0 1px rgba(66, 133, 244, 0.1);
 
   /* Status colors for light theme */
   --text-success: #137333;
   --text-warning: #b06000;
   --text-danger: #c5221f;
+  
+  /* Enhanced light theme specific variables */
+  --light-surface-elevated: rgba(255, 255, 255, 0.98);
+  --light-surface-hover: rgba(248, 249, 250, 0.95);
+  --light-border-subtle: rgba(66, 133, 244, 0.08);
+  --light-border-medium: rgba(66, 133, 244, 0.12);
+  --light-border-strong: rgba(66, 133, 244, 0.18);
+  --light-accent-glow: rgba(66, 133, 244, 0.06);
+  --light-accent-glow-strong: rgba(66, 133, 244, 0.1);
 }
 
 /* Default dark theme body styles */
@@ -246,6 +257,35 @@ body {
 /* ============================================================================
  * LIGHT THEME TEXT COLOR FIXES - Fix white/gray text visibility
  * ============================================================================ */
+
+/* Message List Component Text Color Fixes for Light Theme */
+[data-theme="light"] .conversation-stream {
+  /* Ensure message text uses proper colors */
+}
+
+[data-theme="light"] .conversation-stream * {
+  /* Force all text in message list to use proper theme colors */
+  color: inherit;
+}
+
+/* Message content text specifically */
+[data-theme="light"] .conversation-stream .text-sm,
+[data-theme="light"] .conversation-stream .text-xs,
+[data-theme="light"] .conversation-stream span,
+[data-theme="light"] .conversation-stream div {
+  /* Override any hardcoded colors in message components */
+  color: inherit;
+}
+
+/* Streaming status and message text */
+[data-theme="light"] .conversation-stream .text-xs.font-medium {
+  color: var(--text-muted) !important;
+}
+
+/* Avatar text and labels */
+[data-theme="light"] .conversation-stream .ml-2.text-sm.font-medium {
+  color: var(--text-primary) !important;
+}
 
 /* Base white text variations */
 [data-theme="light"] .text-white {
@@ -420,18 +460,57 @@ body {
   box-shadow: 0 1px 3px rgba(60, 64, 67, 0.08), 0 0 0 3px rgba(66, 133, 244, 0.08) !important;
 }
 
-/* Message bubbles for light theme */
+/* Message bubbles for light theme - Better contrast */
 [data-theme="light"] .glass-primary {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid rgba(66, 133, 244, 0.08) !important;
-  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.05) !important;
+  background: rgba(248, 249, 250, 0.95) !important;
+  border: 1px solid rgba(66, 133, 244, 0.12) !important;
+  box-shadow: 0 2px 8px rgba(60, 64, 67, 0.08) !important;
+  color: var(--text-primary) !important;
 }
 
-/* User message bubble styling */
+/* AI message bubbles - Light gray background for better contrast */
+[data-theme="light"] .conversation-stream .p-3.rounded-lg {
+  background: rgba(241, 243, 244, 0.8) !important;
+  border: 1px solid rgba(66, 133, 244, 0.08) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.06) !important;
+}
+
+/* Message content text */
+[data-theme="light"] .conversation-stream .whitespace-pre-wrap {
+  color: var(--text-primary) !important;
+}
+
+/* User message bubble styling - Light theme appropriate */
 [data-theme="light"] .user-message {
-  background: linear-gradient(135deg, #4285f4 0%, #1a73e8 100%) !important;
-  color: white !important;
-  box-shadow: 0 2px 8px rgba(66, 133, 244, 0.2) !important;
+  background: rgba(66, 133, 244, 0.08) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(66, 133, 244, 0.12) !important;
+  box-shadow: 0 1px 3px rgba(66, 133, 244, 0.1) !important;
+}
+
+/* User message content - Light theme colors */
+[data-theme="light"] .conversation-stream .flex.justify-end .p-3.rounded-lg {
+  background: rgba(66, 133, 244, 0.08) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(66, 133, 244, 0.12) !important;
+  box-shadow: 0 1px 3px rgba(66, 133, 244, 0.1) !important;
+}
+
+/* AI message bubble styling for light theme */
+[data-theme="light"] .conversation-stream [style*="--glass-primary"] {
+  background: rgba(241, 243, 244, 0.8) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(66, 133, 244, 0.08) !important;
+}
+
+/* Override any inline styles for message content */
+[data-theme="light"] .conversation-stream [style*="color: var(--text-primary)"] {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .conversation-stream [style*="color: var(--text-muted)"] {
+  color: var(--text-muted) !important;
 }
 
 /* Button styling for light theme */

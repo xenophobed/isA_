@@ -11,7 +11,7 @@
  * 仅用于开发环境测试
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSessionStore } from '../../stores/useSessionStore';
 
 export const SessionArtifactTester: React.FC = () => {
@@ -21,7 +21,7 @@ export const SessionArtifactTester: React.FC = () => {
   const { getCurrentSession, getArtifactMessages } = useSessionStore();
 
   // 刷新数据
-  const refreshData = () => {
+  const refreshData = useCallback(() => {
     const currentSession = getCurrentSession();
     setSessionInfo(currentSession);
     
@@ -29,14 +29,14 @@ export const SessionArtifactTester: React.FC = () => {
       const artifacts = getArtifactMessages();
       setArtifactMessages(artifacts);
     }
-  };
+  }, [getCurrentSession, getArtifactMessages]);
 
   // 定期刷新数据
   useEffect(() => {
     refreshData();
     const interval = setInterval(refreshData, 2000); // 每2秒刷新一次
     return () => clearInterval(interval);
-  }, []);
+  }, [refreshData]);
 
   // 只在开发环境显示
   if (process.env.NODE_ENV !== 'development') {

@@ -143,12 +143,22 @@ export interface ResumeStreamCallbacks {
 export class ExecutionControlService {
   private apiService: BaseApiService;
   private hilBaseUrl: string;
+  private activePollingTimers: Map<string, NodeJS.Timeout> = new Map();
+  private statusCache: Map<string, { status: ExecutionStatus; timestamp: number }> = new Map();
+  private readonly CACHE_DURATION = 2000; // 2 seconds cache
+  private readonly DEFAULT_POLL_INTERVAL = 3000; // Increased from 2s to 3s
+  private readonly IDLE_POLL_INTERVAL = 10000; // 10s for idle sessions
 
   constructor(apiService?: BaseApiService) {
     // 使用专用的HIL服务URL或复用现有的BaseApiService
     this.apiService = apiService || new BaseApiService(config.api.baseUrl);
     // HIL服务运行在8080端口
     this.hilBaseUrl = 'http://localhost:8080';
+    
+    // 定期清理缓存 (每分钟)
+    setInterval(() => {
+      this.cleanupCache();
+    }, 60000);
   }
 
   // ================================================================================
@@ -182,10 +192,23 @@ export class ExecutionControlService {
   }
 
   /**
-   * 获取线程执行状态
+   * 获取线程执行状态 (with caching)
    */
   async getExecutionStatus(threadId: string): Promise<ExecutionStatus> {
     try {
+      // Check cache first
+      const cached = this.statusCache.get(threadId);
+      const now = Date.now();
+      
+      if (cached && (now - cached.timestamp) < this.CACHE_DURATION) {
+        logger.debug(LogCategory.CHAT_FLOW, 'Execution status retrieved from cache', { 
+          threadId, 
+          status: cached.status.status,
+          cacheAge: now - cached.timestamp
+        });
+        return cached.status;
+      }
+
       const response = await fetch(`${this.hilBaseUrl}/api/execution/status/${threadId}`, {
         method: 'GET',
         headers: {
@@ -199,7 +222,14 @@ export class ExecutionControlService {
       }
 
       const status = await response.json();
-      logger.debug(LogCategory.CHAT_FLOW, 'Execution status retrieved', { threadId, status: status.status });
+      
+      // Cache the response
+      this.statusCache.set(threadId, { status, timestamp: now });
+      
+      logger.debug(LogCategory.CHAT_FLOW, 'Execution status retrieved and cached', { 
+        threadId, 
+        status: status.status 
+      });
       return status;
     } catch (error) {
       logger.error(LogCategory.CHAT_FLOW, 'Failed to get execution status', { threadId, error });
@@ -420,14 +450,27 @@ export class ExecutionControlService {
   // ================================================================================
 
   /**
-   * 轮询执行状态直到中断或完成
+   * 轮询执行状态直到中断或完成 (optimized with smart intervals and cleanup)
    */
   async monitorExecution(
     threadId: string, 
     callbacks: HILEventCallbacks,
-    pollInterval: number = 2000
+    pollInterval?: number
   ): Promise<void> {
-    logger.info(LogCategory.CHAT_FLOW, 'Starting execution monitoring', { threadId, pollInterval });
+    // Stop any existing polling for this thread
+    this.stopMonitoring(threadId);
+    
+    // Use smart interval based on session activity
+    const interval = pollInterval || this.DEFAULT_POLL_INTERVAL;
+    
+    logger.info(LogCategory.CHAT_FLOW, 'Starting execution monitoring', { 
+      threadId, 
+      pollInterval: interval,
+      activePollers: this.activePollingTimers.size
+    });
+
+    let consecutiveIdleCount = 0;
+    const maxIdleCount = 3; // Switch to slow polling after 3 idle checks
 
     const poll = async (): Promise<boolean> => {
       try {
@@ -455,6 +498,7 @@ export class ExecutionControlService {
 
         switch (status.status) {
           case 'interrupted':
+            consecutiveIdleCount = 0; // Reset idle count
             if (status.interrupts.length > 0) {
               status.interrupts.forEach(interrupt => {
                 // 转换为 AGUI 标准事件
@@ -486,10 +530,15 @@ export class ExecutionControlService {
             return false; // 停止轮询
 
           case 'running':
+            consecutiveIdleCount = 0; // Reset idle count for active execution
+            return true; // 继续轮询
+
           case 'ready':
+            consecutiveIdleCount++;
             return true; // 继续轮询
 
           default:
+            consecutiveIdleCount++;
             logger.warn(LogCategory.CHAT_FLOW, 'Unknown execution status', { 
               threadId, 
               status: status.status 
@@ -503,15 +552,87 @@ export class ExecutionControlService {
       }
     };
 
-    // 开始轮询
-    while (await poll()) {
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    // Smart polling with adaptive intervals
+    const scheduleNextPoll = () => {
+      // Use longer interval for idle sessions
+      const nextInterval = consecutiveIdleCount >= maxIdleCount ? 
+        this.IDLE_POLL_INTERVAL : 
+        interval;
+      
+      const timer = setTimeout(async () => {
+        if (await poll()) {
+          scheduleNextPoll();
+        } else {
+          this.stopMonitoring(threadId);
+        }
+      }, nextInterval);
+      
+      this.activePollingTimers.set(threadId, timer);
+    };
+
+    // Initial poll
+    if (await poll()) {
+      scheduleNextPoll();
     }
   }
 
   // ================================================================================
   // 工具方法
   // ================================================================================
+
+  /**
+   * 停止指定线程的监控
+   */
+  stopMonitoring(threadId: string): void {
+    const timer = this.activePollingTimers.get(threadId);
+    if (timer) {
+      clearTimeout(timer);
+      this.activePollingTimers.delete(threadId);
+      logger.info(LogCategory.CHAT_FLOW, 'Stopped monitoring for thread', { 
+        threadId,
+        remainingPollers: this.activePollingTimers.size
+      });
+    }
+  }
+
+  /**
+   * 停止所有监控
+   */
+  stopAllMonitoring(): void {
+    const activeCount = this.activePollingTimers.size;
+    this.activePollingTimers.forEach((timer) => {
+      clearTimeout(timer);
+    });
+    this.activePollingTimers.clear();
+    this.statusCache.clear();
+    
+    logger.info(LogCategory.CHAT_FLOW, 'Stopped all execution monitoring', { 
+      stoppedPollers: activeCount
+    });
+  }
+
+  /**
+   * 获取活跃监控状态
+   */
+  getActiveMonitoringStats(): { activePollers: number; cachedStatuses: number } {
+    return {
+      activePollers: this.activePollingTimers.size,
+      cachedStatuses: this.statusCache.size
+    };
+  }
+
+  /**
+   * 清理过期缓存
+   */
+  cleanupCache(): void {
+    const now = Date.now();
+    const entries = Array.from(this.statusCache.entries());
+    for (const [threadId, cached] of entries) {
+      if ((now - cached.timestamp) > this.CACHE_DURATION * 5) { // Keep cache 5x longer than refresh
+        this.statusCache.delete(threadId);
+      }
+    }
+  }
 
   /**
    * 检查服务是否可用

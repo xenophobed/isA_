@@ -180,10 +180,9 @@ export const CalendarToolbar: React.FC<CalendarToolbarProps> = ({
       {/* Calendar Toolbar Button */}
       <button
         ref={buttonRef}
-        onClick={() => {}} // Disabled
-        className="relative flex items-center gap-2 px-3 py-1.5 bg-gray-800/30 border border-gray-700/50 rounded-lg text-gray-500 cursor-not-allowed opacity-60"
-        title="Calendar (Coming Soon)"
-        disabled
+        onClick={toggleCalendarPanel}
+        className="relative flex items-center gap-2 px-3 py-1.5 bg-gray-800/30 border border-gray-700/50 rounded-lg text-white hover:bg-gray-700/50 transition-colors cursor-pointer"
+        title="Calendar"
       >
         {/* Calendar Icon with Badge */}
         <div className="relative">

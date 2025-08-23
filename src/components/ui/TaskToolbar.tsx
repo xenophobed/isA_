@@ -188,10 +188,9 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
       {/* Task Toolbar Button */}
       <button
         ref={buttonRef}
-        onClick={() => {}} // Disabled
-        className="relative flex items-center gap-2 px-3 py-1.5 bg-gray-800/30 border border-gray-700/50 rounded-lg text-gray-500 cursor-not-allowed opacity-60"
-        title="Tasks (Coming Soon)"
-        disabled
+        onClick={toggleTaskPanel}
+        className="relative flex items-center gap-2 px-3 py-1.5 bg-gray-800/30 border border-gray-700/50 rounded-lg text-white hover:bg-gray-700/50 transition-colors cursor-pointer"
+        title="Tasks"
       >
         {/* Task Icon with Badge */}
         <div className="relative">

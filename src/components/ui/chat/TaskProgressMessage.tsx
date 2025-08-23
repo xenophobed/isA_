@@ -367,7 +367,7 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
         }}>
           <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{
             backgroundColor: currentTask.status === 'running' ? '#4285f4' : 
-                            currentTask.status === 'error' ? '#ea4335' : '#fbbc04'
+                            currentTask.status === 'failed' ? '#ea4335' : '#fbbc04'
           }}></div>
           <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
             {currentTask.title.length > 20 ? currentTask.title.substring(0, 20) + '...' : currentTask.title}

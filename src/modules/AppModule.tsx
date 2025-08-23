@@ -35,8 +35,10 @@ import { AppLayout, AppLayoutProps } from '../components/AppLayout';
 import { ChatModule } from './ChatModule';
 import { SessionModule } from './SessionModule';
 import { UserModule } from './UserModule';
+import { ContextModule } from './ContextModule';
+import { OrganizationModule } from './OrganizationModule';
 import { RightSidebarLayout } from '../components/ui/chat/RightSidebarLayout';
-import { UserButton } from '../components/ui/user/UserButton';
+import UserButtonContainer from '../components/ui/user/UserButtonContainer';
 import { UserPortal } from '../components/ui/user/UserPortal';
 
 // Business logic hooks
@@ -264,10 +266,11 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
 
   // Render children as render props pattern with business logic data
   return (
-    <>
-      {/* 🆕 Session Artifact Tester - Development Only */}
-      
-      <AppLayout {...props}>
+    <ContextModule>
+      <OrganizationModule>
+        {/* 🆕 Session Artifact Tester - Development Only */}
+        
+        <AppLayout {...props}>
       {() => ({
         // Simplified Chat with pure module integration
         chatModule: (
@@ -289,7 +292,7 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
               <SessionModule 
                 sidebarWidth="300px" 
                 userContent={
-                  <UserButton onToggleDrawer={() => setShowUserPortal(!showUserPortal)} />
+                  <UserButtonContainer onToggleDrawer={() => setShowUserPortal(!showUserPortal)} />
                 }
               />
             }
@@ -326,7 +329,8 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
           />
         )
       })}
-      </AppLayout>
-    </>
+        </AppLayout>
+      </OrganizationModule>
+    </ContextModule>
   );
 };

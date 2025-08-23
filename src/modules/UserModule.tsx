@@ -288,18 +288,71 @@ export const UserModule: React.FC<{ children: React.ReactNode }> = ({ children }
     }
 
     try {
-      console.log('👤 UserModule: Refreshing user data');
-      // Use userHook's fetchCurrentUser method instead of direct service call
+      console.log('👤 UserModule: Starting user refresh process...');
+      console.log('👤 UserModule: Auth status:', { 
+        isAuthenticated, 
+        hasAuth0User: !!auth0User,
+        auth0UserSub: auth0User?.sub 
+      });
+      
+      // Get access token with detailed logging
+      console.log('👤 UserModule: Getting access token...');
       const token = await getAccessToken();
-      await userHook.fetchCurrentUser(token);
-      console.log('👤 UserModule: User data refreshed successfully');
+      console.log('👤 UserModule: Token obtained:', {
+        hasToken: !!token,
+        tokenLength: token?.length,
+        tokenStart: token?.substring(0, 30) + '...'
+      });
+      
+      // Call fetchCurrentUser with token
+      console.log('👤 UserModule: Calling fetchCurrentUser...');
+      try {
+        await userHook.fetchCurrentUser(token);
+        console.log('👤 UserModule: User data refreshed successfully');
+      } catch (error) {
+        // If user doesn't exist (404), try to initialize user first
+        if (error instanceof Error && error.message.includes('404')) {
+          console.log('👤 UserModule: User not found (404), attempting to initialize user...');
+          
+          if (auth0User?.sub && auth0User?.email && auth0User?.name) {
+            console.log('👤 UserModule: Initializing user via ensureUserExists...');
+            await initializeUser();
+            console.log('👤 UserModule: User initialized, retrying fetchCurrentUser...');
+            await userHook.fetchCurrentUser(token);
+            console.log('👤 UserModule: User data refreshed successfully after initialization');
+          } else {
+            throw new Error('Cannot initialize user: missing Auth0 user data');
+          }
+        } else {
+          throw error;
+        }
+      }
       
     } catch (error) {
       console.error('👤 UserModule: Failed to refresh user', error);
+      
+      // Enhanced error reporting
+      if (error instanceof Error) {
+        console.error('👤 UserModule: Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+        
+        // Check for specific error types
+        if (error.message.includes('404')) {
+          console.error('👤 UserModule: 404 Error - API endpoint not found or user not exists');
+        } else if (error.message.includes('401') || error.message.includes('403')) {
+          console.error('👤 UserModule: Auth Error - Token invalid or expired');
+        } else if (error.message.includes('Network Error') || error.message.includes('fetch')) {
+          console.error('👤 UserModule: Network Error - Service might be down');
+        }
+      }
+      
       logger.error(LogCategory.USER_AUTH, 'Failed to refresh user', { error });
       throw error;
     }
-  }, [isAuthenticated, userHook.fetchCurrentUser, getAccessToken]);
+  }, [isAuthenticated, userHook.fetchCurrentUser, getAccessToken, auth0User, initializeUser]);
 
   const logout = useCallback(() => {
     // Use userHook's clearUser method instead of direct store access

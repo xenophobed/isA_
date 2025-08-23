@@ -8,6 +8,7 @@
  * - 记住用户选择（localStorage）
  * - 响应系统主题偏好
  * - 流畅的切换动画
+ * - 优化的浅色主题视觉效果
  */
 
 import React, { useState, useEffect } from 'react';
@@ -69,6 +70,25 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
     lg: 'w-5 h-5'
   };
 
+  // 优化的滑块位置计算
+  const getSliderPosition = () => {
+    if (theme === 'dark') {
+      return 'left-0.5';
+    }
+    
+    // 浅色主题下的精确位置计算
+    switch (size) {
+      case 'sm':
+        return 'left-4';
+      case 'md':
+        return 'left-5';
+      case 'lg':
+        return 'left-7';
+      default:
+        return 'left-5';
+    }
+  };
+
   // 避免服务端渲染闪烁
   if (!mounted) {
     return (
@@ -89,33 +109,30 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
       style={{
         background: theme === 'dark' 
           ? 'linear-gradient(135deg, #1f2937 0%, #374151 100%)'
-          : 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-        border: theme === 'light' ? '1px solid rgba(66, 133, 244, 0.12)' : 'none',
+          : 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 50%, #e8eaed 100%)',
+        border: theme === 'light' ? '1px solid rgba(66, 133, 244, 0.15)' : 'none',
         boxShadow: theme === 'dark'
           ? '0 2px 8px rgba(0, 0, 0, 0.2)'
-          : '0 1px 3px rgba(60, 64, 67, 0.08), 0 0 0 1px rgba(66, 133, 244, 0.08)'
+          : '0 2px 8px rgba(60, 64, 67, 0.12), 0 0 0 1px rgba(66, 133, 244, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
       }}
       title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
     >
-      {/* 切换滑块 */}
+      {/* 优化的切换滑块 */}
       <div
         className={`
           absolute top-0.5 w-5 h-5 rounded-full transition-all duration-300 ease-in-out
           flex items-center justify-center
-          ${theme === 'dark' 
-            ? 'left-0.5' 
-            : `${size === 'sm' ? 'left-4' : size === 'md' ? 'left-5' : 'left-7'}`
-          }
+          ${getSliderPosition()}
         `}
         style={{
           background: theme === 'dark'
             ? 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)'
-            : 'linear-gradient(135deg, #4285f4 0%, #34a853 100%)',
+            : 'linear-gradient(135deg, #4285f4 0%, #34a853 50%, #fbbc04 100%)',
           boxShadow: theme === 'dark'
             ? '0 1px 3px rgba(0, 0, 0, 0.3)'
-            : '0 1px 3px rgba(60, 64, 67, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.5)',
-          border: theme === 'light' ? '1px solid rgba(255, 255, 255, 0.8)' : 'none'
+            : '0 2px 6px rgba(66, 133, 244, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+          border: theme === 'light' ? '1px solid rgba(255, 255, 255, 0.9)' : 'none'
         }}
       >
         {/* Gemini 风格的主题图标 */}
@@ -141,24 +158,35 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
         )}
       </div>
 
-      {/* Gemini 风格的背景装饰 */}
-      <div className="absolute inset-0 rounded-full opacity-30">
+      {/* 优化的背景装饰 */}
+      <div className="absolute inset-0 rounded-full opacity-40">
         {theme === 'dark' ? (
-          // 星星装饰
+          // 星星装饰 - 暗色主题
           <div className="flex items-center justify-end pr-2 h-full">
             <div className="w-1 h-1 bg-yellow-300 rounded-full opacity-60 animate-pulse" />
             <div className="w-0.5 h-0.5 bg-yellow-200 rounded-full ml-1 opacity-40 animate-pulse delay-100" />
           </div>
         ) : (
-          // Gemini 彩色光点装饰
+          // 优化的 Gemini 彩色光点装饰 - 浅色主题
           <div className="flex items-center justify-start pl-2 h-full space-x-0.5">
-            <div className="w-1 h-1 bg-red-400 rounded-full opacity-60" />
-            <div className="w-1 h-1 bg-yellow-400 rounded-full opacity-60" />
-            <div className="w-1 h-1 bg-green-400 rounded-full opacity-60" />
-            <div className="w-1 h-1 bg-blue-400 rounded-full opacity-60" />
+            <div className="w-1 h-1 bg-red-400 rounded-full opacity-80 shadow-sm" />
+            <div className="w-1 h-1 bg-yellow-400 rounded-full opacity-80 shadow-sm" />
+            <div className="w-1 h-1 bg-green-400 rounded-full opacity-80 shadow-sm" />
+            <div className="w-1 h-1 bg-blue-400 rounded-full opacity-80 shadow-sm" />
+            {/* 添加额外的装饰元素 */}
+            <div className="w-0.5 h-0.5 bg-purple-400 rounded-full opacity-60 ml-1" />
+            <div className="w-0.5 h-0.5 bg-orange-400 rounded-full opacity-60 ml-0.5" />
           </div>
         )}
       </div>
+
+      {/* 浅色主题下的额外视觉层次 */}
+      {theme === 'light' && (
+        <div className="absolute inset-0 rounded-full opacity-20">
+          <div className="absolute top-1 right-1 w-1 h-1 bg-blue-300 rounded-full" />
+          <div className="absolute bottom-1 right-2 w-0.5 h-0.5 bg-green-300 rounded-full" />
+        </div>
+      )}
     </button>
   );
 };

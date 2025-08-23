@@ -31,6 +31,7 @@
 
 import React from 'react';
 import { AppHeader } from './ui/AppHeader';
+import { useDeviceType } from '../hooks/useDeviceType';
 
 export interface AppLayoutProps {
   className?: string;
@@ -64,6 +65,9 @@ export interface AppLayoutProps {
  * No business logic or direct state management
  */
 export const AppLayout: React.FC<AppLayoutProps> = ({ className = '', children }) => {
+  // Get device type to determine whether to show desktop header
+  const { isMobile } = useDeviceType();
+  
   // Get rendered modules and data from AppModule via render props
   const moduleData = children?.();
   
@@ -82,13 +86,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ className = '', children }
 
   return (
     <div className={`h-screen w-full flex flex-col text-white ${className}`} style={{ background: 'var(--gradient-primary)' }}>
-      {/* Application Header */}
-      <div className="h-16 px-6 py-3 flex-shrink-0" style={{ background: 'var(--glass-primary)', backdropFilter: 'blur(20px)' }}>
-        <AppHeader 
-          currentApp={appData.currentApp}
-          availableApps={appData.availableApps}
-        />
-      </div>
+      {/* Application Header - Only show on desktop, hidden on mobile */}
+      {!isMobile && (
+        <div className="h-16 px-6 py-3 flex-shrink-0" style={{ background: 'var(--glass-primary)', backdropFilter: 'blur(20px)' }}>
+          <AppHeader 
+            currentApp={appData.currentApp}
+            availableApps={appData.availableApps}
+          />
+        </div>
+      )}
       
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden w-full">

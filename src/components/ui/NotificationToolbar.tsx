@@ -202,10 +202,9 @@ export const NotificationToolbar: React.FC<NotificationToolbarProps> = ({
       {/* Notification Toolbar Button */}
       <button
         ref={buttonRef}
-        onClick={() => {}} // Disabled
-        className="relative flex items-center gap-2 px-3 py-1.5 bg-gray-800/30 border border-gray-700/50 rounded-lg text-gray-500 cursor-not-allowed opacity-60"
-        title="Notifications (Coming Soon)"
-        disabled
+        onClick={toggleNotificationPanel}
+        className="relative flex items-center gap-2 px-3 py-1.5 bg-gray-800/30 border border-gray-700/50 rounded-lg text-white hover:bg-gray-700/50 transition-colors cursor-pointer"
+        title="Notifications"
       >
         {/* Notification Icon with Badge */}
         <div className="relative">

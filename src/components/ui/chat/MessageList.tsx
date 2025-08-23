@@ -33,6 +33,49 @@ import { ChatEmbeddedTaskPanel } from './ChatEmbeddedTaskPanel';
 
 // MessageActions will be implemented later
 
+// Smart time formatting function
+const formatMessageTime = (timestamp: string | number | Date): string => {
+  const messageDate = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - messageDate.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  // Just now (less than 1 minute)
+  if (diffMinutes < 1) {
+    return 'Just now';
+  }
+  
+  // Minutes ago (1-59 minutes)
+  if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  }
+  
+  // Hours ago (1-23 hours)
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+  
+  // Days ago (1-6 days) 
+  if (diffDays < 7) {
+    if (diffDays === 1) return 'Yesterday';
+    return `${diffDays} days ago`;
+  }
+  
+  // This week (show day name)
+  if (diffDays < 30) {
+    return messageDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+  
+  // Older messages (show full date)
+  return messageDate.toLocaleDateString([], { 
+    year: messageDate.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+    month: 'short', 
+    day: 'numeric' 
+  });
+};
+
 export interface MessageListProps {
   showTimestamps?: boolean;
   showAvatars?: boolean;
@@ -130,8 +173,20 @@ export const MessageList = memo<MessageListProps>(({
     overscan
   );
   
-  // Determine which messages to render
-  const messagesToRender = virtualized ? virtualScroll.visibleItems : messages;
+  // Determine which messages to render with deduplication
+  const baseMessagesToRender = virtualized ? virtualScroll.visibleItems : messages;
+  
+  // Ensure message uniqueness by ID to prevent duplicate rendering
+  const messagesToRender = useMemo(() => {
+    const seen = new Set();
+    return baseMessagesToRender.filter(msg => {
+      if (seen.has(msg.id)) {
+        return false;
+      }
+      seen.add(msg.id);
+      return true;
+    });
+  }, [baseMessagesToRender]);
   
   // useEffect(() => {
   //   if (process.env.NODE_ENV === 'development') {
@@ -304,79 +359,154 @@ export const MessageList = memo<MessageListProps>(({
     const regularMessage = message as any; // Cast to access legacy properties for now
     return (
       <div 
-        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
+        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-6`}
         onClick={() => onMessageClick?.(message)}
+        style={{
+          paddingRight: message.role === 'user' ? '2rem' : '0',
+          paddingLeft: message.role === 'assistant' ? '0' : '0'
+        }}
       >
-        <div className={`max-w-[80%] group`}>
+        <div className={`max-w-[80%] group transition-all duration-300 ${message.role === 'user' ? 'hover:scale-[1.02]' : ''}`}>
           {showAvatars && (
-            <div className={`flex items-center mb-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" style={{
-                background: message.role === 'user' 
-                  ? 'var(--accent-soft)' 
-                  : isStreaming 
-                    ? 'var(--gradient-secondary)'
-                    : 'var(--glass-secondary)',
-                color: 'var(--text-primary)',
-                boxShadow: isStreaming || message.role === 'user' ? '0 0 15px var(--accent-soft)' : 'none'
-              }}>
-                {message.role === 'user' ? 'U' : isStreaming ? '🤖' : 'AI'}
-              </div>
-              {/* Show streaming status next to AI avatar */}
-              {message.role === 'assistant' && isStreaming && hasStatus && (
-                <div className="ml-3 flex items-center space-x-2 bg-white/5 px-3 py-1 rounded-full border border-white/10">
-                  <div className="flex space-x-1">
-                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse shadow-sm shadow-blue-400/50"></div>
-                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full animate-pulse delay-75 shadow-sm shadow-blue-300/30"></div>
-                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full animate-pulse delay-150 shadow-sm shadow-blue-200/20"></div>
+            <div className={`flex items-start gap-3 mb-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {/* User avatar and timestamp on the right */}
+              {message.role === 'user' && (
+                <>
+                  {/* Timestamp for user messages */}
+                  {showTimestamps && (
+                    <div className="text-xs text-white/40 font-medium self-end mb-1">
+                      {formatMessageTime(message.timestamp)}
+                    </div>
+                  )}
+                  
+                  {/* User Avatar */}
+                  <div className="relative flex-shrink-0">
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 group-hover:scale-105"
+                      style={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: '#ffffff',
+                        boxShadow: '0 6px 20px rgba(102, 126, 234, 0.25), 0 0 0 1px rgba(255,255,255,0.1), inset 0 1px 0 rgba(255,255,255,0.2)'
+                      }}>
+                      👤
+                    </div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-white rounded-full shadow-sm"></div>
                   </div>
-                  <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                    {message.streamingStatus}
-                  </span>
-                </div>
+                </>
               )}
               
-              {/* Compact Task Progress in message header - always show for AI messages */}
+              {/* AI avatar and inline status */}
               {message.role === 'assistant' && (
-                <div className="ml-3">
-                  <TaskProgressMessage 
-                    messageId={message.id}
-                    compact={true}
-                    showControls={false}
-                    inline={true}
-                    isStreaming={isStreaming}
-                    className="text-xs"
-                  />
+                <div className="flex items-center gap-3">
+                  {/* AI Avatar */}
+                  <div className="relative flex-shrink-0">
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300"
+                      style={{
+                        background: isStreaming ? 'var(--gradient-secondary)' : 'var(--glass-secondary)',
+                        color: 'var(--text-primary)',
+                        boxShadow: isStreaming ? '0 0 15px var(--accent-soft)' : 'none'
+                      }}>
+                      {isStreaming ? '🤖' : 'AI'}
+                    </div>
+                  </div>
+                  
+                  {/* Inline timestamp and status */}
+                  <div className="flex items-center gap-2">
+                    {/* Timestamp */}
+                    {showTimestamps && !isStreaming && (
+                      <span className="text-xs text-white/40 font-medium">
+                        {formatMessageTime(message.timestamp)}
+                      </span>
+                    )}
+                    
+                    {/* Streaming status */}
+                    {isStreaming && hasStatus && (
+                      <div className="flex items-center space-x-2 bg-white/5 px-2 py-1 rounded-full border border-white/10">
+                        <div className="flex space-x-1">
+                          <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse"></div>
+                          <div className="w-1 h-1 bg-blue-300 rounded-full animate-pulse delay-75"></div>
+                          <div className="w-1 h-1 bg-blue-200 rounded-full animate-pulse delay-150"></div>
+                        </div>
+                        <span className="text-xs font-medium text-white/60">
+                          {message.streamingStatus}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {/* Task progress */}
+                    <TaskProgressMessage 
+                      messageId={message.id}
+                      compact={true}
+                      showControls={false}
+                      inline={true}
+                      isStreaming={isStreaming}
+                      className="text-xs"
+                    />
+                  </div>
                 </div>
               )}
             </div>
           )}
           
+          
           <div 
-            className="p-3 rounded-lg"
+            className={`relative p-4 transition-all duration-300 group-hover:shadow-lg ${
+              message.role === 'user' 
+                ? 'rounded-2xl rounded-br-md' 
+                : 'rounded-xl rounded-bl-md bg-gray-800/60 border border-white/10 text-white'
+            }`}
             style={{
               background: message.role === 'user' 
-                ? 'var(--accent-soft)' 
-                : 'var(--glass-primary)',
-              color: 'var(--text-primary)',
-              border: message.role === 'user' ? 'none' : '1px solid var(--glass-border)',
-              boxShadow: message.role === 'user' ? '0 0 20px var(--accent-soft)30' : 'none'
+                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                : undefined,
+              backdropFilter: message.role === 'user' ? 'blur(20px) saturate(1.2)' : 'blur(12px)',
+              WebkitBackdropFilter: message.role === 'user' ? 'blur(20px) saturate(1.2)' : 'blur(12px)',
+              boxShadow: message.role === 'user' 
+                ? '0 8px 32px rgba(102, 126, 234, 0.3), 0 4px 12px rgba(118, 75, 162, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)' 
+                : '0 4px 16px rgba(0,0,0,0.1)',
+              position: 'relative' as const,
+              color: message.role === 'user' ? '#ffffff' : 'inherit'
             }}
           >
+            {/* Seamless message tail for user messages - points down-right */}
+            {message.role === 'user' && (
+              <div 
+                className="absolute bottom-0 right-0 w-3 h-3"
+                style={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  clipPath: 'polygon(0 0, 100% 100%, 0 100%)',
+                  transform: 'translate(25%, 25%)'
+                }}
+              />
+            )}
+            
+            {/* Seamless message tail for AI messages - points down-left */}
+            {message.role === 'assistant' && (
+              <div 
+                className="absolute bottom-0 left-0 w-3 h-3"
+                style={{
+                  background: 'rgba(31, 41, 55, 0.6)',
+                  clipPath: 'polygon(0 100%, 100% 0, 100% 100%)',
+                  transform: 'translate(-25%, 25%)'
+                }}
+              />
+            )}
             {hasContent ? (
-              <div className="whitespace-pre-wrap break-words">
+              <div className={`whitespace-pre-wrap break-words ${
+                message.role === 'user' ? 'font-medium leading-relaxed text-white' : ''
+              }`}>
                 <ContentRenderer
                   content={(message as any).content}
-                  type="markdown"  // 改为 markdown 类型以支持图片等
+                  type="markdown"
                   variant="chat"
                   size="sm"
                   features={{
-                    markdown: true,      // 启用 markdown 渲染
-                    imagePreview: true,  // 启用图片预览
+                    markdown: true,
+                    imagePreview: true,
                     wordBreak: true,
-                    copyButton: false,   // 聊天消息不需要复制按钮
-                    saveButton: true     // 图片可以保存
+                    copyButton: false,
+                    saveButton: true
                   }}
-                  className="inline"
+                  className={`inline ${message.role === 'user' ? 'text-white' : ''}`}
                 />
                 {isStreaming && (
                   <span className="inline-flex items-center ml-2">
@@ -418,7 +548,7 @@ export const MessageList = memo<MessageListProps>(({
           onScroll={virtualScroll.handleScroll}
         >
           <div style={{ height: virtualScroll.totalHeight, position: 'relative' }}>
-            {messagesToRender.map((message, index) => (
+            {messagesToRender.map((message) => (
               <div key={`${message.id}-virtual-${message.virtualIndex}`} style={message.style}>
                 {renderMessage(message, message.virtualIndex)}
               </div>

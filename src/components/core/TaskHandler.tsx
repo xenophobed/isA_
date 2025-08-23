@@ -191,7 +191,7 @@ export const TaskHandler: React.FC<TaskHandlerProps> = ({
         eventData 
       });
     }
-  }, [createTask, updateTask, getTask, updateTaskStatus, updateTaskProgress, completeTask, failTask, onTaskEvent]);
+  }, [createTask, getTask, updateTaskStatus, updateTaskProgress, completeTask, failTask, onTaskEvent]);
 
   // ================================================================================
   // SSE事件解析函数

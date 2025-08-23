@@ -240,7 +240,7 @@ export const ChatLayout = memo<ChatLayoutProps>(({
     [className, isFullscreen]
   );
   
-  // Responsive grid styles with mobile support
+  // Responsive grid styles (removed invalid inline media queries)
   const gridStyles = useMemo(() => ({
     display: 'grid',
     gridTemplateAreas: gridConfig.templateAreas,
@@ -251,13 +251,8 @@ export const ChatLayout = memo<ChatLayoutProps>(({
     width: '100%',
     maxWidth: '100%',
     minWidth: 0,
-    overflow: 'hidden',
-    // Mobile responsiveness
-    '@media (max-width: 768px)': {
-      gridTemplateAreas: '"chat"',
-      gridTemplateColumns: '1fr',
-      gap: 'var(--space-sm)'
-    }
+    overflow: 'hidden'
+    // Note: Mobile responsiveness handled via CSS classes instead of inline media queries
   }), [gridConfig]);
   
   // 渲染全屏Widget模式 (从ThreeColumnLayout移植)
@@ -368,25 +363,57 @@ export const ChatLayout = memo<ChatLayoutProps>(({
           </div>
         )}
 
-        {/* Right Panel Toggle Button */}
+        {/* Ultra-Transparent Floating Toggle */}
         {!showRightSidebar && (
-          <div className="absolute right-0 top-1/2 transform -translate-y-1/2 z-20">
+          <div className="fixed right-3 top-1/2 transform -translate-y-1/2 z-30">
             <button
               onClick={onToggleRightPanel}
-              className={`w-8 h-12 glass-secondary hover:glass-border-hover border-l border-t border-b border-glass-border rounded-l-lg layout-center text-white/70 hover:text-white transition-all shadow-lg hover:shadow-xl interactive ${
-                showRightPanel ? '' : 'bg-primary/80 hover:bg-primary-hover/90'
+              className={`group relative w-10 h-10 rounded-full transition-all duration-700 ease-out hover:scale-125 active:scale-90 ${
+                showRightPanel 
+                  ? 'opacity-40 hover:opacity-80' 
+                  : 'opacity-25 hover:opacity-90'
               }`}
-              title={showRightPanel ? 'Hide panel' : 'Show panel'}
-              aria-label={showRightPanel ? 'Hide right panel' : 'Show right panel'}
+              title={showRightPanel ? 'Hide Session Panel' : 'Show Session Panel'}
+              style={{
+                background: showRightPanel 
+                  ? 'rgba(75, 85, 99, 0.15)' 
+                  : 'rgba(59, 130, 246, 0.15)',
+                backdropFilter: 'blur(20px) saturate(1.8)',
+                WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
+                border: showRightPanel 
+                  ? '1px solid rgba(255,255,255,0.08)' 
+                  : '1px solid rgba(59,130,246,0.2)',
+                boxShadow: showRightPanel 
+                  ? '0 4px 20px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.05)' 
+                  : '0 4px 20px rgba(59,130,246,0.15), inset 0 1px 0 rgba(147,197,253,0.1)'
+              }}
             >
-              <svg 
-                className={`w-4 h-4 transition-transform duration-normal ${showRightPanel ? 'rotate-0' : 'rotate-180'}`}
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+              {/* Subtle animated glow */}
+              <div className={`absolute inset-0 rounded-full transition-opacity duration-500 ${
+                showRightPanel ? 'opacity-0' : 'opacity-60'
+              }`}>
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400/10 to-purple-500/10 animate-pulse"></div>
+              </div>
+              
+              {/* Minimal icon */}
+              <div className="relative flex items-center justify-center w-full h-full">
+                <svg 
+                  className={`w-4 h-4 text-white/70 group-hover:text-white transition-all duration-500 ${
+                    showRightPanel ? 'rotate-180' : 'rotate-0'
+                  }`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </div>
+              
+              {/* Subtle indicator dot */}
+              {!showRightPanel && (
+                <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-400/60 rounded-full animate-pulse border border-white/20"></div>
+              )}
             </button>
           </div>
         )}

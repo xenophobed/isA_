@@ -58,6 +58,14 @@ import {
   AGUIConverter
 } from '../types/aguiTypes';
 
+// 🆕 Debug monitor for polling optimization - REMOVED FOR TESTING
+// import { StatusPollingMonitor } from '../components/debug/StatusPollingMonitor';
+
+// 🆕 Mobile-first responsive layout
+import { ResponsiveChatLayout } from '../components/ui/adaptive/ResponsiveChatLayout';
+import { useDeviceType } from '../hooks/useDeviceType';
+import { useNativeApp } from '../hooks/useNativeApp';
+
 interface ChatModuleProps extends Omit<ChatLayoutProps, 'messages' | 'isLoading' | 'isTyping' | 'onSendMessage' | 'onSendMultimodal'> {
   // All ChatLayout props except the data and callback props that we'll provide from business logic
 }
@@ -120,6 +128,10 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   
   // Get app actions for navigation
   const { setCurrentApp } = useAppActions();
+  
+  // 🆕 Device detection and native app support
+  const { isMobile, isTablet, deviceType } = useDeviceType();
+  const nativeApp = useNativeApp();
   
   // // 🆕 任务管理集成
   // const { taskActions } = useTask();
@@ -277,13 +289,21 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     // 清理函数
     return () => {
       setHilMonitoringActive(false);
+      // 停止所有监控以避免内存泄漏
+      executionControlService.stopAllMonitoring();
     };
   }, []);
 
-  // 🆕 当有活跃会话时启动HIL监控
+  // 🆕 当有活跃会话时启动HIL监控 (with cleanup optimization)
   useEffect(() => {
     if (currentSession && hilMonitoringActive) {
       const threadId = currentSession.id;
+      
+      // 清理之前会话的监控以避免重复polling
+      logger.info(LogCategory.CHAT_FLOW, 'Starting HIL monitoring for new session', { 
+        threadId,
+        previousPollers: executionControlService.getActiveMonitoringStats().activePollers
+      });
       
       // 开始监控执行状态
       const startMonitoring = async () => {
@@ -309,6 +329,13 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
 
       startMonitoring();
     }
+    
+    // 清理函数：当会话改变或组件卸载时停止监控
+    return () => {
+      if (currentSession) {
+        executionControlService.stopMonitoring(currentSession.id);
+      }
+    };
   }, [currentSession, hilMonitoringActive]);
 
   // 🆕 HIL事件处理函数
@@ -802,6 +829,25 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   }, [chatActions, auth0User, currentSession, sessionActions, userModule, setShowUpgradeModal, mapPluginTypeToContentType]);
 
   // ================================================================================
+  // 聊天控制业务逻辑 - New Chat and Session Management
+  // ================================================================================
+  
+  // Business logic: Handle new chat creation
+  const handleNewChat = useCallback(() => {
+    logger.info(LogCategory.CHAT_FLOW, '📱 Creating new chat session from mobile interface');
+    
+    // Create a new session with timestamp
+    const newSessionTitle = `New Chat ${new Date().toLocaleTimeString()}`;
+    const newSession = sessionActions.createSession(newSessionTitle);
+    sessionActions.selectSession(newSession.id);
+    
+    logger.info(LogCategory.CHAT_FLOW, 'New chat session created', {
+      sessionId: newSession.id,
+      title: newSessionTitle
+    });
+  }, [sessionActions, logger]);
+
+  // ================================================================================
   // 消息发送业务逻辑 - 原有的消息发送处理
   // ================================================================================
   
@@ -1121,7 +1167,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   // Pass all data and business logic callbacks as props to pure UI component
   return (
     <>
-      <ChatLayout
+      <ResponsiveChatLayout
         {...otherProps}
         messages={chatInterface.messages as any} // TODO: Fix type mismatch
         isLoading={chatInterface.isLoading}
@@ -1129,6 +1175,18 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
         onSendMessage={handleSendMessage}
         onSendMultimodal={handleSendMultimodal}
         onMessageClick={handleMessageClick}
+        onNewChat={handleNewChat}
+        
+        // 🆕 Responsive layout based on device type
+        forceLayout={isMobile ? 'mobile' : 'auto'} // Use mobile layout for mobile devices
+        showHeader={!isMobile} // Hide ChatLayout header on mobile (AppLayout controls desktop header)
+        
+        // 🆕 Mobile-first responsive props
+        enableSwipeGestures={isMobile || isTablet}
+        enablePullToRefresh={isMobile}
+        isNativeApp={nativeApp.isNativeApp}
+        nativeStatusBarHeight={nativeApp.statusBarHeight}
+        nativeBottomSafeArea={nativeApp.safeAreaInsets.bottom}
         
         // Right Panel (会话信息管理)
         showRightPanel={showRightPanel}
@@ -1192,6 +1250,9 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
 
       {/* 🆕 HIL Interaction Manager - 基于实际API格式的新HIL处理 */}
       <HILInteractionManager />
+      
+      {/* 🆕 Debug Monitor for polling optimization - REMOVED FOR TESTING */}
+      {/* <StatusPollingMonitor /> */}
     </>
   );
 };

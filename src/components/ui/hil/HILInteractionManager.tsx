@@ -44,7 +44,7 @@ export const HILInteractionManager: React.FC<HILInteractionManagerProps> = ({
   // 监听HIL状态变化，自动打开相应的对话框
   useEffect(() => {
     if (hilStatus === 'waiting_for_human' && currentInterrupt) {
-      const interruptType = currentInterrupt.data?.raw_interrupt?.type || currentInterrupt.type;
+      const interruptType = currentInterrupt.interrupt?.data?.raw_interrupt?.type || currentInterrupt.interrupt?.interrupt_type;
       
       console.log('🤖 HIL_MANAGER: HIL interrupt detected:', {
         type: interruptType,

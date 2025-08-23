@@ -20,6 +20,8 @@ export interface InputAreaLayoutProps {
   // Widget system integration
   onShowWidgetSelector?: () => void;
   showWidgetSelector?: boolean;
+  // Chat configuration
+  onShowChatConfig?: () => void;
 }
 
 /**
@@ -42,7 +44,8 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
   children,
   config,
   onShowWidgetSelector,
-  showWidgetSelector
+  showWidgetSelector,
+  onShowChatConfig
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -365,50 +368,167 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
       {/* Main Input Area */}
       <div className="input-controls">
         <div className="input-row">
-          {/* File Upload Button Container */}
-          <div className="button-container">
-            <button
-              onClick={() => handleFileSelection}
-              disabled={true}
-              title="File upload (coming soon)"
+          {/* Collapsed Icon Group - Shows 1 by default, expands to 3 on hover */}
+          <div 
+            className="icon-group-container"
+            style={{ 
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              width: '40px', // Start with space for just 1 icon
+              height: '40px',
+              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              overflow: 'visible' // Allow absolute positioned icons to show outside
+            }}
+            onMouseEnter={(e) => {
+              const container = e.currentTarget as HTMLElement;
+              const secondaryIcon = container.querySelector('.secondary-icon') as HTMLElement;
+              const tertiaryIcon = container.querySelector('.tertiary-icon') as HTMLElement;
+              
+              // Expand container width
+              container.style.width = '136px'; // Space for all 3 icons + gaps
+              
+              if (secondaryIcon) {
+                secondaryIcon.style.opacity = '1';
+                secondaryIcon.style.transform = 'scale(1) translateX(0px)';
+                secondaryIcon.style.pointerEvents = 'auto';
+              }
+              if (tertiaryIcon) {
+                tertiaryIcon.style.opacity = '1';
+                tertiaryIcon.style.transform = 'scale(1) translateX(0px)';
+                tertiaryIcon.style.pointerEvents = 'auto';
+              }
+            }}
+            onMouseLeave={(e) => {
+              const container = e.currentTarget as HTMLElement;
+              const secondaryIcon = container.querySelector('.secondary-icon') as HTMLElement;
+              const tertiaryIcon = container.querySelector('.tertiary-icon') as HTMLElement;
+              
+              // Collapse container width
+              container.style.width = '40px'; // Back to single icon
+              
+              if (secondaryIcon) {
+                secondaryIcon.style.opacity = '0';
+                secondaryIcon.style.transform = 'scale(0.8) translateX(-20px)';
+                secondaryIcon.style.pointerEvents = 'none';
+              }
+              if (tertiaryIcon) {
+                tertiaryIcon.style.opacity = '0';
+                tertiaryIcon.style.transform = 'scale(0.8) translateX(-20px)';
+                tertiaryIcon.style.pointerEvents = 'none';
+              }
+            }}
+          >
+            <div 
+              className="icon-group"
               style={{
-                ...createGlassButtonStyle('107, 114, 128', true), // gray color
-                width: '40px',
-                height: '40px',
-                color: '#9ca3af'
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                position: 'relative',
+                width: '100%',
+                height: '100%'
               }}
-              {...createGlassButtonHoverHandlers('107, 114, 128')}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M12 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M9 14l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          </div>
-          
-          {/* Audio Recording Button Container */}
-          <div className="button-container">
-            <button
-              onClick={toggleRecording}
-              disabled={true}
-              title="Audio recording (coming soon)"
-              style={{
-                ...createGlassButtonStyle('107, 114, 128', true), // gray color
-                width: '40px',
-                height: '40px',
-                color: '#9ca3af'
-              }}
-              {...createGlassButtonHoverHandlers('107, 114, 128')}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M12 19v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M8 23h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
+              {/* Configuration Button - Primary (always visible) */}
+              <div 
+                className="button-container primary-icon"
+                style={{
+                  opacity: 1,
+                  transform: 'scale(1)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
+              >
+                <button
+                  onClick={() => {
+                    playAudioFeedback('click');
+                    onShowChatConfig && onShowChatConfig();
+                  }}
+                  disabled={disabled || isLoading}
+                  title="Chat settings and configuration"
+                  style={{
+                    ...createGlassButtonStyle('75, 85, 99', disabled || isLoading),
+                    width: '40px',
+                    height: '40px',
+                    color: '#64748b'
+                  }}
+                  {...createGlassButtonHoverHandlers('75, 85, 99')}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* File Upload Button - Secondary (hidden by default, visible on hover) */}
+              <div 
+                className="button-container secondary-icon"
+                style={{
+                  opacity: 0,
+                  transform: 'scale(0.8) translateX(-20px)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'absolute',
+                  left: '48px', // Position right after the first icon
+                  pointerEvents: 'none'
+                }}
+              >
+                <button
+                  onClick={() => handleFileSelection}
+                  disabled={true}
+                  title="File upload (coming soon)"
+                  style={{
+                    ...createGlassButtonStyle('107, 114, 128', true),
+                    width: '40px',
+                    height: '40px',
+                    color: '#9ca3af'
+                  }}
+                  {...createGlassButtonHoverHandlers('107, 114, 128')}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M12 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M9 14l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+              
+              {/* Audio Recording Button - Tertiary (hidden by default, visible on hover) */}
+              <div 
+                className="button-container tertiary-icon"
+                style={{
+                  opacity: 0,
+                  transform: 'scale(0.8) translateX(-20px)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'absolute',
+                  left: '96px', // Position right after the second icon
+                  pointerEvents: 'none'
+                }}
+              >
+                <button
+                  onClick={toggleRecording}
+                  disabled={true}
+                  title="Audio recording (coming soon)"
+                  style={{
+                    ...createGlassButtonStyle('107, 114, 128', true),
+                    width: '40px',
+                    height: '40px',
+                    color: '#9ca3af'
+                  }}
+                  {...createGlassButtonHoverHandlers('107, 114, 128')}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M12 19v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M8 23h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
           </div>
           
           {/* Chat Input Container with Magic Wand */}
@@ -418,12 +538,12 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
               value={inputValue}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder={inputValue.trim() ? (placeholder || "Type your message...") : "       " + (placeholder || "Type your message or click ✨ for smart widgets...")}
+              placeholder={inputValue.trim() ? (placeholder || "Type your message...") : "          " + (placeholder || "Type your message or click ✨ for smart widgets...")}
               disabled={disabled || isLoading}
               autoFocus={autoFocus}
               rows={1}
               className="chat-input"
-              style={{ paddingLeft: inputValue.trim() ? '12px' : '50px' }}
+              style={{ paddingLeft: inputValue.trim() ? '12px' : '58px' }}
             />
             {/* Magic Wand Button - Left side of textarea, only when empty */}
             {!inputValue.trim() && (

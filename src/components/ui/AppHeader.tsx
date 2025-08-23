@@ -1,5 +1,4 @@
 import React from 'react';
-import { AssistantToolbar } from './AssistantToolbar';
 import { TaskToolbar } from './TaskToolbar';
 import { CalendarToolbar } from './CalendarToolbar';
 import { NotificationToolbar } from './NotificationToolbar';
@@ -42,15 +41,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               boxShadow: '0 2px 6px rgba(66, 133, 244, 0.2)'
             }}
           >
-            <span className="text-sm font-bold" style={{ color: 'var(--text-inverse)' }}>I</span>
+            <span className="text-sm font-bold" style={{ color: 'var(--text-inverse)' }}>C</span>
           </div>
           <div className="flex flex-col">
             <h1 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              ISA
+              Claude
             </h1>
-            <p className="text-xs -mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Intelligent Agent Platform
-            </p>
           </div>
         </div>
 
@@ -69,14 +65,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       
       {/* Right Section - Status & Controls */}
       <div className="flex items-center gap-3">
-        {/* System Status - More Subtle */}
-        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-          <div 
-            className="w-1.5 h-1.5 rounded-full" 
-            style={{ backgroundColor: 'var(--color-accent)' }}
-          ></div>
-          <span>v0.1</span>
-        </div>
 
         {/* Theme Toggle */}
         <ThemeToggle size="sm" className="mx-2" />
@@ -89,9 +77,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           className="ml-1"
         />
         
-        {/* Personal Assistant Toolbar Suite - macOS style */}
+        {/* Toolbar Suite - macOS style */}
         <div className="flex items-center gap-2">
-          <AssistantToolbar />
           <TaskToolbar />
           <CalendarToolbar />
           <NotificationToolbar />

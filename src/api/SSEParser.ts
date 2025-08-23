@@ -641,10 +641,10 @@ export class SSEParser {
       console.log('🚨 SSE_PARSER: Real HIL interrupt detected in graph_update:', interruptData);
       
       // 转换为AGUI标准格式的HIL中断事件
-      const hilInterrupt = {
+      const hilInterrupt: HILInterruptData = {
         id: `hil_interrupt_${Date.now()}`,
-        type: interruptData.type === 'ask_human' ? 'ask_human' as const : 
-              interruptData.type === 'authorization' ? 'authorization' as const : 
+        type: interruptData.type === 'ask_human' ? 'input_validation' as const : 
+              interruptData.type === 'authorization' ? 'tool_authorization' as const : 
               'input_validation' as const,
         title: interruptData.type === 'ask_human' ? 'Human Input Required' : 
                interruptData.type === 'authorization' ? 'Authorization Required' : 
@@ -846,7 +846,9 @@ export class SSEParser {
     if (interruptData && callbacks.onHILInterruptDetected) {
       const hilInterrupt: HILInterruptData = {
         id: interruptData.id || `interrupt_${Date.now()}`,
-        type: interruptData.type || 'approval',
+        type: interruptData.type === 'ask_human' ? 'input_validation' : 
+              interruptData.type === 'authorization' ? 'tool_authorization' : 
+              (interruptData.type || 'approval'),
         timestamp: eventData.timestamp || new Date().toISOString(),
         thread_id: interruptData.thread_id || 'unknown',
         title: interruptData.title || 'Human intervention required',

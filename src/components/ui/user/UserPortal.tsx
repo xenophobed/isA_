@@ -16,7 +16,12 @@
 
 import React, { useState } from 'react';
 import { useUserModule, PRICING_PLANS, formatCredits } from '../../../modules/UserModule';
+import { useContextModule } from '../../../modules/ContextModule';
+import { useOrganizationModule } from '../../../modules/OrganizationModule';
 import { PlanType } from '../../../types/userTypes';
+import OrganizationMembersPanel from '../organization/OrganizationMembersPanel';
+import InviteMemberModal, { InviteMemberData } from '../organization/InviteMemberModal';
+import CreateOrganizationModal, { CreateOrganizationData } from '../organization/CreateOrganizationModal';
 
 interface UserPortalProps {
   isOpen: boolean;
@@ -26,8 +31,11 @@ interface UserPortalProps {
 
 export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose, sidebarWidth = '16.67%' }) => {
   const userModule = useUserModule();
-  const [activeTab, setActiveTab] = useState<'account' | 'billing' | 'usage'>('account');
+  const contextModule = useContextModule();
+  const organizationModule = useOrganizationModule();
+  const [activeTab, setActiveTab] = useState<'account' | 'billing' | 'usage' | 'organizations'>('account');
   const [upgradingPlan, setUpgradingPlan] = useState<string | null>(null);
+  const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
 
   // Don't render if not open or not authenticated
   if (!isOpen || !userModule.isAuthenticated || !userModule.auth0User) {
@@ -101,7 +109,7 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose, sidebar
 
       {/* Drawer - positioned AFTER the left sidebar */}
       <div 
-        className="fixed top-0 h-full w-96 bg-gradient-to-br from-gray-900/95 via-gray-800/95 to-gray-900/95 backdrop-blur-xl shadow-2xl transition-all duration-300 ease-out z-50 border-l border-white/20"
+        className="fixed top-0 h-full w-[480px] bg-gradient-to-br from-gray-900/95 via-gray-800/95 to-gray-900/95 backdrop-blur-xl shadow-2xl transition-all duration-300 ease-out z-50 border-l border-white/20"
         style={{ 
           left: portalLeftPosition, // Start right after the left sidebar
           backdropFilter: 'blur(20px)',
@@ -186,7 +194,8 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose, sidebar
           {[
             { id: 'account', label: 'Account', icon: '👤' },
             { id: 'billing', label: 'Billing', icon: '💳' },
-            { id: 'usage', label: 'Usage', icon: '📊' }
+            { id: 'usage', label: 'Usage', icon: '📊' },
+            { id: 'organizations', label: 'Organizations', icon: '🏢' }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -234,6 +243,14 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose, sidebar
               usagePercentage={usagePercentage}
               getCreditColor={getCreditColor}
               formatCredits={formatCredits}
+            />
+          )}
+
+          {activeTab === 'organizations' && (
+            <OrganizationsTab 
+              contextModule={contextModule}
+              organizationModule={organizationModule}
+              userModule={userModule}
             />
           )}
         </div>
@@ -469,3 +486,224 @@ const UsageTab: React.FC<{
     </div>
   </div>
 );
+
+const OrganizationsTab: React.FC<{
+  contextModule: any;
+  organizationModule: any;
+  userModule: any;
+}> = ({ contextModule, organizationModule, userModule }) => {
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  // Mock organization data for now
+  const currentOrganization = contextModule.currentContext?.type === 'organization' 
+    ? contextModule.currentContext.organization 
+    : null;
+
+  const availableOrganizations = contextModule.availableOrganizations || [];
+
+  // Handle organization creation
+  const handleCreateOrganization = async (data: CreateOrganizationData) => {
+    setCreateLoading(true);
+    setCreateError(null);
+    
+    try {
+      console.log('Creating organization with data:', data);
+      
+      // Call organization creation API
+      const newOrganization = await organizationModule.createOrganization(data);
+      console.log('Organization created successfully:', newOrganization);
+      
+      // Close modal and refresh context
+      setShowCreateModal(false);
+      
+      // Refresh organizations list
+      await contextModule.refreshContext();
+      
+    } catch (error) {
+      console.error('Failed to create organization:', error);
+      setCreateError(error instanceof Error ? error.message : 'Failed to create organization');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Current Context */}
+      <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+        <h3 className="text-white font-medium mb-3">Current Context</h3>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div 
+              className="w-3 h-3 rounded-full"
+              style={{ 
+                background: contextModule.contextType === 'organization' ? '#f59e0b' : '#10b981' 
+              }}
+            />
+            <div>
+              <div className="text-white font-medium">
+                {contextModule.contextType === 'organization' ? 'Organization Mode' : 'Personal Mode'}
+              </div>
+              {currentOrganization && (
+                <div className="text-sm text-gray-400">
+                  {currentOrganization.name} • {currentOrganization.role}
+                </div>
+              )}
+            </div>
+          </div>
+          {contextModule.contextType === 'organization' && (
+            <button
+              onClick={() => contextModule.switchToPersonal()}
+              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+            >
+              Switch to Personal
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Organizations List */}
+      <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-white font-medium">Your Organizations</h3>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors"
+          >
+            + Create Organization
+          </button>
+        </div>
+
+        {availableOrganizations.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="text-gray-400 text-sm">
+              You haven't created or joined any organizations yet.
+            </div>
+            <div className="text-gray-500 text-xs mt-1">
+              Create an organization to collaborate with your team!
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {availableOrganizations.map((org: any) => (
+              <div
+                key={org.id}
+                className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                    {org.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="text-white font-medium">{org.name}</div>
+                    <div className="text-sm text-gray-400">
+                      {org.role} • {org.plan} Plan • {org.creditsPool} credits
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {contextModule.contextType === 'personal' && (
+                    <button
+                      onClick={() => contextModule.switchToOrganization(org.id)}
+                      className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg transition-colors"
+                    >
+                      Switch
+                    </button>
+                  )}
+                  {(org.role === 'owner' || org.role === 'admin') && (
+                    <button
+                      onClick={() => setShowInviteModal(true)}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+                    >
+                      Invite
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Organization Features */}
+      {contextModule.contextType === 'organization' && currentOrganization && (
+        <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+          <h3 className="text-white font-medium mb-3">Organization Features</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors text-left">
+              <div className="text-blue-400 text-lg mb-1">👥</div>
+              <div className="text-white text-sm font-medium">Members</div>
+              <div className="text-gray-400 text-xs">Manage team</div>
+            </button>
+            <button className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors text-left">
+              <div className="text-green-400 text-lg mb-1">📊</div>
+              <div className="text-white text-sm font-medium">Analytics</div>
+              <div className="text-gray-400 text-xs">Usage stats</div>
+            </button>
+            <button className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors text-left">
+              <div className="text-purple-400 text-lg mb-1">⚙️</div>
+              <div className="text-white text-sm font-medium">Settings</div>
+              <div className="text-gray-400 text-xs">Configure org</div>
+            </button>
+            <button className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors text-left">
+              <div className="text-yellow-400 text-lg mb-1">💳</div>
+              <div className="text-white text-sm font-medium">Billing</div>
+              <div className="text-gray-400 text-xs">Manage plan</div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+        <h3 className="text-white font-medium mb-3">Quick Actions</h3>
+        <div className="space-y-2">
+          <button
+            onClick={() => contextModule.refreshContext()}
+            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+          >
+            🔄 Refresh Organizations
+          </button>
+          {contextModule.contextType === 'organization' && (
+            <button className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm">
+              📋 View Organization Dashboard
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Create Organization Modal */}
+      <CreateOrganizationModal
+        isOpen={showCreateModal}
+        isLoading={createLoading}
+        error={createError}
+        onClose={() => {
+          setShowCreateModal(false);
+          setCreateError(null);
+        }}
+        onCreate={handleCreateOrganization}
+      />
+
+      {/* Invite Member Modal - TODO: Implement */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-6 rounded-xl border border-white/10 max-w-md w-full mx-4">
+            <h3 className="text-white font-medium mb-4">Invite Member</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              Member invitation feature is coming soon!
+            </p>
+            <button
+              onClick={() => setShowInviteModal(false)}
+              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

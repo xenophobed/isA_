@@ -1,0 +1,737 @@
+/**
+ * ============================================================================
+ * Mobile-First CSS - Enhanced mobile support
+ * ============================================================================
+ */
+
+/* Native app safe area support */
+:root {
+  /* Safe area insets - will be updated by JS */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --status-bar-height: 0px;
+  
+  /* Mobile-specific spacing */
+  --mobile-header-height: 56px;
+  --mobile-input-height: 64px;
+  --mobile-touch-target: 48px;
+  --mobile-padding: 16px;
+  --mobile-gap: 12px;
+  
+  /* Mobile typography */
+  --mobile-font-size-xs: 12px;
+  --mobile-font-size-sm: 14px;
+  --mobile-font-size-base: 16px;
+  --mobile-font-size-lg: 18px;
+  --mobile-font-size-xl: 20px;
+  
+  /* Mobile breakpoints */
+  --mobile-xs: 375px;
+  --mobile-sm: 425px;
+  --tablet-sm: 768px;
+  --tablet-lg: 1024px;
+}
+
+/* ============================================================================
+ * Base mobile styles
+ * ============================================================================ */
+
+/* Prevent horizontal scroll on mobile */
+html, body {
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile viewport optimization */
+@media (max-width: 768px) {
+  html {
+    /* Prevent zoom on form focus in iOS */
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+  }
+  
+  body {
+    /* Improved touch scrolling */
+    -webkit-overflow-scrolling: touch;
+    /* Prevent bounce scrolling */
+    overscroll-behavior: none;
+  }
+}
+
+/* ============================================================================
+ * Native app specific styles
+ * ============================================================================ */
+
+/* Native app container */
+.native-app {
+  /* Respect safe areas */
+  padding-top: var(--sat);
+  padding-bottom: var(--sab);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+  
+  /* Full height minus safe areas */
+  height: calc(100vh - var(--sat) - var(--sab));
+  min-height: calc(100vh - var(--sat) - var(--sab));
+}
+
+/* Native header adjustments */
+.native-header {
+  height: calc(var(--mobile-header-height) + var(--status-bar-height));
+  padding-top: var(--status-bar-height);
+}
+
+/* ============================================================================
+ * Mobile chat layout
+ * ============================================================================ */
+
+.mobile-chat-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.mobile-optimized {
+  /* Mobile-specific optimizations */
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.tablet-optimized {
+  /* Tablet-specific optimizations */
+  max-width: 1024px;
+  margin: 0 auto;
+}
+
+/* ============================================================================
+ * Mobile header
+ * ============================================================================ */
+
+.mobile-header {
+  flex-shrink: 0;
+  min-height: var(--mobile-header-height);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+}
+
+.mobile-menu-btn {
+  /* Ensure proper touch target size */
+  min-width: var(--mobile-touch-target);
+  min-height: var(--mobile-touch-target);
+  
+  /* Improve touch feedback */
+  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-menu-btn:active {
+  transform: scale(0.95);
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* ============================================================================
+ * Mobile sidebar
+ * ============================================================================ */
+
+.mobile-sidebar {
+  /* Hardware acceleration for smooth animations */
+  will-change: transform;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  
+  /* Better backdrop blur support */
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+}
+
+/* Mobile sidebar animations */
+@media (max-width: 768px) {
+  .mobile-sidebar {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Prevent content shift during sidebar animation */
+  .mobile-sidebar + * {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* ============================================================================
+ * Mobile message list
+ * ============================================================================ */
+
+.mobile-message-list {
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  
+  /* Prevent overscroll bounce */
+  overscroll-behavior: contain;
+}
+
+.mobile-message {
+  /* Optimize for mobile rendering */
+  contain: layout;
+  will-change: auto;
+}
+
+/* Message bubble optimizations */
+.message-bubble {
+  /* Better text rendering on mobile */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Improve message bubble touch targets */
+.message-bubble:active {
+  transform: scale(0.98);
+  transition: transform 0.1s ease-out;
+}
+
+/* ============================================================================
+ * Mobile input area
+ * ============================================================================ */
+
+.mobile-input-area {
+  flex-shrink: 0;
+  min-height: var(--mobile-input-height);
+  
+  /* Sticky positioning for better UX */
+  position: sticky;
+  bottom: 0;
+  
+  /* Backdrop blur */
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+}
+
+/* Mobile input field */
+.mobile-input-area textarea {
+  /* Prevent zoom on iOS */
+  font-size: var(--mobile-font-size-base);
+  
+  /* Better mobile input handling */
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 12px;
+  
+  /* Smooth resizing */
+  transition: height 0.2s ease-out;
+  
+  /* Prevent autocomplete styling */
+  -webkit-box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.05) inset;
+  box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.05) inset;
+}
+
+/* Mobile input buttons */
+.mobile-input-area button {
+  min-width: var(--mobile-touch-target);
+  min-height: var(--mobile-touch-target);
+  
+  /* Better touch feedback */
+  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-input-area button:active {
+  transform: scale(0.95);
+}
+
+/* ============================================================================
+ * Touch and gesture support
+ * ============================================================================ */
+
+/* Improve touch targets for all interactive elements */
+@media (pointer: coarse) {
+  button, 
+  input[type="button"], 
+  input[type="submit"], 
+  [role="button"], 
+  .clickable {
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    padding: 8px 12px;
+  }
+}
+
+/* Disable text selection where appropriate */
+.mobile-chat-layout button,
+.mobile-chat-layout .mobile-header,
+.mobile-chat-layout .mobile-input-area {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ============================================================================
+ * Keyboard handling
+ * ============================================================================ */
+
+/* Keyboard visible state */
+.keyboard-visible {
+  /* Adjust layout when keyboard is shown */
+  height: calc(100vh - var(--keyboard-height, 0px));
+}
+
+/* Input area keyboard adjustments */
+.mobile-input-area.keyboard-visible {
+  padding-bottom: calc(var(--mobile-padding) + env(keyboard-inset-height, 0px));
+}
+
+/* ============================================================================
+ * Device-specific optimizations
+ * ============================================================================ */
+
+/* iPhone X and newer (devices with notch) */
+@supports (padding: max(0px)) {
+  .native-app {
+    padding-left: max(var(--sal), 16px);
+    padding-right: max(var(--sar), 16px);
+    padding-bottom: max(var(--sab), 16px);
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 375px) {
+  :root {
+    --mobile-padding: 12px;
+    --mobile-gap: 8px;
+    --mobile-touch-target: 44px;
+  }
+  
+  .mobile-header {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  
+  .mobile-input-area {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+/* Large mobile devices */
+@media (min-width: 425px) and (max-width: 768px) {
+  .mobile-chat-layout {
+    max-width: 425px;
+    margin: 0 auto;
+  }
+}
+
+/* Landscape orientation on mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  .mobile-header {
+    height: 48px;
+    min-height: 48px;
+  }
+  
+  .mobile-input-area {
+    min-height: 56px;
+  }
+  
+  .mobile-message-list {
+    /* Adjust for reduced vertical space */
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
+
+/* ============================================================================
+ * Performance optimizations
+ * ============================================================================ */
+
+/* GPU acceleration for smooth animations */
+.mobile-sidebar,
+.mobile-header,
+.mobile-input-area {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Optimize scroll performance */
+.mobile-message-list {
+  contain: layout style paint;
+  overflow-anchor: auto;
+}
+
+/* Reduce repaints during scrolling */
+.mobile-message .message-bubble {
+  contain: layout style;
+}
+
+/* ============================================================================
+ * Accessibility improvements
+ * ============================================================================ */
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .mobile-chat-layout {
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --glass-border-hover: rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .mobile-sidebar,
+  .mobile-menu-btn,
+  .mobile-input-area button {
+    transition: none;
+  }
+  
+  .mobile-message-list {
+    scroll-behavior: auto;
+  }
+}
+
+/* Focus indicators for keyboard navigation */
+@media (any-hover: none) {
+  button:focus,
+  input:focus,
+  textarea:focus {
+    outline: 2px solid rgba(59, 130, 246, 0.5);
+    outline-offset: 2px;
+  }
+}
+
+/* ============================================================================
+ * Dark mode optimizations
+ * ============================================================================ */
+
+@media (prefers-color-scheme: dark) {
+  .mobile-chat-layout {
+    /* Enhanced dark mode colors */
+    --glass-primary: rgba(0, 0, 0, 0.8);
+    --glass-secondary: rgba(15, 15, 35, 0.9);
+    --glass-border: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* ============================================================================
+ * Modern Mobile Components - ChatGPT/Claude/Gemini inspired
+ * ============================================================================ */
+
+.modern-mobile-chat-layout {
+  /* Modern layout optimizations */
+  contain: layout style paint;
+  isolation: isolate;
+}
+
+.modern-mobile-header {
+  /* Enhanced glassmorphism effect */
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  
+  /* Smooth transitions */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modern-mobile-header button {
+  /* Modern button interactions */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, background-color;
+}
+
+.modern-mobile-header button:active {
+  transform: scale(0.96);
+}
+
+.modern-mobile-message-list {
+  /* Enhanced scroll performance */
+  scroll-behavior: smooth;
+  overflow-anchor: auto;
+  contain: layout;
+  
+  /* Better momentum scrolling */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.modern-message-container {
+  /* Animation support */
+  animation: messageSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  contain: layout style;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-content {
+  /* Optimize text rendering */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.typing-dots div {
+  /* Smooth animation delays */
+  animation: typingBounce 1.4s ease-in-out infinite;
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-10px);
+  }
+}
+
+.modern-mobile-input-area {
+  /* Modern input styling */
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modern-mobile-input-area textarea {
+  /* Prevent iOS zoom and enhance UX */
+  font-size: 16px !important;
+  -webkit-appearance: none;
+  appearance: none;
+  
+  /* Smooth height transitions */
+  transition: height 0.2s ease-out, border-color 0.2s ease-out;
+  
+  /* Better mobile input */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+.modern-mobile-input-area textarea:focus {
+  /* Enhanced focus state */
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.modern-mobile-input-area button {
+  /* Touch-friendly buttons */
+  min-width: 40px;
+  min-height: 40px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, background-color;
+}
+
+.modern-mobile-input-area button:active {
+  transform: scale(0.95);
+}
+
+/* Suggestions styling */
+.modern-mobile-input-area button[class*="suggestion"] {
+  /* Modern suggestion pills */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* File attachment previews */
+.modern-mobile-input-area .file-preview {
+  animation: fileSlideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fileSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Menu overlay modern styling */
+.modern-mobile-chat-layout .fixed.inset-0 {
+  /* Modern backdrop */
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  animation: backdropFadeIn 0.2s ease-out;
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modern-mobile-chat-layout .fixed.top-16 {
+  /* Modern menu panel */
+  animation: menuSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+@keyframes menuSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+/* Mobile task progress animations */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 200px;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 200px;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+  }
+}
+
+@keyframes progressFlow {
+  0% {
+    background-position: -100% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* Premium animation classes */
+.animate-fadeIn {
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  background-size: 200px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-slideDown {
+  animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-pulseGlow {
+  animation: pulseGlow 2s infinite;
+}
+
+.animate-progressFlow {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: progressFlow 2s infinite;
+}
+
+/* Scrollbar hide utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar { 
+  display: none;  /* Safari and Chrome */
+}
+
+/* ============================================================================
+ * Print styles (hide mobile-specific elements)
+ * ============================================================================ */
+
+@media print {
+  .mobile-header,
+  .mobile-input-area,
+  .mobile-sidebar,
+  .modern-mobile-header,
+  .modern-mobile-input-area {
+    display: none !important;
+  }
+  
+  .mobile-message-list,
+  .modern-mobile-message-list {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}

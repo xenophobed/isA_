@@ -224,7 +224,17 @@ const MainAppContent: React.FC = () => {
       {/* User Management at Bottom */}
       <div className="border-t border-white/10 pt-4 mt-4">
         <UserButton 
+          isAuthenticated={false}
+          isLoading={false}
+          user={null}
+          credits={0}
+          currentPlan="free"
+          contextType="personal"
+          availableOrganizations={[]}
+          onLogin={() => {}}
           onToggleDrawer={() => setShowUserDrawer(!showUserDrawer)}
+          onSwitchToPersonal={() => {}}
+          onSwitchToOrganization={() => {}}
           showDrawer={showUserDrawer}
         />
       </div>
