@@ -39,6 +39,7 @@ import React, { useState, memo, useCallback, useMemo } from 'react';
 import { ChatContentLayout } from './ChatContentLayout';
 import { InputAreaLayout } from './InputAreaLayout';
 import { SmartWidgetSelector } from '../widgets/SmartWidgetSelector';
+import { THEME_COLORS } from '../../../constants/theme';
 
 // Pure interface - no dependency on stores
 export interface ChatMessage {
@@ -286,7 +287,8 @@ export const ChatLayout = memo<ChatLayoutProps>(({
       style={{
         width: '100%',
         maxWidth: '100%',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        background: THEME_COLORS.primaryGradient
       }}
     >
       {/* Header */}
@@ -296,14 +298,23 @@ export const ChatLayout = memo<ChatLayoutProps>(({
         </div>
       )}
 
-      {/* CSS Grid Main Content Area */}
-      <div style={gridStyles} className="flex-1 overflow-hidden">
+      {/* CSS Grid Main Content Area with Glass Overlay */}
+      <div style={gridStyles} className="flex-1 overflow-hidden relative">
+        {/* Glassmorphism Background Overlay */}
+        <div className="absolute inset-0 bg-white/5 backdrop-blur-sm pointer-events-none" />
+        
+        {/* Floating Glass Orbs for Ambient Effect */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-white/5 rounded-full blur-xl animate-pulse delay-1000" />
+          <div className="absolute top-3/4 right-1/3 w-24 h-24 bg-purple-400/10 rounded-full blur-lg animate-pulse delay-2000" />
+          <div className="absolute bottom-1/2 left-3/4 w-40 h-40 bg-blue-400/8 rounded-full blur-2xl animate-pulse delay-500" />
+        </div>
         
         {/* Left Sidebar */}
         {gridConfig.showLeftSidebar && effectiveLeftPanelContent && (
           <div 
-            className="border-r border-glass-border overflow-hidden"
-            style={{ gridArea: 'left' }}
+            className="overflow-hidden relative z-10"
+            style={{ borderRight: '1px solid var(--glass-border)', gridArea: 'left' }}
           >
             {effectiveLeftPanelContent}
           </div>
@@ -311,7 +322,7 @@ export const ChatLayout = memo<ChatLayoutProps>(({
 
         {/* Center Chat Area */}
         <div 
-          className="flex flex-col overflow-hidden min-w-0"
+          className="flex flex-col overflow-hidden min-w-0 relative z-10"
           style={{ gridArea: 'chat' }}
         >
           {/* Chat Content */}
@@ -326,7 +337,7 @@ export const ChatLayout = memo<ChatLayoutProps>(({
           </div>
 
           {/* Input Area */}
-          <div className="flex-shrink-0 border-t border-glass-border">
+          <div className="flex-shrink-0" style={{ borderTop: '1px solid var(--glass-border)' }}>
             <InputAreaLayout
               onSend={onSendMessage}
               onSendMultimodal={onSendMultimodal}
@@ -340,8 +351,8 @@ export const ChatLayout = memo<ChatLayoutProps>(({
         {/* Right Sidebar (Widget Mode) */}
         {showRightSidebar && rightSidebarContent && (
           <div 
-            className="border-l border-glass-border glass-tertiary overflow-hidden"
-            style={{ gridArea: 'widget' }}
+            className="glass-tertiary overflow-hidden relative z-10"
+            style={{ borderLeft: '1px solid var(--glass-border)', gridArea: 'widget' }}
           >
             {rightSidebarContent}
           </div>
@@ -350,8 +361,9 @@ export const ChatLayout = memo<ChatLayoutProps>(({
         {/* Right Panel (Session Management) */}
         {gridConfig.showRightPanel && rightPanelContent && (
           <div 
-            className="border-l border-glass-border overflow-hidden w-full max-w-full"
+            className="overflow-hidden w-full max-w-full relative z-10"
             style={{ 
+              borderLeft: '1px solid var(--glass-border)', 
               gridArea: 'right',
               minWidth: 0,
               maxWidth: '100%'

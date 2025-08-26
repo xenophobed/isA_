@@ -1,5 +1,6 @@
 import React, { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
+import { GlassChatInput, GlassCard, GlassButton, IntelligentModeSettings } from '../../shared';
 
 export interface InputAreaLayoutProps {
   placeholder?: string;
@@ -52,6 +53,11 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [intelligentMode, setIntelligentMode] = useState<IntelligentModeSettings>({
+    mode: 'reactive',
+    confidence_threshold: 0.7,
+    enable_predictions: false
+  });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -211,36 +217,31 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
   };
 
 
-  // Unified Glass Button Style Creator
-  const createGlassButtonStyle = (color: string, isDisabled: boolean = false) => ({
+  // Minimal Button Style Creator
+  const createMinimalButtonStyle = (isDisabled: boolean = false) => ({
     borderRadius: '8px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: isDisabled ? 'not-allowed' : 'pointer',
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    background: `rgba(${color}, 0.1)`,
-    backdropFilter: 'blur(10px)',
-    border: `1px solid rgba(${color}, 0.2)`,
-    opacity: isDisabled ? 0.4 : 1,
-    boxShadow: `0 2px 8px rgba(${color}, 0.15)`
+    transition: 'all 0.15s ease',
+    background: isDisabled ? '#f3f4f6' : '#ffffff',
+    border: isDisabled ? '1px solid #e5e7eb' : '1px solid #e5e7eb',
+    opacity: isDisabled ? 0.6 : 1,
+    color: isDisabled ? '#9ca3af' : '#374151'
   });
 
-  const createGlassButtonHoverHandlers = (color: string) => ({
+  const createMinimalHoverHandlers = () => ({
     onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
       if (!e.currentTarget.disabled) {
-        e.currentTarget.style.background = `rgba(${color}, 0.2)`;
-        e.currentTarget.style.borderColor = `rgba(${color}, 0.4)`;
-        e.currentTarget.style.transform = 'scale(1.05)';
-        e.currentTarget.style.boxShadow = `0 4px 12px rgba(${color}, 0.25)`;
+        e.currentTarget.style.background = '#f9fafb';
+        e.currentTarget.style.borderColor = '#d1d5db';
       }
     },
     onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
       if (!e.currentTarget.disabled) {
-        e.currentTarget.style.background = `rgba(${color}, 0.1)`;
-        e.currentTarget.style.borderColor = `rgba(${color}, 0.2)`;
-        e.currentTarget.style.transform = 'scale(1)';
-        e.currentTarget.style.boxShadow = `0 2px 8px rgba(${color}, 0.15)`;
+        e.currentTarget.style.background = '#ffffff';
+        e.currentTarget.style.borderColor = '#e5e7eb';
       }
     }
   });
@@ -300,370 +301,72 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
     </div>
   );
 
+  // Handle file attachment
+  const handleFileAttach = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.txt';
+    input.onchange = (e: any) => {
+      const files = Array.from(e.target.files || []) as File[];
+      setAttachedFiles(prev => [...prev, ...files]);
+    };
+    input.click();
+  };
+
   return (
-    <div className={`input-area-container ${className}`}>
+    <div className={`p-4 ${className}`}>
       {/* Suggestions Content */}
       {suggestionsContent && (
-        <div className="suggestions-content">
+        <GlassCard variant="subtle" className="mb-4">
           {suggestionsContent}
-        </div>
+        </GlassCard>
       )}
       
       {/* File Attachments Display */}
       {attachedFiles.length > 0 && (
-        <div className="attached-files">
-          <div className="attached-files-label">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M17 8l-5-5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M12 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            {attachedFiles.length} file{attachedFiles.length > 1 ? 's' : ''} attached
-          </div>
-          <div className="attached-files-list">
+        <div className="mb-4">
+          <div className="flex flex-wrap gap-2">
             {attachedFiles.map((file, index) => (
-              <div key={index} className="attached-file-item">
-                <div className="file-info">
-                  <div className="file-icon">
-                    {file.type.startsWith('image/') ? (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
-                        <circle cx="9" cy="9" r="2" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21" stroke="currentColor" strokeWidth="2"/>
-                      </svg>
-                    ) : file.type.startsWith('audio/') ? (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M12 19v4" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M8 23h8" stroke="currentColor" strokeWidth="2"/>
-                      </svg>
-                    ) : (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2"/>
-                      </svg>
-                    )}
-                  </div>
-                  <div className="file-details">
-                    <div className="file-name">{file.name}</div>
-                    <div className="file-size">{Math.round(file.size / 1024)}KB</div>
-                  </div>
-                </div>
-                <button
-                  className="remove-file"
-                  onClick={() => removeFile(index)}
-                  title={`Remove ${file.name}`}
+              <GlassCard key={index} variant="elevated" className="flex items-center gap-2 px-3 py-2 text-sm">
+                <span className="font-medium">{file.name}</span>
+                <span className="text-xs opacity-70">({Math.round(file.size / 1024)}KB)</span>
+                <GlassButton
+                  onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== index))}
+                  variant="ghost"
+                  size="xs"
+                  className="w-5 h-5 !p-0 text-red-400 hover:text-red-300"
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                </button>
-              </div>
+                  ×
+                </GlassButton>
+              </GlassCard>
             ))}
           </div>
         </div>
       )}
-      
-      {/* Main Input Area */}
-      <div className="input-controls">
-        <div className="input-row">
-          {/* Collapsed Icon Group - Shows 1 by default, expands to 3 on hover */}
-          <div 
-            className="icon-group-container"
-            style={{ 
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              width: '40px', // Start with space for just 1 icon
-              height: '40px',
-              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              overflow: 'visible' // Allow absolute positioned icons to show outside
-            }}
-            onMouseEnter={(e) => {
-              const container = e.currentTarget as HTMLElement;
-              const secondaryIcon = container.querySelector('.secondary-icon') as HTMLElement;
-              const tertiaryIcon = container.querySelector('.tertiary-icon') as HTMLElement;
-              
-              // Expand container width
-              container.style.width = '136px'; // Space for all 3 icons + gaps
-              
-              if (secondaryIcon) {
-                secondaryIcon.style.opacity = '1';
-                secondaryIcon.style.transform = 'scale(1) translateX(0px)';
-                secondaryIcon.style.pointerEvents = 'auto';
-              }
-              if (tertiaryIcon) {
-                tertiaryIcon.style.opacity = '1';
-                tertiaryIcon.style.transform = 'scale(1) translateX(0px)';
-                tertiaryIcon.style.pointerEvents = 'auto';
-              }
-            }}
-            onMouseLeave={(e) => {
-              const container = e.currentTarget as HTMLElement;
-              const secondaryIcon = container.querySelector('.secondary-icon') as HTMLElement;
-              const tertiaryIcon = container.querySelector('.tertiary-icon') as HTMLElement;
-              
-              // Collapse container width
-              container.style.width = '40px'; // Back to single icon
-              
-              if (secondaryIcon) {
-                secondaryIcon.style.opacity = '0';
-                secondaryIcon.style.transform = 'scale(0.8) translateX(-20px)';
-                secondaryIcon.style.pointerEvents = 'none';
-              }
-              if (tertiaryIcon) {
-                tertiaryIcon.style.opacity = '0';
-                tertiaryIcon.style.transform = 'scale(0.8) translateX(-20px)';
-                tertiaryIcon.style.pointerEvents = 'none';
-              }
-            }}
-          >
-            <div 
-              className="icon-group"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                position: 'relative',
-                width: '100%',
-                height: '100%'
-              }}
-            >
-              {/* Configuration Button - Primary (always visible) */}
-              <div 
-                className="button-container primary-icon"
-                style={{
-                  opacity: 1,
-                  transform: 'scale(1)',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                }}
-              >
-                <button
-                  onClick={() => {
-                    playAudioFeedback('click');
-                    onShowChatConfig && onShowChatConfig();
-                  }}
-                  disabled={disabled || isLoading}
-                  title="Chat settings and configuration"
-                  style={{
-                    ...createGlassButtonStyle('75, 85, 99', disabled || isLoading),
-                    width: '40px',
-                    height: '40px',
-                    color: '#64748b'
-                  }}
-                  {...createGlassButtonHoverHandlers('75, 85, 99')}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-              </div>
 
-              {/* File Upload Button - Secondary (hidden by default, visible on hover) */}
-              <div 
-                className="button-container secondary-icon"
-                style={{
-                  opacity: 0,
-                  transform: 'scale(0.8) translateX(-20px)',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'absolute',
-                  left: '48px', // Position right after the first icon
-                  pointerEvents: 'none'
-                }}
-              >
-                <button
-                  onClick={() => handleFileSelection}
-                  disabled={true}
-                  title="File upload (coming soon)"
-                  style={{
-                    ...createGlassButtonStyle('107, 114, 128', true),
-                    width: '40px',
-                    height: '40px',
-                    color: '#9ca3af'
-                  }}
-                  {...createGlassButtonHoverHandlers('107, 114, 128')}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M12 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M9 14l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-              </div>
-              
-              {/* Audio Recording Button - Tertiary (hidden by default, visible on hover) */}
-              <div 
-                className="button-container tertiary-icon"
-                style={{
-                  opacity: 0,
-                  transform: 'scale(0.8) translateX(-20px)',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'absolute',
-                  left: '96px', // Position right after the second icon
-                  pointerEvents: 'none'
-                }}
-              >
-                <button
-                  onClick={toggleRecording}
-                  disabled={true}
-                  title="Audio recording (coming soon)"
-                  style={{
-                    ...createGlassButtonStyle('107, 114, 128', true),
-                    width: '40px',
-                    height: '40px',
-                    color: '#9ca3af'
-                  }}
-                  {...createGlassButtonHoverHandlers('107, 114, 128')}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M12 19v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M8 23h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-          </div>
-          
-          {/* Chat Input Container with Magic Wand */}
-          <div className="input-container" style={{ position: 'relative' }}>
-            <textarea
-              ref={textareaRef}
-              value={inputValue}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder={inputValue.trim() ? (placeholder || "Type your message...") : "          " + (placeholder || "Type your message or click ✨ for smart widgets...")}
-              disabled={disabled || isLoading}
-              autoFocus={autoFocus}
-              rows={1}
-              className="chat-input"
-              style={{ paddingLeft: inputValue.trim() ? '12px' : '58px' }}
-            />
-            {/* Magic Wand Button - Left side of textarea, only when empty */}
-            {!inputValue.trim() && (
-              <button
-                onClick={() => {
-                  playAudioFeedback('click');
-                  onShowWidgetSelector && onShowWidgetSelector();
-                }}
-                disabled={disabled || isLoading}
-                title="Open smart widgets"
-                style={{
-                  ...createGlassButtonStyle('139, 92, 246', disabled || isLoading), // purple color
-                  position: 'absolute',
-                  left: '8px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '32px',
-                  height: '32px',
-                  color: '#a855f7'
-                }}
-                onMouseEnter={(e) => {
-                  if (!e.currentTarget.disabled) {
-                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
-                    e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
-                    e.currentTarget.style.color = '#8b5cf6';
-                    e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.25)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!e.currentTarget.disabled) {
-                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
-                    e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.2)';
-                    e.currentTarget.style.color = '#a855f7';
-                    e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.15)';
-                  }
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M15 4V2m0 16v-2m-8-8H5m16 0h-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  <path d="M9 9l6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  <circle cx="9" cy="9" r="1" fill="currentColor"/>
-                  <circle cx="15" cy="15" r="1" fill="currentColor"/>
-                </svg>
-              </button>
-            )}
-          </div>
-          
-          {/* Send Button Container - Restored with Glass Style */}
-          <div className="button-container">
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
-              title="Send message"
-              style={{
-                ...createGlassButtonStyle(
-                  !inputValue.trim() || isLoading ? '107, 114, 128' : '34, 197, 94', // gray when disabled, green when active
-                  !inputValue.trim() || isLoading
-                ),
-                width: '40px',
-                height: '40px',
-                color: !inputValue.trim() || isLoading ? '#9ca3af' : '#22c55e'
-              }}
-              {...createGlassButtonHoverHandlers(!inputValue.trim() || isLoading ? '107, 114, 128' : '34, 197, 94')}
-            >
-              {isLoading ? (
-                <LoadingSpinner />
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
-            </button>
-          </div>
-        </div>
-        
-        {/* Suggestions Panel */}
-        {showSuggestions && (
-          <div className="suggestions-panel">
-            <div className="suggestions-header">
-              <div className="suggestions-title">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="2" fill="currentColor"/>
-                </svg>
-                Quick Suggestions
-              </div>
-              <button
-                className="close-suggestions"
-                onClick={() => {
-                  playAudioFeedback('click');
-                  setShowSuggestions(false);
-                }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-              </button>
-            </div>
-            
-            <div className="suggestions-grid">
-              {suggestions.map((suggestion, index) => (
-                <div
-                  key={index}
-                  className="suggestion-item"
-                  onClick={() => handleSuggestionClick(suggestion)}
-                >
-                  <div className="suggestion-dot" />
-                  {suggestion}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Main Glass Chat Input */}
+      <GlassChatInput
+        value={inputValue}
+        onChange={setInputValue}
+        onSend={handleSendMessage}
+        placeholder={placeholder || "Type your message..."}
+        disabled={disabled || isLoading}
+        isLoading={isLoading}
+        variant="elevated"
+        showAttachButton={true}
+        showVoiceButton={true}
+        showMagicButton={!!onShowWidgetSelector}
+        onAttachFile={handleFileAttach}
+        onVoiceRecord={toggleRecording}
+        onMagicAction={onShowWidgetSelector}
+        intelligentMode={intelligentMode}
+        onIntelligentModeChange={setIntelligentMode}
+        className="w-full"
+      />
       
-      {/* Additional Content */}
       {children && (
-        <div className="additional-content">
+        <div className="mt-4">
           {children}
         </div>
       )}

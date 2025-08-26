@@ -186,7 +186,6 @@ export const MobileChatLayout: React.FC<MobileChatLayoutProps> = ({
             keyboardHeight={keyboardHeight}
             isNativeApp={isNativeApp}
             placeholder="Message AI Assistant..."
-            suggestions={["Help me code", "Explain this concept", "Write documentation"]}
           />
         </div>
         

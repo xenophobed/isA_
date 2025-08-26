@@ -21,14 +21,10 @@ import { useOrganizationModule } from '../../../modules/OrganizationModule';
 import { logger, LogCategory } from '../../../utils/logger';
 
 interface UserButtonContainerProps {
-  onToggleDrawer: () => void;
-  showDrawer?: boolean;
+  // No props needed since we're using Modal now
 }
 
-export const UserButtonContainer: React.FC<UserButtonContainerProps> = ({
-  onToggleDrawer,
-  showDrawer
-}) => {
+export const UserButtonContainer: React.FC<UserButtonContainerProps> = () => {
   // Module Integration
   const userModule = useUserModule();
   const contextModule = useContextModule();
@@ -174,12 +170,8 @@ export const UserButtonContainer: React.FC<UserButtonContainerProps> = ({
     
     // Actions
     onLogin: handleLogin,
-    onToggleDrawer,
     onSwitchToPersonal: handleSwitchToPersonal,
-    onSwitchToOrganization: handleSwitchToOrganization,
-    
-    // Optional Props
-    showDrawer
+    onSwitchToOrganization: handleSwitchToOrganization
   }), [
     userModule.isAuthenticated,
     userModule.isLoading,
@@ -191,10 +183,8 @@ export const UserButtonContainer: React.FC<UserButtonContainerProps> = ({
     currentOrganizationData,
     availableOrganizations,
     handleLogin,
-    onToggleDrawer,
     handleSwitchToPersonal,
-    handleSwitchToOrganization,
-    showDrawer
+    handleSwitchToOrganization
   ]);
 
   // ================================================================================

@@ -232,10 +232,8 @@ const MainAppContent: React.FC = () => {
           contextType="personal"
           availableOrganizations={[]}
           onLogin={() => {}}
-          onToggleDrawer={() => setShowUserDrawer(!showUserDrawer)}
           onSwitchToPersonal={() => {}}
           onSwitchToOrganization={() => {}}
-          showDrawer={showUserDrawer}
         />
       </div>
     </div>

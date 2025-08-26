@@ -1,6 +1,6 @@
 import React from 'react';
-import { TaskToolbar } from './TaskToolbar';
 import { CalendarToolbar } from './CalendarToolbar';
+import { TaskToolbar } from './TaskToolbar';
 import { NotificationToolbar } from './NotificationToolbar';
 import { TaskStatusIndicator } from './header/TaskStatusIndicator';
 import { ThemeToggle } from './theme/ThemeToggle';
@@ -29,38 +29,22 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const currentAppData = availableApps.find(app => app.id === currentApp);
 
   return (
-    <header className="flex items-center justify-between w-full h-full">
+    <header className="flex items-center justify-between w-full h-full px-4 py-2">
       {/* Left Section - Brand & Active App */}
       <div className="flex items-center gap-6">
         {/* Brand Logo & Title */}
-        <div className="flex items-center gap-3">
-          <div 
-            className="w-8 h-8 rounded-lg flex items-center justify-center" 
-            style={{ 
-              background: 'var(--gradient-secondary)',
-              boxShadow: '0 2px 6px rgba(66, 133, 244, 0.2)'
-            }}
-          >
-            <span className="text-sm font-bold" style={{ color: 'var(--text-inverse)' }}>C</span>
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-blue-600 shadow-lg shadow-indigo-500/25 backdrop-blur-sm border border-white/10">
+            <span className="text-lg font-bold text-white drop-shadow-sm">isA</span>
           </div>
           <div className="flex flex-col">
-            <h1 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              Claude
+            <h1 className="text-xl font-bold tracking-tight text-white/95 drop-shadow-sm">
+              Intelligent Systems Assistant
             </h1>
+            <span className="text-xs text-white/60 font-medium">AI-Powered Productivity</span>
           </div>
         </div>
 
-        {/* Active App Indicator */}
-        {currentApp && currentAppData && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: 'var(--glass-primary)', border: '1px solid var(--glass-border)' }}>
-            <span className="text-sm">{currentAppData.icon}</span>
-            <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{currentAppData.name}</span>
-            <div 
-              className="w-1.5 h-1.5 rounded-full animate-pulse" 
-              style={{ backgroundColor: 'var(--color-accent)' }}
-            ></div>
-          </div>
-        )}
       </div>
       
       {/* Right Section - Status & Controls */}
@@ -77,10 +61,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           className="ml-1"
         />
         
-        {/* Toolbar Suite - macOS style */}
+        {/* Toolbar Icons */}
         <div className="flex items-center gap-2">
-          <TaskToolbar />
           <CalendarToolbar />
+          <TaskToolbar />
           <NotificationToolbar />
         </div>
         

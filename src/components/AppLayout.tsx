@@ -32,6 +32,7 @@
 import React from 'react';
 import { AppHeader } from './ui/AppHeader';
 import { useDeviceType } from '../hooks/useDeviceType';
+import { THEME_COLORS } from '../constants/theme';
 
 export interface AppLayoutProps {
   className?: string;
@@ -85,10 +86,19 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ className = '', children }
   const { chatModule, appData, userPortal } = moduleData;
 
   return (
-    <div className={`h-screen w-full flex flex-col text-white ${className}`} style={{ background: 'var(--gradient-primary)' }}>
+    <div 
+      className={`h-screen w-full flex flex-col text-white relative ${className}`} 
+      style={{ background: THEME_COLORS.primaryGradient }}
+    >
+      {/* Ambient Glass Orbs */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-white/5 rounded-full blur-3xl opacity-40 animate-pulse"></div>
+        <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl opacity-30 animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-3/4 left-3/4 w-48 h-48 bg-purple-500/8 rounded-full blur-3xl opacity-50 animate-pulse" style={{ animationDelay: '4s' }}></div>
+      </div>
       {/* Application Header - Only show on desktop, hidden on mobile */}
       {!isMobile && (
-        <div className="h-16 px-6 py-3 flex-shrink-0" style={{ background: 'var(--glass-primary)', backdropFilter: 'blur(20px)' }}>
+        <div className="h-16 flex-shrink-0 p-2">
           <AppHeader 
             currentApp={appData.currentApp}
             availableApps={appData.availableApps}

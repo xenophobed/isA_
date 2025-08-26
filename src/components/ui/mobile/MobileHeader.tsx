@@ -106,8 +106,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
       className={`
         mobile-header
         flex flex-col
-        bg-gradient-to-r from-black/30 via-black/20 to-black/30
-        backdrop-blur-xl border-b border-white/10
+        bg-white/8 backdrop-blur-md border-b border-white/10
         relative z-30 overflow-hidden
         ${isNativeApp ? 'native-header pt-safe' : ''}
       `}
@@ -125,7 +124,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               mobile-menu-btn
               w-11 h-11 rounded-xl
               flex items-center justify-center
-              bg-white/5 hover:bg-white/10 active:bg-white/15
+              bg-white/8 hover:bg-white/12 active:bg-white/15
               border border-white/10 hover:border-white/20
               transition-all duration-200 flex-shrink-0
               ${showLeftSidebar ? 'bg-blue-500/20 border-blue-500/30' : ''}
@@ -139,13 +138,18 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             )}
           </button>
           
+          {/* Brand Logo - matching PC */}
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-blue-600 shadow-lg shadow-indigo-500/25 backdrop-blur-sm border border-white/10 ml-2">
+            <span className="text-sm font-bold text-white drop-shadow-sm">isA</span>
+          </div>
+          
           {/* Title and status section */}
-          <div className="flex-1 min-w-0 ml-2">
+          <div className="flex-1 min-w-0 ml-3">
             {content || (
               <div className="flex flex-col justify-center min-h-11">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-white font-semibold text-lg truncate leading-tight">
-                    {title}
+                  <h1 className="text-white/95 font-bold text-lg truncate leading-tight tracking-tight">
+                    {title === 'AI Assistant' ? 'Intelligent Systems Assistant' : title}
                   </h1>
                   
                   {/* Connection status indicator */}
@@ -159,8 +163,8 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                 
                 {/* Subtitle or connection status */}
                 {(subtitle || connectionStatus !== 'connected') && (
-                  <p className="text-white/60 text-sm truncate leading-tight -mt-0.5">
-                    {subtitle || getConnectionText()}
+                  <p className="text-white/60 text-xs font-medium truncate leading-tight -mt-0.5">
+                    {subtitle || 'AI-Powered Productivity'}
                   </p>
                 )}
               </div>
@@ -178,7 +182,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                 relative
                 w-11 h-11 rounded-xl
                 flex items-center justify-center
-                bg-white/5 hover:bg-white/10 active:bg-white/15
+                bg-white/8 hover:bg-white/12 active:bg-white/15
                 border border-white/10 hover:border-white/20
                 transition-all duration-200
               "
@@ -204,11 +208,11 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             <button
               onClick={onUserAvatarClick}
               className="
-                w-11 h-11 rounded-xl
+                w-11 h-11 rounded-full
                 flex items-center justify-center
-                bg-white/5 hover:bg-white/10 active:bg-white/15
-                border border-white/10 hover:border-white/20
-                transition-all duration-200 overflow-hidden
+                bg-gradient-to-br from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600
+                border border-white/20
+                transition-all duration-200 overflow-hidden shadow-lg
               "
               aria-label={`User menu - ${userName || 'Profile'}`}
             >
@@ -219,7 +223,9 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <User className="w-5 h-5 text-white" />
+                <span className="text-white font-bold text-sm">
+                  {userName?.charAt(0)?.toUpperCase() || '?'}
+                </span>
               )}
             </button>
           )}
@@ -231,7 +237,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               mobile-menu-btn
               w-11 h-11 rounded-xl
               flex items-center justify-center
-              bg-white/5 hover:bg-white/10 active:bg-white/15
+              bg-white/8 hover:bg-white/12 active:bg-white/15
               border border-white/10 hover:border-white/20
               transition-all duration-200
               ${showRightSidebar ? 'bg-blue-500/20 border-blue-500/30' : ''}

@@ -19,7 +19,11 @@
   "user_id": "auth0_user_123456", 
   "session_id": "sess_789abc",    
   "prompt_name": null,            
-  "prompt_args": {}               
+  "prompt_args": {},              
+  "proactive_enabled": false,     
+  "collaborative_enabled": false, 
+  "confidence_threshold": 0.7,    
+  "proactive_predictions": null   
 }
 ```
 
@@ -29,6 +33,10 @@
 - `session_id`: 前端管理的会话标识符（必需，由前端管理）
 - `prompt_name`: 可选的提示模板名称
 - `prompt_args`: 提示模板的参数
+- `proactive_enabled`: 是否启用主动模式（可选，默认false）
+- `collaborative_enabled`: 是否启用协作模式（可选，默认false）
+- `confidence_threshold`: 主动模式激活的置信度阈值（可选，默认0.7）
+- `proactive_predictions`: 预测数据用于主动决策（可选）
 
 **重要说明：**
 - `user_id` 和 `session_id` 由前端应用负责管理
@@ -420,7 +428,11 @@ const ChatComponent: React.FC = () => {
         body: JSON.stringify({ 
           message, 
           user_id: userId,      // 前端管理的用户ID
-          session_id: sessionId // 前端管理的会话ID
+          session_id: sessionId, // 前端管理的会话ID
+          // 智能模式配置 (可选)
+          proactive_enabled: false,
+          collaborative_enabled: false,
+          confidence_threshold: 0.7
         }),
       });
 
@@ -931,20 +943,125 @@ API支持使用预定义的提示词模板来增强对话效果。通过 `prompt
 - 支持角色内心世界的深度描写
 - 适合长篇内容创作
 
+## 🤖 智能模式配置 (NEW - 2025-08-25) ✅
+
+API现在支持三种智能模式，可以根据不同场景自动调整系统行为：
+
+### 模式类型
+
+#### 1. **Reactive Mode（反应式模式）**
+- **默认模式**: `proactive_enabled: false, collaborative_enabled: false`
+- **特点**: 基础响应，等待用户指令
+- **适用场景**: 简单问答、基础对话
+
+#### 2. **Collaborative Mode（协作式模式）** 
+- **配置**: `proactive_enabled: false, collaborative_enabled: true`
+- **特点**: 增强协作能力，主动提供建议
+- **适用场景**: 任务协助、方案讨论
+
+#### 3. **Proactive Mode（主动式模式）**
+- **配置**: `proactive_enabled: true, collaborative_enabled: true`
+- **特点**: 基于预测数据主动优化，智能决策
+- **适用场景**: 复杂任务执行、智能规划
+
+### 置信度阈值控制
+
+系统通过 `confidence_threshold` 参数控制主动模式激活：
+- **默认值**: `0.7` (70%置信度)
+- **范围**: `0.0 - 1.0`
+- **机制**: 当预测置信度≥阈值时激活主动模式
+
+### 预测数据结构
+
+`proactive_predictions` 支持多种预测类型：
+
+```json
+{
+  "proactive_predictions": {
+    "user_needs": {
+      "confidence": 0.85,
+      "prediction": "performance optimization"
+    },
+    "task_outcomes": {
+      "confidence": 0.90, 
+      "prediction": "code refactoring needed"
+    },
+    "resource_requirements": {
+      "confidence": 0.80,
+      "prediction": "high CPU analysis"
+    }
+  }
+}
+```
+
+### 模式测试示例
+
+#### Reactive Mode测试
+```bash
+curl -X POST "http://localhost:8080/api/chat" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dev_key_O5m-_Tl-9r2BoVy_U7ZJSWGQzq_ZvjAncZtapAe4w5M" \
+  -d '{
+    "message": "What is the capital of France?",
+    "user_id": "test_user_001", 
+    "session_id": "test_session_reactive",
+    "proactive_enabled": false,
+    "collaborative_enabled": false
+  }' --no-buffer -s
+```
+
+#### Collaborative Mode测试
+```bash
+curl -X POST "http://localhost:8080/api/chat" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dev_key_O5m-_Tl-9r2BoVy_U7ZJSWGQzq_ZvjAncZtapAe4w5M" \
+  -d '{
+    "message": "Help me plan a data analysis project",
+    "user_id": "test_user_002",
+    "session_id": "test_session_collaborative", 
+    "proactive_enabled": false,
+    "collaborative_enabled": true,
+    "confidence_threshold": 0.6
+  }' --no-buffer -s
+```
+
+#### Proactive Mode测试
+```bash
+curl -X POST "http://localhost:8080/api/chat" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dev_key_O5m-_Tl-9r2BoVy_U7ZJSWGQzq_ZvjAncZtapAe4w5M" \
+  -d '{
+    "message": "I need to optimize my code performance",
+    "user_id": "test_user_003",
+    "session_id": "test_session_proactive",
+    "proactive_enabled": true,
+    "collaborative_enabled": true,
+    "confidence_threshold": 0.7,
+    "proactive_predictions": {
+      "user_needs": {"confidence": 0.85, "prediction": "performance optimization"},
+      "task_outcomes": {"confidence": 0.90, "prediction": "code refactoring needed"},
+      "resource_requirements": {"confidence": 0.80, "prediction": "high CPU analysis"}
+    }
+  }' --no-buffer -s
+```
+
 ### 测试验证状态
 
 ✅ **已验证功能:**
 - 基础对话功能正常
-- 复杂提示词模板（storytelling_prompt）完全正常
+- 复杂提示词模板（storytelling_prompt）完全正常  
+- 智能模式配置（Reactive/Collaborative/Proactive）✅ NEW
+- 置信度阈值控制正常工作 ✅ NEW
+- 预测数据集成测试通过 ✅ NEW
 - 流式输出稳定
 - JSON序列化无错误
 - 记忆更新功能正常
 
 🧪 **测试环境:**
 - API服务器: `http://localhost:8080`
-- 认证Token: `dev_key_test`
-- 测试时间: 2025-07-25
-- 所有测试用例均通过
+- 认证Token: `dev_key_O5m-_Tl-9r2BoVy_U7ZJSWGQzq_ZvjAncZtapAe4w5M`
+- 测试时间: 2025-08-25
+- 所有测试用例均通过（包括智能模式测试）
 
 ## 前端责任
 

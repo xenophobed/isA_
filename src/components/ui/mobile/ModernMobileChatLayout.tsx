@@ -3,6 +3,7 @@
  * Following ChatGPT, Claude, Gemini, Grok mobile UX/UI patterns
  */
 import React, { useState, useCallback, useMemo } from 'react';
+import { THEME_COLORS } from '../../../constants/theme';
 import { ChatMessage } from '../chat/ChatLayout';
 import { ModernMobileHeader } from './ModernMobileHeader';
 import { ModernMobileMessageList } from './ModernMobileMessageList';
@@ -88,24 +89,12 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [showMenu, showUserProfile]);
 
-  // Smart suggestions based on context
-  const suggestions = useMemo(() => {
-    if (messages.length === 0) {
-      return [
-        "Help me code a React component",
-        "Explain machine learning basics", 
-        "Write documentation for my API"
-      ];
-    }
-    return [
-      "Can you explain more?",
-      "Show me an example", 
-      "How does this work?"
-    ];
-  }, [messages.length]);
 
   return (
-    <div className={`modern-mobile-chat-layout h-screen flex flex-col bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 transition-all duration-500 ${isInitialLoad ? 'opacity-0' : 'opacity-100'}`}>
+    <div className={`modern-mobile-chat-layout h-screen flex flex-col transition-all duration-500 ${isInitialLoad ? 'opacity-0' : 'opacity-100'}`}
+      style={{ 
+        background: THEME_COLORS.primaryGradient 
+      }}>
       
       {/* Premium Loading Overlay */}
       {isInitialLoad && (
@@ -172,7 +161,7 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
         />
       </div>
 
-      {/* Input Area with slide-up animation */}
+      {/* Input Area with slide-up animation - Connected seamlessly */}
       <div className={`transition-all duration-700 transform ${isInitialLoad ? 'translate-y-10 opacity-0' : 'translate-y-0 opacity-100'}`} style={{ transitionDelay: '600ms' }}>
         <ModernMobileInputArea
           onSendMessage={onSendMessage}
@@ -180,7 +169,6 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
           isLoading={false} // Disabled: handled by MobileTaskBar above
           isNativeApp={isNativeApp}
           placeholder="Message AI Assistant..."
-          suggestions={suggestions}
         />
       </div>
 
@@ -193,26 +181,27 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
             onClick={() => setShowMenu(false)}
           />
           
-          {/* Left Sidebar Menu */}
+          {/* Left Sidebar Menu - Glassmorphism */}
           <div 
             className={`
               fixed top-0 left-0 bottom-0 w-80 max-w-[85vw]
-              bg-white dark:bg-gray-900
-              border-r border-gray-200 dark:border-gray-700
+              bg-white/90 dark:bg-black/50 backdrop-blur-xl
+              border-r border-white/20 dark:border-white/10
               z-50
               transform transition-transform duration-300 ease-out
               ${showMenu ? 'translate-x-0' : '-translate-x-full'}
               flex flex-col
+              shadow-2xl shadow-black/20
             `}
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between p-4 border-b border-white/20 dark:border-white/10">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">AI Assistant</h2>
               <button
                 onClick={() => setShowMenu(false)}
-                className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-lg bg-white/20 dark:bg-white/10 hover:bg-white/30 dark:hover:bg-white/20 backdrop-blur-sm flex items-center justify-center transition-all duration-200 border border-white/20"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-gray-800 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -226,7 +215,7 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
                   handleNewChat();
                   setShowMenu(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-gray-800 dark:text-gray-200 hover:bg-white/20 dark:hover:bg-white/10 transition-all duration-200 backdrop-blur-sm rounded-lg mx-2"
               >
                 <div className="w-5 h-5 flex items-center justify-center">
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -242,7 +231,7 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
                   console.log('🔥 Chat History clicked');
                   setShowMenu(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-gray-800 dark:text-gray-200 hover:bg-white/20 dark:hover:bg-white/10 transition-all duration-200 backdrop-blur-sm rounded-lg mx-2"
               >
                 <div className="w-5 h-5 flex items-center justify-center">
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -258,7 +247,7 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
                   console.log('🔥 Settings clicked');
                   setShowMenu(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-gray-800 dark:text-gray-200 hover:bg-white/20 dark:hover:bg-white/10 transition-all duration-200 backdrop-blur-sm rounded-lg mx-2"
               >
                 <div className="w-5 h-5 flex items-center justify-center">
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -271,13 +260,13 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
             </div>
 
             {/* User Profile Section */}
-            <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+            <div className="border-t border-white/20 dark:border-white/10 p-4">
               <button
                 onClick={() => {
                   handleUserClick();
                   setShowMenu(false);
                 }}
-                className="w-full flex items-center gap-3 px-2 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                className="w-full flex items-center gap-3 px-2 py-3 text-gray-800 dark:text-gray-200 hover:bg-white/20 dark:hover:bg-white/10 rounded-lg transition-all duration-200 backdrop-blur-sm"
               >
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                   {userAvatarUrl ? (
@@ -307,16 +296,16 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
             onClick={() => setShowUserProfile(false)}
           />
           
-          {/* Profile Modal */}
-          <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-w-sm mx-auto animate-fadeIn">
+          {/* Profile Modal - Glassmorphism */}
+          <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 bg-white/90 dark:bg-black/50 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 dark:border-white/10 max-w-sm mx-auto animate-fadeIn">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between p-6 border-b border-white/20 dark:border-white/10">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Profile</h2>
               <button
                 onClick={() => setShowUserProfile(false)}
-                className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-lg bg-white/20 dark:bg-white/10 hover:bg-white/30 dark:hover:bg-white/20 backdrop-blur-sm flex items-center justify-center transition-all duration-200 border border-white/20"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-gray-800 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -348,7 +337,7 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
                     console.log('🔥 Edit Profile clicked');
                     setShowUserProfile(false);
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-gray-800 dark:text-gray-200 hover:bg-white/20 dark:hover:bg-white/10 rounded-lg transition-all duration-200 backdrop-blur-sm"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -361,7 +350,7 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
                     console.log('🔥 Account Settings clicked');
                     setShowUserProfile(false);
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-gray-800 dark:text-gray-200 hover:bg-white/20 dark:hover:bg-white/10 rounded-lg transition-all duration-200 backdrop-blur-sm"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -375,7 +364,7 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
                     console.log('🔥 Privacy clicked');
                     setShowUserProfile(false);
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-gray-800 dark:text-gray-200 hover:bg-white/20 dark:hover:bg-white/10 rounded-lg transition-all duration-200 backdrop-blur-sm"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -383,13 +372,13 @@ export const ModernMobileChatLayout: React.FC<ModernMobileChatLayoutProps> = ({
                   <span>Privacy & Security</span>
                 </button>
 
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+                <div className="border-t border-white/20 dark:border-white/10 pt-2 mt-2">
                   <button
                     onClick={() => {
                       console.log('🔥 Sign Out clicked');
                       setShowUserProfile(false);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-500/10 dark:hover:bg-red-500/20 rounded-lg transition-all duration-200 backdrop-blur-sm"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

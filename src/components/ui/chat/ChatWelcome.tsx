@@ -4,9 +4,9 @@
  * ============================================================================
  * 
  * 【核心功能】
- * - 替换静态welcome为动态widget卡片
+ * - 动态加载widget配置，支持运行时修改
  * - 点击widget卡片直接触发对应widget并发送预设消息
- * - 保留示例提示词，点击可直接发送
+ * - 动态示例提示词，支持配置化管理
  * - 利用现有的handler、module、store架构
  * 
  * 【Widget映射】
@@ -16,7 +16,7 @@
  * - Knowledge Analysis → KnowledgeWidget (🧠 文档分析)
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAppStore } from '../../../stores/useAppStore';
 import { WidgetType } from '../../../types/widgetTypes';
 import { 
@@ -25,55 +25,14 @@ import {
   useDreamActions,
   useKnowledgeActions 
 } from '../../../stores/useWidgetStores';
+import { welcomeConfig, validateWelcomeConfig } from '../../../config/welcomeConfig';
 
 interface ChatWelcomeProps {
   onSendMessage?: (message: string) => void;
   className?: string;
 }
 
-// Widget定义 - 使用优雅深色系统
-const WELCOME_WIDGETS = [
-  {
-    id: 'omni' as WidgetType,
-    title: 'Creative Projects',
-    icon: '⚡',
-    description: 'Generate content, write stories, or brainstorm ideas',
-    accentColor: '#6366f1', // 优雅蓝紫
-    defaultPrompt: 'Help me create something amazing! I need assistance with creative content generation.'
-  },
-  {
-    id: 'hunt' as WidgetType,
-    title: 'Product Search',
-    icon: '🔍',
-    description: 'Search and compare products, find the best deals',
-    accentColor: '#8b5cf6', // 优雅紫
-    defaultPrompt: 'Help me find and compare products. What are you looking for?'
-  },
-  {
-    id: 'dream' as WidgetType,
-    title: 'Image Generation',
-    icon: '🎨',
-    description: 'Generate images, create artwork, or visualize ideas',
-    accentColor: '#a855f7', // 优雅紫粉
-    defaultPrompt: 'Create a beautiful image for me. Describe what you want to see generated.'
-  },
-  {
-    id: 'knowledge' as WidgetType,
-    title: 'Knowledge Analysis',
-    icon: '🧠',
-    description: 'Analyze documents, research topics, or get explanations',
-    accentColor: '#3b82f6', // 优雅蓝
-    defaultPrompt: 'Analyze this content or help me research a topic. What would you like to explore?'
-  }
-];
-
-// 示例提示词
-const EXAMPLE_PROMPTS = [
-  "Create a logo for my startup",
-  "Help me debug this code", 
-  "Analyze this data trend",
-  "Explain quantum computing"
-];
+// Dynamic configuration is now loaded from welcomeConfig
 
 export const ChatWelcome: React.FC<ChatWelcomeProps> = ({
   onSendMessage,
@@ -85,8 +44,18 @@ export const ChatWelcome: React.FC<ChatWelcomeProps> = ({
   const { triggerDreamGeneration } = useDreamActions();
   const { triggerKnowledgeAnalysis } = useKnowledgeActions();
 
+  // Validate configuration on component mount
+  useEffect(() => {
+    const isValid = validateWelcomeConfig();
+    if (!isValid) {
+      console.error('🎯 CHAT_WELCOME: Invalid welcome configuration detected');
+    } else {
+      console.log('🎯 CHAT_WELCOME: Welcome configuration loaded successfully');
+    }
+  }, []);
+
   // 处理widget卡片点击
-  const handleWidgetClick = async (widget: typeof WELCOME_WIDGETS[0]) => {
+  const handleWidgetClick = async (widget: typeof welcomeConfig.widgets[0]) => {
     console.log(`🎯 CHAT_WELCOME: Widget clicked - ${widget.title} (${widget.id})`);
     
     try {
@@ -133,104 +102,91 @@ export const ChatWelcome: React.FC<ChatWelcomeProps> = ({
   };
 
   return (
-    <div className={`flex flex-col items-center justify-center min-h-[60vh] px-4 ${className}`}>
-      {/* Main Welcome Card */}
-      <div className="rounded-2xl p-8 max-w-4xl mx-auto backdrop-blur-sm" style={{ 
-        background: 'var(--glass-primary)', 
-        boxShadow: '0 8px 32px rgba(255, 0, 128, 0.2), 0 0 40px rgba(58, 134, 255, 0.1)' 
-      }}>
+    <div className={`flex flex-col items-center justify-center min-h-[60vh] px-4 sm:px-6 lg:px-8 ${className}`}>
+      {/* Main Welcome Card - Simplified design for consistency */}
+      <div className="p-4 sm:p-6 lg:p-8 w-full max-w-5xl mx-auto glass-secondary rounded-2xl" style={{ border: '1px solid var(--glass-border)' }}>
         {/* AI Avatar */}
-        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse" style={{
-          background: 'var(--gradient-secondary)',
-          boxShadow: '0 0 30px var(--neon-pink), 0 0 60px var(--neon-blue)'
-        }}>
-          <span className="text-white font-bold text-xl">✨</span>
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-6 glass-tertiary" style={{ border: '1px solid var(--glass-border)' }}>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--color-primary)' }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
         </div>
         
-        {/* Welcome Text */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-3" style={{
-            background: 'var(--gradient-secondary)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            filter: 'drop-shadow(0 0 10px var(--neon-pink))'
-          }}>
-            Welcome to isA_
+        {/* Welcome Text - Responsive typography */}
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3" style={{ color: 'var(--text-primary)' }}>
+            {welcomeConfig.title}
           </h1>
-          <p className="text-gray-300 text-lg leading-relaxed">
-            Choose your AI assistant below, or start a conversation with any prompt.
+          <p className="text-sm sm:text-base leading-relaxed max-w-2xl mx-auto px-2" style={{ color: 'var(--text-secondary)' }}>
+            {welcomeConfig.subtitle}
           </p>
         </div>
 
-        {/* Dynamic Widget Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          {WELCOME_WIDGETS.map((widget) => (
-            <div
+        {/* Dynamic Widget Cards - Enhanced mobile layout */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-2 gap-3 sm:gap-4 lg:gap-5 mb-6 sm:mb-8">
+          {welcomeConfig.widgets.map((widget, index) => (
+            <button
               key={widget.id}
-              className="rounded-xl p-4 transition-all cursor-pointer group hover:transform hover:scale-105"
-              style={{
-                background: 'var(--glass-secondary)',
-                border: 'none',
-                boxShadow: `0 4px 16px rgba(0, 0, 0, 0.2)`
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = `0 8px 32px ${widget.accentColor}30, 0 0 40px ${widget.accentColor}20`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(15, 15, 35, 0.3)';
-              }}
+              className={`p-3 sm:p-4 lg:p-5 rounded-xl sm:rounded-2xl cursor-pointer group transition-all duration-200 text-left glass-tertiary hover:glass-secondary ${
+                widget.featured ? 'sm:col-span-2 lg:col-span-2 xl:col-span-2' : ''
+              }`}
+              style={{ border: '1px solid var(--glass-border)' }}
               onClick={() => handleWidgetClick(widget)}
             >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center transition-all" style={{
-                  background: `${widget.accentColor}20`,
-                  boxShadow: `0 0 15px ${widget.accentColor}30`
-                }}>
-                  <span className="text-sm" style={{ color: widget.accentColor }}>{widget.icon}</span>
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div 
+                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-105 glass-tertiary"
+                  style={{
+                    border: `1px solid var(--glass-border)`,
+                    color: widget.accentColor
+                  }}
+                >
+                  {widget.icon}
                 </div>
-                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>{widget.title}</h3>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm sm:text-base mb-1 sm:mb-2 transition-colors" style={{ color: 'var(--text-primary)' }}>
+                    {widget.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm transition-colors leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    {widget.description}
+                  </p>
+                </div>
               </div>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{widget.description}</p>
-            </div>
+            </button>
           ))}
         </div>
 
-        {/* Example Prompts */}
-        <div className="pt-6" style={{ borderTop: '1px solid var(--glass-border)' }}>
-          <h4 className="font-medium mb-3 text-center" style={{ color: 'var(--text-secondary)' }}>Or try asking me something like:</h4>
-          <div className="flex flex-wrap justify-center gap-2">
-            {EXAMPLE_PROMPTS.map((prompt, index) => (
-              <span
+        {/* Example Prompts - Mobile-optimized layout */}
+        <div className="pt-4 sm:pt-6" style={{ borderTop: '1px solid var(--glass-border)' }}>
+          <h4 className="font-medium mb-3 sm:mb-4 text-center text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>Quick start examples:</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-2 gap-2 sm:gap-3 max-w-4xl mx-auto">
+            {welcomeConfig.examplePrompts.map((prompt, index) => (
+              <button
                 key={index}
-                className="px-3 py-1 rounded-full text-sm cursor-pointer transition-all hover:transform hover:scale-105"
-                style={{
-                  color: 'var(--text-secondary)',
-                  background: 'var(--glass-secondary)',
-                  border: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 0 20px var(--accent-soft)';
-                  e.currentTarget.style.background = 'var(--glass-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.background = 'var(--glass-secondary)';
+                className="p-2 sm:p-2.5 lg:p-3 rounded-lg text-left text-xs sm:text-sm glass-tertiary hover:glass-secondary transition-all duration-200"
+                style={{ 
+                  border: '1px solid var(--glass-border)',
+                  color: 'var(--text-secondary)'
                 }}
                 onClick={() => handlePromptClick(prompt)}
               >
                 "{prompt}"
-              </span>
+              </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Getting Started Tip */}
-      <div className="mt-6 text-center">
-        <p className="text-gray-500 text-sm flex items-center justify-center gap-2">
-          <span>💡</span>
-          Click any widget above to get started, or type your message below
-        </p>
+      {/* Getting Started Tip - Enhanced styling */}
+      <div className="mt-4 sm:mt-6 text-center px-4">
+        <div className="inline-flex items-center justify-center gap-2 px-4 py-2 glass-secondary rounded-full" style={{ border: '1px solid var(--glass-border)' }}>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--color-primary)' }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
+            {welcomeConfig.tipText}
+          </span>
+        </div>
       </div>
     </div>
   );

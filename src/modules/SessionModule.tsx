@@ -30,7 +30,7 @@
  * SessionHook (状态监听) → SessionModule (业务逻辑) → UI Components (纯展示)
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { LeftSidebarLayout, LeftSidebarLayoutProps } from '../components/ui/chat/LeftSidebarLayout';
 import { useAppStore } from '../stores/useAppStore';
 import { useChatMessages, useChatActions, useChatStore } from '../stores/useChatStore';
@@ -109,12 +109,28 @@ export const SessionModule: React.FC<SessionModuleProps> = (props) => {
   // ================================================================================
   
   // 直接订阅store状态，避免SessionHook的复杂性和循环依赖
-  const sessions = useSessions();
+  const rawSessions = useSessions();
   const currentSession = useCurrentSession();
   const currentSessionId = useCurrentSessionId();
   const sessionCount = useSessionCount();
   const isLoading = useIsLoadingSession();
   const isSyncing = useIsSyncingToAPI();
+  
+  // 按最后活动时间排序sessions（最新的在前）
+  const sessions = useMemo(() => {
+    if (!Array.isArray(rawSessions)) return [];
+    
+    return [...rawSessions].sort((a, b) => {
+      // 首先，当前会话总是排在最前面
+      if (a.id === currentSessionId) return -1;
+      if (b.id === currentSessionId) return 1;
+      
+      // 然后按timestamp排序（最新的在前）
+      const aTime = new Date(a.timestamp || 0).getTime();
+      const bTime = new Date(b.timestamp || 0).getTime();
+      return bTime - aTime;
+    });
+  }, [rawSessions, currentSessionId]);
   const syncStatus = useSyncStatus();
   const lastSyncError = useLastSyncError();
   
@@ -316,13 +332,19 @@ export const SessionModule: React.FC<SessionModuleProps> = (props) => {
     
     // 如果删除的是当前会话，切换到默认会话或第一个会话
     if (sessionId === currentSessionId) {
-      const remainingSessions = sessions.filter((s: ChatSession) => s.id !== sessionId);
+      const remainingSessions = rawSessions.filter((s: ChatSession) => s.id !== sessionId);
       if (remainingSessions.length > 0) {
-        sessionCRUDActions.selectSession(remainingSessions[0].id);
+        // 选择最近的会话（排序后的第一个，除了被删除的）
+        const sortedRemaining = remainingSessions.sort((a, b) => {
+          const aTime = new Date(a.timestamp || 0).getTime();
+          const bTime = new Date(b.timestamp || 0).getTime();
+          return bTime - aTime;
+        });
+        sessionCRUDActions.selectSession(sortedRemaining[0].id);
       } else {
         // 如果没有会话了，创建一个默认会话，但避免重复创建
         setTimeout(() => {
-          if (sessions.length === 0) { // 再次检查确保没有会话
+          if (rawSessions.length === 0) { // 再次检查确保没有会话
             handleNewSession();
           }
         }, 0);

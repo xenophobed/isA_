@@ -1,8 +1,9 @@
 /**
- * Modern Mobile Header Component
- * Inspired by ChatGPT, Claude, Gemini, and Grok mobile designs
+ * Modern Mobile Header Component - Glassmorphism Pro
+ * Ultra-modern glass effects inspired by ChatGPT, Claude, Gemini, and Grok
  */
 import React from 'react';
+import { GlassButton, GlassCard } from '../../shared';
 
 // Simple SVG icon components
 const Menu = ({ className }: { className?: string }) => (
@@ -51,143 +52,85 @@ export const ModernMobileHeader: React.FC<ModernMobileHeaderProps> = ({
   return (
     <header 
       className={`
-        modern-mobile-header relative
+        glass-mobile-header relative
         flex items-center justify-between
-        h-16 px-5
-        bg-white/90 dark:bg-gray-900/90
-        backdrop-blur-2xl 
-        border-b border-gray-200/30 dark:border-gray-700/30
-        shadow-lg shadow-black/5
-        z-50
+        h-16 px-4
         ${isNativeApp ? 'pt-safe' : ''}
       `}
       style={{
         paddingTop: isNativeApp ? 'env(safe-area-inset-top)' : undefined
       }}
     >
-      {/* Premium glassmorphism overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-white/80 via-white/60 to-white/40 dark:from-gray-900/80 dark:via-gray-900/60 dark:to-gray-900/40 pointer-events-none" />
-      
-      {/* Subtle top highlight */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/60 dark:via-gray-300/20 to-transparent pointer-events-none" />
+      {/* Clean glassmorphism background - matching PC design */}
+      <div className="absolute inset-0 bg-white/8 backdrop-blur-md border-b border-white/10" />
       
       <div className="relative z-10 flex items-center justify-between w-full">
-        {/* Premium Left section - Menu button */}
-        <button
-          onClick={(e) => {
-            console.log('🔥🔥🔥 MENU BUTTON CLICKED - Raw Event', e);
-            onMenuClick?.();
-          }}
-          className="
-            group w-11 h-11 rounded-2xl
-            flex items-center justify-center
-            bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700
-            hover:from-blue-50 hover:to-purple-50 dark:hover:from-blue-900/30 dark:hover:to-purple-900/30
-            active:scale-95
-            transition-all duration-200
-            shadow-sm hover:shadow-md
-            border border-gray-200/60 dark:border-gray-700/60
-            hover:border-blue-300/60 dark:hover:border-blue-600/60
-            relative z-10
-            cursor-pointer
-          "
-          aria-label="Open menu"
-          style={{ pointerEvents: 'auto' }}
-        >
-          <Menu className="w-5 h-5 text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200" />
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-400/10 via-purple-400/10 to-blue-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
-        </button>
+        {/* Left section - Brand logo + Menu (matching PC) */}
+        <div className="flex items-center gap-3">
+          {/* Brand Logo - matching PC design */}
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-blue-600 shadow-lg shadow-indigo-500/25 backdrop-blur-sm border border-white/10">
+            <span className="text-sm font-bold text-white drop-shadow-sm">isA</span>
+          </div>
+          
+          {/* Menu Button */}
+          <button
+            onClick={() => {
+              console.log('🔥🔥🔥 GLASS MENU CLICKED');
+              onMenuClick?.();
+            }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/10 hover:bg-white/15 border border-white/20 transition-all duration-200"
+            aria-label="Open menu"
+          >
+            <Menu className="w-4 h-4 text-white/90" />
+          </button>
+        </div>
 
-        {/* Premium Center section - Title */}
-        <div className="flex-1 flex flex-col items-center justify-center min-w-0 px-6">
-          <h1 className="text-gray-900 dark:text-white font-bold text-lg truncate leading-tight bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-            {title}
+        {/* Center section - Title (matching PC style) */}
+        <div className="flex-1 flex flex-col items-center justify-center min-w-0 px-4">
+          <h1 className="text-white/95 font-bold text-lg truncate drop-shadow-sm tracking-tight">
+            {title || 'Intelligent Systems Assistant'}
           </h1>
           {subtitle && (
-            <div className="flex items-center gap-2 mt-0.5">
-              {subtitle.toLowerCase().includes('online') && (
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-sm shadow-green-500/50"></div>
-              )}
-              {subtitle.toLowerCase().includes('typing') && (
-                <div className="flex gap-1">
-                  <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-              )}
-              <p className="text-gray-600 dark:text-gray-400 text-sm font-medium truncate leading-tight">
-                {subtitle}
-              </p>
-            </div>
+            <p className="text-white/60 text-xs font-medium">
+              {subtitle}
+            </p>
           )}
         </div>
 
-        {/* Premium Right section - Actions */}
+        {/* Right section - Glassmorphism Actions */}
         <div className="flex items-center gap-3">
-          {/* Premium New Chat button */}
+          {/* New Chat button - matching PC glassmorphism style */}
           {showNewChatButton && (
             <button
               onClick={onNewChatClick}
-              className="
-                group w-11 h-11 rounded-2xl
-                flex items-center justify-center
-                bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700
-                hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/30 dark:hover:to-emerald-900/30
-                active:scale-95
-                transition-all duration-200
-                shadow-sm hover:shadow-md
-                border border-gray-200/60 dark:border-gray-700/60
-                hover:border-green-300/60 dark:hover:border-green-600/60
-              "
+              className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/10 hover:bg-white/15 border border-white/20 transition-all duration-200"
               aria-label="New chat"
             >
-              <Edit className="w-5 h-5 text-gray-700 dark:text-gray-300 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors duration-200" />
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-green-400/10 via-emerald-400/10 to-green-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              <Edit className="w-4 h-4 text-white/90" />
             </button>
           )}
           
-          {/* Premium User avatar */}
+          {/* User avatar - matching PC design */}
           {showUserAvatar && (
             <button
-              onClick={(e) => {
-                console.log('🔥🔥🔥 USER AVATAR CLICKED - Raw Event', e);
+              onClick={() => {
+                console.log('🔥🔥🔥 GLASS USER AVATAR CLICKED');
                 onUserAvatarClick?.();
               }}
-              className="
-                group relative w-10 h-10 rounded-2xl
-                flex items-center justify-center
-                overflow-hidden
-                bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600
-                hover:from-blue-600 hover:via-blue-700 hover:to-purple-700
-                shadow-lg shadow-blue-500/25
-                hover:shadow-xl hover:shadow-blue-600/30
-                hover:scale-105 active:scale-95
-                transition-all duration-200
-                border-2 border-white/20 hover:border-white/30
-                relative z-10
-                cursor-pointer
-              "
+              className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden bg-gradient-to-br from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 border border-white/20 transition-all duration-200 shadow-lg"
               aria-label={`User menu - ${userName || 'Profile'}`}
-              style={{ pointerEvents: 'auto' }}
             >
-              {/* Avatar content */}
-              <div className="relative z-10">
-                {userAvatarUrl ? (
-                  <img 
-                    src={userAvatarUrl} 
-                    alt={userName || 'User'} 
-                    className="w-full h-full object-cover rounded-xl"
-                  />
-                ) : (
-                  <User className="w-5 h-5 text-white drop-shadow-sm" />
-                )}
-              </div>
-              
-              {/* Premium overlay effect */}
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/20 via-transparent to-black/10 pointer-events-none" />
-              
-              {/* Online indicator */}
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full shadow-sm animate-pulse pointer-events-none"></div>
+              {userAvatarUrl ? (
+                <img 
+                  src={userAvatarUrl} 
+                  alt={userName || 'User'} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-white font-bold text-sm">
+                  {userName?.charAt(0)?.toUpperCase() || '?'}
+                </span>
+              )}
             </button>
           )}
         </div>

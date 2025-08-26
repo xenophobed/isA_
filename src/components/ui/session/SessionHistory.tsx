@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChatSession } from '../../../hooks/useSession';
+import { GlassButton } from '../../shared';
 
 export interface SessionHistoryProps {
   // Data props - provided by parent
@@ -53,21 +54,23 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
   
 
   return (
-    <div className={`session-history ${className}`}>
+    <div className={`session-history ${className} flex flex-col h-full`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white">Chat Sessions</h3>
+        <h3 className="text-lg font-semibold text-white/90">Chat Sessions</h3>
         {showCreateButton && (
           <button
             onClick={onNewSession}
             disabled={isLoading}
-            className="p-2 rounded-lg text-sm transition-all flex items-center gap-1 transform hover:scale-105 active:scale-95"
-            style={{
-              background: 'var(--color-accent)',
-              color: 'white',
-              boxShadow: '0 2px 8px rgba(66, 133, 244, 0.3)',
-              opacity: isLoading ? 0.6 : 1
-            }}
+            className="
+              px-3 py-2 rounded-xl flex items-center gap-2
+              bg-white/10 hover:bg-white/15 backdrop-blur-sm
+              border border-white/20 hover:border-white/30
+              text-white/90 hover:text-white
+              transition-all duration-200
+              disabled:opacity-50 disabled:cursor-not-allowed
+              text-sm font-medium
+            "
             title="New Chat Session"
           >
             {isLoading ? (
@@ -82,13 +85,13 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
         )}
       </div>
 
-      {/* Sessions List */}
-      <div className="space-y-2 flex-1 overflow-y-auto min-h-0">
+      {/* Sessions List - Fixed scrolling */}
+      <div className="flex-1 overflow-y-auto min-h-0 space-y-1 pr-1" style={{ maxHeight: 'calc(100vh - 200px)' }}>
         {!Array.isArray(sessions) || sessions.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="text-gray-400 text-sm">No sessions yet</div>
-              <div className="text-gray-500 text-xs mt-1">Create your first chat session</div>
+            <div className="text-center p-8">
+              <div className="text-white/70 text-sm font-medium">No sessions yet</div>
+              <div className="text-white/50 text-xs mt-1">Create your first chat session</div>
             </div>
           </div>
         ) : (
@@ -98,16 +101,17 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
             return (
               <div
                 key={session.id}
-                onClick={() => onSessionSelect?.(session.id)}
-                className={`w-full text-left p-3 rounded-lg border transition-all group relative cursor-pointer ${
+                className={`w-full text-left p-3 rounded-lg transition-all group relative cursor-pointer border ${
                   isActive 
-                    ? 'bg-blue-500/20 border-blue-500/50 shadow-lg shadow-blue-500/10' 
-                    : 'bg-white/5 hover:bg-white/10 border-white/10 hover:border-white/20'
+                    ? 'bg-blue-500/20 text-white border-blue-400/40 shadow-lg shadow-blue-500/20 ring-1 ring-blue-400/30' 
+                    : 'hover:bg-white/8 text-white/85 border-white/5 hover:border-white/15'
                 }`}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                {/* Click handler for the entire session */}
+                <div onClick={() => onSessionSelect?.(session.id)} className="flex-1">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0 pr-2">
+                      <div className="flex items-center gap-2 mb-1">
                       {editingSessionId === session.id ? (
                         <input
                           type="text"
@@ -118,71 +122,89 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                             if (e.key === 'Enter') onRenameSession?.(session.id, editingTitle);
                             if (e.key === 'Escape') onCancelRename?.();
                           }}
-                          className="text-sm font-medium bg-white/10 border border-white/20 rounded px-2 py-1 text-white w-full"
+                          className="text-sm font-medium bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white w-full focus:bg-white/15 focus:border-white/30 transition-colors"
                           autoFocus
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : (
-                        <div 
-                          className={`text-sm font-medium truncate cursor-pointer ${
-                            isActive ? 'text-blue-300' : 'text-white'
-                          }`}
+                        <h4 
+                          className={`text-sm font-semibold ${
+                            isActive ? 'text-white' : 'text-white/95'
+                          } leading-tight truncate`}
                           onDoubleClick={(e) => {
                             e.stopPropagation();
                             onStartRename?.(session.id, session.title);
                           }}
+                          title={String(session.title || 'Untitled Session')}
                         >
-                          {String(session.title || '')}
-                        </div>
+                          {String(session.title || 'Untitled Session')}
+                        </h4>
                       )}
                       {isActive && editingSessionId !== session.id && (
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse flex-shrink-0" />
+                        <div className="w-2 h-2 bg-blue-300 rounded-full animate-pulse flex-shrink-0 shadow-sm shadow-blue-400/50" />
                       )}
                     </div>
                     
                     {editingSessionId !== session.id && (
-                      <div className="text-gray-400 text-xs truncate mb-2">
-                        {(() => {
-                          try {
-                            if (session.messages && Array.isArray(session.messages) && session.messages.length > 0) {
-                              const lastMessage = session.messages[session.messages.length - 1];
-                              const content = lastMessage?.content || '';
-                              if (typeof content === 'string') {
-                                return content.length > 60 ? content.substring(0, 60) + '...' : content;
+                        <div className="text-white/60 text-xs leading-relaxed mb-1 line-clamp-1">
+                          {(() => {
+                            try {
+                              if (session.messages && Array.isArray(session.messages) && session.messages.length > 0) {
+                                const lastMessage = session.messages[session.messages.length - 1];
+                                const content = lastMessage?.content || '';
+                                if (typeof content === 'string') {
+                                  return content.length > 60 ? content.substring(0, 60) + '...' : content;
+                                }
                               }
+                              if (session.lastMessage && typeof session.lastMessage === 'string') {
+                                return session.lastMessage.length > 60 ? session.lastMessage.substring(0, 60) + '...' : session.lastMessage;
+                              }
+                              return 'No messages yet';
+                            } catch (error) {
+                              console.error('Error rendering session message:', error);
+                              return 'Error loading message';
                             }
-                            if (session.lastMessage && typeof session.lastMessage === 'string') {
-                              return session.lastMessage;
-                            }
-                            return '';
-                          } catch (error) {
-                            console.error('Error rendering session message:', error);
-                            return '';
-                          }
-                        })()}
-                      </div>
-                    )}
+                          })()}
+                        </div>
+                      )}
                     
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mt-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-500 text-xs">
-                          {session.timestamp ? new Date(session.timestamp).toLocaleDateString() : ''}
+                        <span className="text-white/60 text-xs font-medium">
+                          {session.timestamp ? (() => {
+                            const date = new Date(session.timestamp);
+                            const now = new Date();
+                            const diffTime = Math.abs(now.getTime() - date.getTime());
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            
+                            if (diffDays === 1) return 'Today';
+                            if (diffDays === 2) return 'Yesterday';
+                            if (diffDays <= 7) return `${diffDays - 1} days ago`;
+                            return date.toLocaleDateString();
+                          })() : 'New Session'}
                         </span>
+                        {session.messages && session.messages.length > 0 && (
+                          <span className="text-white/40 text-xs">
+                            • {session.messages.length} {session.messages.length === 1 ? 'message' : 'messages'}
+                          </span>
+                        )}
+                      </div>
                       </div>
                     </div>
                   </div>
                   
+                  {/* Action buttons - only show on hover */}
                   {editingSessionId !== session.id && (
-                    <div className="flex items-center gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onStartRename?.(session.id, session.title);
                         }}
-                        className="p-1 hover:bg-blue-500/20 rounded text-blue-400 hover:text-blue-300"
+                        className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 text-white/70 hover:text-white transition-all duration-200 flex items-center justify-center"
                         title="Rename session"
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                           <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
@@ -192,11 +214,12 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                           e.stopPropagation();
                           onDeleteSession?.(session.id);
                         }}
-                        className="p-1 hover:bg-red-500/20 rounded text-red-400 hover:text-red-300"
+                        className="w-7 h-7 rounded-lg bg-white/10 hover:bg-red-500/20 border border-white/20 hover:border-red-500/30 text-white/70 hover:text-red-400 transition-all duration-200 flex items-center justify-center"
                         title="Delete session"
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                          <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </button>
                     </div>

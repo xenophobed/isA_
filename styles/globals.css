@@ -537,6 +537,62 @@ body {
 }
 
 /* ============================================================================
+ * Glassmorphism Components Theme Integration
+ * ============================================================================ */
+
+/* Light theme adjustments for glassmorphism */
+[data-theme="light"] .glass-card {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  backdrop-filter: blur(20px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(120%) !important;
+}
+
+[data-theme="light"] .glass-message-bubble {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .glass-chat-input-container textarea {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .glass-chat-input-container textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* Dark theme enhancements for glassmorphism */
+[data-theme="dark"] .glass-card {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+[data-theme="dark"] .glass-message-bubble {
+  background: rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Glassmorphism performance optimizations */
+.glass-card,
+.glass-button,
+.glass-message-bubble,
+.glass-chat-input-container {
+  /* Hardware acceleration */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: backdrop-filter;
+}
+
+/* Glassmorphism hover states */
+.glass-card:hover,
+.glass-button:hover {
+  backdrop-filter: blur(24px) saturate(130%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(130%) !important;
+}
+
+/* ============================================================================
  * BOTTOM LAYOUT - Three Area Consistency (UserButton, InputAreaLayout, BaseWidget)
  * ============================================================================ */
 

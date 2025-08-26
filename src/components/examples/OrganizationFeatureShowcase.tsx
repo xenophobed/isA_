@@ -116,10 +116,7 @@ export const OrganizationFeatureShowcase: React.FC = () => {
           
           {/* Context-aware UserButton */}
           <div className="w-80">
-            <UserButtonContainer
-              onToggleDrawer={() => setShowUserDrawer(!showUserDrawer)}
-              showDrawer={showUserDrawer}
-            />
+            <UserButtonContainer />
           </div>
         </div>
       </header>

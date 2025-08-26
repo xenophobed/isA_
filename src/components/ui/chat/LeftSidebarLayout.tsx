@@ -62,7 +62,7 @@ export interface LeftSidebarLayoutProps {
  */
 export const LeftSidebarLayout = memo<LeftSidebarLayoutProps>(({
   className = '',
-  sidebarWidth = '16.67%',
+  sidebarWidth = '320px', // Fixed width for better control and mobile responsiveness
   
   // Data props for SessionHistory
   sessions,
@@ -109,16 +109,7 @@ export const LeftSidebarLayout = memo<LeftSidebarLayoutProps>(({
       
       {/* User Area - 使用统一高度系统与输入区域对齐 */}
       <div 
-        className="flex-shrink-0 border-t border-white/10 p-4 user-area-container" 
-        style={{
-          minHeight: 'var(--bottom-area-height)',
-          maxHeight: 'var(--bottom-area-height)',
-          background: 'var(--glass-primary)',
-          backdropFilter: 'blur(20px) saturate(120%)',
-          border: '1px solid var(--glass-border)',
-          borderRadius: '20px',
-          boxShadow: '0 8px 32px var(--accent-soft)20'
-        }}
+        className="flex-shrink-0 p-4 user-area-container min-h-[80px]"
       >
         <div className="h-full flex items-center justify-center">
           {userContent}

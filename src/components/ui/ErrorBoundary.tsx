@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { logger, LogCategory } from '../../utils/logger';
+import { GlassButton } from '../shared';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -94,18 +95,22 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               )}
               
               <div className="flex gap-3">
-                <button
+                <GlassButton
                   onClick={this.handleRetry}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                  variant="danger"
+                  size="md"
+                  className="flex-1 text-white"
                 >
                   Try Again
-                </button>
-                <button
+                </GlassButton>
+                <GlassButton
                   onClick={() => window.location.reload()}
-                  className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                  variant="ghost"
+                  size="md"
+                  className="flex-1 text-white border-gray-500/30 hover:bg-gray-500/20"
                 >
                   Refresh Page
-                </button>
+                </GlassButton>
               </div>
             </div>
           </div>

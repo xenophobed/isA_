@@ -292,7 +292,7 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
               <SessionModule 
                 sidebarWidth="300px" 
                 userContent={
-                  <UserButtonContainer onToggleDrawer={() => setShowUserPortal(!showUserPortal)} />
+                  <UserButtonContainer />
                 }
               />
             }

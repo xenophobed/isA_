@@ -720,6 +720,71 @@ html, body {
  * Print styles (hide mobile-specific elements)
  * ============================================================================ */
 
+/* ============================================================================
+ * Glassmorphism mobile optimizations
+ * ============================================================================ */
+
+/* Ensure glassmorphism components are touch-friendly on mobile */
+@media (max-width: 768px) {
+  .glass-chat-input-container {
+    /* Enhanced touch targets */
+    --glass-touch-target: 48px;
+  }
+  
+  .glass-mobile-input-area {
+    /* Optimized backdrop blur for mobile performance */
+    backdrop-filter: blur(16px) saturate(120%);
+    -webkit-backdrop-filter: blur(16px) saturate(120%);
+  }
+  
+  .glass-mobile-header {
+    /* Performance optimized glass effect */
+    backdrop-filter: blur(20px) saturate(130%);
+    -webkit-backdrop-filter: blur(20px) saturate(130%);
+  }
+  
+  /* Touch-optimized glassmorphism buttons */
+  .glass-button {
+    min-height: var(--mobile-touch-target);
+    min-width: var(--mobile-touch-target);
+  }
+  
+  /* Glassmorphism cards with better mobile spacing */
+  .glass-card {
+    margin: var(--mobile-gap);
+    padding: var(--mobile-padding);
+  }
+  
+  /* Optimized glass effects for better mobile performance */
+  .glass-message-bubble,
+  .glass-card,
+  .glass-button {
+    /* Use transform3d for hardware acceleration */
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+}
+
+/* Small screen adjustments for glassmorphism */
+@media (max-width: 425px) {
+  .glass-chat-input-container {
+    /* Reduce blur for better performance on smaller devices */
+    backdrop-filter: blur(12px) saturate(110%);
+    -webkit-backdrop-filter: blur(12px) saturate(110%);
+  }
+}
+
+/* Landscape mode adjustments */
+@media (max-width: 768px) and (orientation: landscape) {
+  .glass-mobile-header {
+    /* Reduce header glass effects in landscape for more content space */
+    backdrop-filter: blur(16px) saturate(110%);
+    -webkit-backdrop-filter: blur(16px) saturate(110%);
+  }
+}
+
 @media print {
   .mobile-header,
   .mobile-input-area,

@@ -94,3 +94,67 @@ export {
   type QuickAction,
   type ScrollFollowUpActionsProps
 } from './widgets';
+
+// Modern Chat UI Components (2025)
+export {
+  Avatar,
+  type AvatarProps
+} from './ui/Avatar';
+
+export {
+  MessageBubble,
+  type MessageBubbleProps
+} from './ui/MessageBubble';
+
+export {
+  TypingIndicator,
+  type TypingIndicatorProps
+} from './ui/TypingIndicator';
+
+export {
+  ChatInput,
+  type ChatInputProps
+} from './ui/ChatInput';
+
+export {
+  SearchBar,
+  type SearchBarProps,
+  type SearchResult
+} from './ui/SearchBar';
+
+export {
+  StatusBar,
+  type StatusBarProps
+} from './ui/StatusBar';
+
+export {
+  EmptyState,
+  type EmptyStateProps
+} from './ui/EmptyState';
+
+// Glassmorphism Pro Components (2025)
+export {
+  GlassCard,
+  type GlassCardProps
+} from './ui/GlassCard';
+
+export {
+  GlassButton,
+  type GlassButtonProps
+} from './ui/GlassButton';
+
+export {
+  GlassInput,
+  type GlassInputProps
+} from './ui/GlassInput';
+
+export {
+  GlassMessageBubble,
+  type GlassMessageBubbleProps
+} from './ui/GlassMessageBubble';
+
+export {
+  GlassChatInput,
+  type GlassChatInputProps,
+  type IntelligentModeSettings
+} from './ui/GlassChatInput';

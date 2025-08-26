@@ -110,23 +110,15 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
       if (isStreaming) {
         // 正在流式传输时显示处理中
         return (
-          <div className="flex items-center space-x-2 px-2 py-1 rounded-full" style={{
-            background: 'rgba(66, 133, 244, 0.08)',
-            border: '1px solid rgba(66, 133, 244, 0.12)'
-          }}>
-            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{
-              backgroundColor: '#4285f4'
-            }}></div>
-            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+          <div className="flex items-center space-x-2 px-3 py-2 rounded-full bg-blue-500/20 backdrop-blur-sm border border-blue-400/40 shadow-lg">
+            <div className="w-2 h-2 rounded-full animate-pulse bg-blue-300 shadow-md shadow-blue-400/60"></div>
+            <span className="text-sm font-semibold text-blue-200">
               Processing...
             </span>
-            <div className="w-8 h-1 rounded-full" style={{ background: 'rgba(66, 133, 244, 0.2)' }}>
+            <div className="w-12 h-1.5 rounded-full bg-blue-800/40">
               <div 
-                className="h-full rounded-full transition-all duration-300 animate-pulse"
-                style={{ 
-                  width: '60%',
-                  backgroundColor: '#4285f4'
-                }}
+                className="h-full rounded-full transition-all duration-300 animate-pulse bg-blue-300 shadow-sm"
+                style={{ width: '60%' }}
               ></div>
             </div>
           </div>
@@ -137,34 +129,24 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
           <div className="relative" ref={dropdownRef}>
             <button 
               onClick={() => setShowTaskDetails(!showTaskDetails)}
-              className="flex items-center space-x-2 px-2 py-1 rounded-full transition-all hover:scale-105"
-              style={{
-                background: 'rgba(52, 168, 83, 0.08)',
-                border: '1px solid rgba(52, 168, 83, 0.12)'
-              }}
+              className="flex items-center space-x-2 px-3 py-2 rounded-full transition-all hover:scale-105 bg-green-500/20 backdrop-blur-sm border border-green-400/40 hover:bg-green-500/30 shadow-lg"
               title="Click to view task details"
             >
-              <div className="w-1.5 h-1.5 rounded-full" style={{
-                backgroundColor: '#34a853'
-              }}></div>
-              <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+              <div className="w-2 h-2 rounded-full bg-green-300 shadow-md shadow-green-400/60"></div>
+              <span className="text-sm font-semibold text-green-200">
                 Completed
               </span>
-              <div className="w-8 h-1 rounded-full" style={{ background: 'rgba(52, 168, 83, 0.2)' }}>
+              <div className="w-12 h-1.5 rounded-full bg-green-800/40">
                 <div 
-                  className="h-full rounded-full transition-all duration-300"
-                  style={{ 
-                    width: '100%',
-                    backgroundColor: '#34a853'
-                  }}
+                  className="h-full rounded-full transition-all duration-300 bg-green-300 shadow-sm"
+                  style={{ width: '100%' }}
                 ></div>
               </div>
               <svg 
-                className={`w-3 h-3 transition-transform duration-200 ${showTaskDetails ? 'rotate-180' : ''}`}
+                className={`w-4 h-4 transition-transform duration-200 text-green-200 ${showTaskDetails ? 'rotate-180' : ''}`}
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
-                style={{ color: 'var(--text-muted)' }}
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m19 9-7 7-7-7" />
               </svg>
@@ -172,25 +154,15 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
             
             {/* Task Details Dropdown */}
             {showTaskDetails && (
-              <div 
-                className="absolute top-full left-0 mt-2 min-w-[300px] max-w-[400px] p-3 rounded-lg border shadow-lg z-50"
-                style={{
-                  background: 'var(--glass-primary)',
-                  border: '1px solid var(--glass-border)',
-                  backdropFilter: 'blur(12px)'
-                }}
-              >
-                <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+              <div className="absolute top-full left-0 mt-2 min-w-[300px] max-w-[400px] p-3 rounded-lg border shadow-lg z-50 bg-white/10 backdrop-blur-md border-white/20">
+                <div className="text-xs font-semibold mb-2 text-white/90">
                   Task Execution Summary
                 </div>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {completedTasks.length > 0 ? completedTasks.slice(-3).map((task) => (
-                    <div key={task.id} className="p-2 rounded border" style={{ 
-                      background: 'var(--glass-secondary)',
-                      border: '1px solid var(--glass-border)'
-                    }}>
+                    <div key={task.id} className="p-2 rounded border bg-white/5 border-white/10">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                        <span className="text-xs font-medium text-white/90">
                           {task.title}
                         </span>
                         <span className="text-xs px-1.5 py-0.5 rounded-full" style={{
@@ -201,7 +173,7 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
                         </span>
                       </div>
                       {task.result && task.result.success && (
-                        <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        <div className="text-xs text-white/70">
                           ✅ {task.result.data || 'Task completed successfully'}
                         </div>
                       )}
@@ -212,16 +184,13 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
                       )}
                     </div>
                   )) : (
-                    <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <div className="text-xs text-white/60">
                       No completed tasks to show
                     </div>
                   )}
                 </div>
                 {completedTasks.length > 3 && (
-                  <div className="text-xs mt-2 pt-2 border-t" style={{ 
-                    color: 'var(--text-muted)',
-                    borderColor: 'var(--glass-border)'
-                  }}>
+                  <div className="text-xs mt-2 pt-2 border-t text-white/60 border-white/10">
                     Showing last 3 tasks ({completedTasks.length} total)
                   </div>
                 )}
@@ -361,25 +330,31 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
     } else {
       // 进行中的任务 - 不可点击
       return (
-        <div className="flex items-center space-x-2 px-2 py-1 rounded-full" style={{
-          background: 'rgba(66, 133, 244, 0.08)',
-          border: '1px solid rgba(66, 133, 244, 0.12)'
-        }}>
-          <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{
-            backgroundColor: currentTask.status === 'running' ? '#4285f4' : 
-                            currentTask.status === 'failed' ? '#ea4335' : '#fbbc04'
-          }}></div>
-          <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-            {currentTask.title.length > 20 ? currentTask.title.substring(0, 20) + '...' : currentTask.title}
+        <div className={`flex items-center space-x-2 px-3 py-2 rounded-full backdrop-blur-sm border shadow-lg ${
+          currentTask.status === 'running' ? 'bg-blue-500/20 border-blue-400/40' : 
+          currentTask.status === 'failed' ? 'bg-red-500/20 border-red-400/40' : 'bg-yellow-500/20 border-yellow-400/40'
+        }`}>
+          <div className={`w-2 h-2 rounded-full animate-pulse shadow-md ${
+            currentTask.status === 'running' ? 'bg-blue-300 shadow-blue-400/60' : 
+            currentTask.status === 'failed' ? 'bg-red-300 shadow-red-400/60' : 'bg-yellow-300 shadow-yellow-400/60'
+          }`}></div>
+          <span className={`text-sm font-semibold ${
+            currentTask.status === 'running' ? 'text-blue-200' : 
+            currentTask.status === 'failed' ? 'text-red-200' : 'text-yellow-200'
+          }`}>
+            {currentTask.title.length > 15 ? currentTask.title.substring(0, 15) + '...' : currentTask.title}
           </span>
           {currentTask.progress !== undefined && (
-            <div className="w-8 h-1 rounded-full" style={{ background: 'rgba(66, 133, 244, 0.2)' }}>
+            <div className={`w-12 h-1.5 rounded-full ${
+              currentTask.status === 'running' ? 'bg-blue-800/40' : 
+              currentTask.status === 'failed' ? 'bg-red-800/40' : 'bg-yellow-800/40'
+            }`}>
               <div 
-                className="h-full rounded-full transition-all duration-300"
-                style={{ 
-                  width: `${currentTask.progress}%`,
-                  backgroundColor: '#4285f4'
-                }}
+                className={`h-full rounded-full transition-all duration-300 shadow-sm ${
+                  currentTask.status === 'running' ? 'bg-blue-300' : 
+                  currentTask.status === 'failed' ? 'bg-red-300' : 'bg-yellow-300'
+                }`}
+                style={{ width: `${currentTask.progress}%` }}
               ></div>
             </div>
           )}
@@ -393,10 +368,10 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
     if (!currentTask) return null;
 
     return (
-      <div className="task-progress-mobile flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 p-3 bg-gray-800/50 rounded-lg border border-gray-600/50">
+      <div className="task-progress-mobile flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 p-3 bg-white/8 backdrop-blur-md rounded-lg border border-white/10">
         <div className="flex items-center space-x-2 min-w-0 flex-1">
-          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse flex-shrink-0"></div>
-          <span className="text-sm font-medium text-gray-300 truncate">
+          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse flex-shrink-0 shadow-sm shadow-blue-400/50"></div>
+          <span className="text-sm font-medium text-white/90 truncate">
             {currentTask.title}
           </span>
         </div>
@@ -414,7 +389,7 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
           <div className="flex space-x-2 justify-end sm:justify-start">
             <button
               onClick={() => handleTaskAction(currentTask.id, 'pause')}
-              className="p-2 text-amber-400 hover:text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 rounded transition-colors"
+              className="p-2 text-yellow-400 hover:text-yellow-300 bg-yellow-400/10 hover:bg-yellow-400/20 rounded-lg backdrop-blur-sm border border-yellow-400/20 transition-colors"
               title="暂停"
             >
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
@@ -423,7 +398,7 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
             </button>
             <button
               onClick={() => handleTaskAction(currentTask.id, 'cancel')}
-              className="p-2 text-red-400 hover:text-red-300 bg-red-400/10 hover:bg-red-400/20 rounded transition-colors"
+              className="p-2 text-red-400 hover:text-red-300 bg-red-400/10 hover:bg-red-400/20 rounded-lg backdrop-blur-sm border border-red-400/20 transition-colors"
               title="取消"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -437,30 +412,30 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
   };
 
   const renderExpandedView = () => (
-    <div className="space-y-2 p-3 bg-gray-800/30 rounded-lg border border-gray-600/30">
+    <div className="space-y-2 p-3 bg-white/8 backdrop-blur-md rounded-lg border border-white/10">
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-sm font-medium text-gray-300">
+        <h4 className="text-sm font-medium text-white/90">
           正在处理 ({relevantTasks.length})
         </h4>
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-white/60">
           {taskCounts.active} 个活跃任务
         </div>
       </div>
       
       <div className="space-y-2">
         {relevantTasks.map(task => (
-          <div key={task.id} className="bg-gray-700/30 rounded p-2">
+          <div key={task.id} className="bg-white/5 backdrop-blur-sm rounded p-2 border border-white/10">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center space-x-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
-                <span className="text-sm text-gray-300">{task.title}</span>
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse shadow-sm shadow-blue-400/50"></div>
+                <span className="text-sm text-white/90">{task.title}</span>
               </div>
               {showControls && (
                 <div className="flex space-x-1">
                   {task.canPause && task.status === 'running' && (
                     <button
                       onClick={() => handleTaskAction(task.id, 'pause')}
-                      className="p-1 text-xs text-gray-400 hover:text-gray-200"
+                      className="p-1 text-xs text-white/60 hover:text-white/90 bg-white/5 hover:bg-white/10 rounded border border-white/10"
                       title="暂停"
                     >
                       ⏸️
@@ -469,7 +444,7 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
                   {task.canResume && task.status === 'paused' && (
                     <button
                       onClick={() => handleTaskAction(task.id, 'resume')}
-                      className="p-1 text-xs text-gray-400 hover:text-green-400"
+                      className="p-1 text-xs text-white/60 hover:text-green-400 bg-white/5 hover:bg-white/10 rounded border border-white/10"
                       title="继续"
                     >
                       ▶️
@@ -478,7 +453,7 @@ export const TaskProgressMessage: React.FC<TaskProgressMessageProps> = ({
                   {task.canCancel && (
                     <button
                       onClick={() => handleTaskAction(task.id, 'cancel')}
-                      className="p-1 text-xs text-gray-400 hover:text-red-400"
+                      className="p-1 text-xs text-white/60 hover:text-red-400 bg-white/5 hover:bg-white/10 rounded border border-white/10"
                       title="取消"
                     >
                       ❌

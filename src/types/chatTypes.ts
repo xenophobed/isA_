@@ -122,6 +122,7 @@ export interface ChatServiceCallbacks {
   onMessageContent?: (content: string) => void;
   onMessageStatus?: (status: string) => void; 
   onMessageComplete?: (completeMessage?: string) => void; // Now receives complete message content
+  onCompleteResponseExtracted?: (completeResponse: string) => void; // 完整响应提取回调
   onError?: (error: Error) => void;
   onArtifactCreated?: (artifact: { id?: string; type: string; content: string }) => void;
   onBillingUpdate?: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => void;
@@ -130,7 +131,29 @@ export interface ChatServiceCallbacks {
 export interface ChatMetadata {
   session_id?: string;
   auth0_id?: string;
+  user_id?: string;
   template_parameters?: Record<string, any>;
+  prompt_name?: string;
+  prompt_args?: Record<string, any>;
+  // 智能模式参数 (2025-08-25)
+  proactive_enabled?: boolean;
+  collaborative_enabled?: boolean;
+  confidence_threshold?: number;
+  proactive_predictions?: {
+    user_needs?: {
+      confidence: number;
+      prediction: string;
+    };
+    task_outcomes?: {
+      confidence: number;
+      prediction: string;
+    };
+    resource_requirements?: {
+      confidence: number;
+      prediction: string;
+    };
+    [key: string]: any;
+  };
   [key: string]: any;
 }
 
