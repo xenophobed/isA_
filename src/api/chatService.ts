@@ -156,16 +156,32 @@ export class ChatService {
         await this.handleStreamingRequest(endpoint, requestPayload, callbacks);
 
       } else {
-        // Multimodal message - use new API format with files
+        // Multimodal message - use multimodal API endpoint for voice transcription support
+        const multimodalEndpoint = '/api/chat/multimodal';
+        
+        // Check if we have audio files for voice processing
+        const hasAudioFiles = files.some(file => file.type.startsWith('audio/'));
+        
         const additionalData = {
           message: content,
-          user_id: metadata.auth0_id || 'test_user',
+          user_id: metadata.auth0_id || metadata.user_id || 'test_user',
           session_id: metadata.session_id || 'default',
           prompt_name: metadata.template_parameters?.template_id || null,
-          prompt_args: JSON.stringify(metadata.template_parameters?.prompt_args || {})
+          prompt_args: JSON.stringify(metadata.template_parameters?.prompt_args || {}),
+          // Add intelligent mode settings if available
+          proactive_enabled: metadata.intelligentMode?.mode === 'proactive' ? 'true' : 'false',
+          collaborative_enabled: metadata.intelligentMode?.mode === 'collaborative' || metadata.intelligentMode?.mode === 'proactive' ? 'true' : 'false',
+          confidence_threshold: metadata.intelligentMode?.confidence_threshold?.toString() || '0.7'
         };
 
-        await this.handleMultimodalStreamingRequest(endpoint, files, additionalData, callbacks);
+        console.log('🎤 CHAT_SERVICE: Using multimodal endpoint for files', {
+          endpoint: multimodalEndpoint,
+          hasAudioFiles,
+          fileTypes: files.map(f => f.type),
+          intelligentMode: metadata.intelligentMode
+        });
+
+        await this.handleMultimodalStreamingRequest(multimodalEndpoint, files, additionalData, callbacks);
       }
 
     } catch (error) {

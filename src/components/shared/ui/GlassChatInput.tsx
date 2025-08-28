@@ -22,6 +22,7 @@ interface ConfigButtonProps {
   showMagicButton?: boolean;
   intelligentMode?: IntelligentModeSettings;
   onIntelligentModeChange?: (settings: IntelligentModeSettings) => void;
+  isRecording?: boolean;
 }
 
 const ConfigButton: React.FC<ConfigButtonProps> = ({
@@ -33,7 +34,8 @@ const ConfigButton: React.FC<ConfigButtonProps> = ({
   showVoiceButton = false,
   showMagicButton = false,
   intelligentMode = { mode: 'reactive', confidence_threshold: 0.7, enable_predictions: false },
-  onIntelligentModeChange
+  onIntelligentModeChange,
+  isRecording = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -173,12 +175,19 @@ const ConfigButton: React.FC<ConfigButtonProps> = ({
                     onVoiceRecord();
                     setIsOpen(false);
                   }}
-                  className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors flex items-center gap-3"
+                  className={`w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors flex items-center gap-3 ${
+                    isRecording ? 'bg-red-50 dark:bg-red-950/30' : ''
+                  }`}
                 >
-                  <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`w-4 h-4 ${isRecording ? 'text-red-500 animate-pulse' : 'text-green-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                   </svg>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Voice input</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    {isRecording ? 'Recording... (click to stop)' : 'Voice input'}
+                  </span>
+                  {isRecording && (
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse ml-auto" />
+                  )}
                 </button>
               )}
             </div>
@@ -210,6 +219,7 @@ export interface GlassChatInputProps {
   onMagicAction?: () => void;
   onFocus?: () => void;
   onBlur?: () => void;
+  isRecording?: boolean;
   // 智能模式设置
   intelligentMode?: IntelligentModeSettings;
   onIntelligentModeChange?: (settings: IntelligentModeSettings) => void;
@@ -239,6 +249,7 @@ export const GlassChatInput: React.FC<GlassChatInputProps> = ({
   onMagicAction,
   onFocus,
   onBlur,
+  isRecording = false,
   intelligentMode = { mode: 'reactive', confidence_threshold: 0.7, enable_predictions: false },
   onIntelligentModeChange
 }) => {
@@ -327,6 +338,7 @@ export const GlassChatInput: React.FC<GlassChatInputProps> = ({
                 showMagicButton={showMagicButton}
                 intelligentMode={intelligentMode}
                 onIntelligentModeChange={onIntelligentModeChange}
+                isRecording={isRecording}
               />
             )}
           </div>

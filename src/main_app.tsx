@@ -37,9 +37,6 @@ import { Auth0Provider } from './providers/Auth0Provider';
 import { ChatModule } from './modules/ChatModule';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { AppHeader } from './components/ui/AppHeader';
-// Removed ArtifactModule import - now handled by MessageList
-// Removed invalid imports - SidebarManager and SessionManager don't exist
-// Removed StreamingHandler import - doesn't exist
 import { ChatInputHandler } from './components/core/ChatInputHandler';
 import { useAppStore, useAppActions } from './stores/useAppStore';
 import { useCurrentTasks, useTaskProgress, useIsExecutingPlan, useChatMessages } from './stores/useChatStore';
@@ -47,10 +44,8 @@ import { useAuth } from './hooks/useAuth';
 import { useAI } from './providers/AIProvider';
 import { UserButton } from './components/ui/user/UserButton';
 import { LoginScreen } from './components/ui/LoginScreen';
-// Removed UserManagementDrawer import - doesn't exist
 import { AppArtifact, AppId } from './types/appTypes';
 import { logger, LogCategory } from './utils/logger';
-// Removed LoggingDashboard import - doesn't exist
 
 /**
  * Main App Content Component (inside provider)

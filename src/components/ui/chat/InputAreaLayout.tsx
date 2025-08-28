@@ -130,20 +130,57 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
     return;
   };
 
-  // Voice recording functions - temporarily disabled
+  // Voice recording functions
   const startRecording = async () => {
-    console.log('🎤 Audio recording temporarily disabled');
-    return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const audioFile = new File([audioBlob], `voice-${Date.now()}.wav`, { type: 'audio/wav' });
+        
+        // Add audio file to attachments for multimodal sending
+        setAttachedFiles(prev => [...prev, audioFile]);
+        
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+        
+        playAudioFeedback('success');
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      playAudioFeedback('click');
+    } catch (error) {
+      console.error('录音失败:', error);
+      playAudioFeedback('error');
+      if (onError) {
+        onError(new Error('无法访问麦克风，请检查权限设置'));
+      }
+    }
   };
 
   const stopRecording = () => {
-    console.log('🎤 Audio recording temporarily disabled');
-    return;
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
   };
 
   const toggleRecording = () => {
-    console.log('🎤 Audio recording temporarily disabled');
-    return;
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   const removeFile = (index: number) => {
@@ -171,7 +208,17 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
     if ((!inputValue.trim() && attachedFiles.length === 0) || isLoading) return;
 
     playAudioFeedback('send');
-    let messageToSend = inputValue.trim() || 'Please analyze the attached files';
+    
+    // Check if we have voice files
+    const hasAudioFiles = attachedFiles.some(file => file.type.startsWith('audio/'));
+    let messageToSend = inputValue.trim();
+    
+    // If no text message but has audio files, provide default message
+    if (!messageToSend && hasAudioFiles) {
+      messageToSend = '请转录和处理这个语音消息';
+    } else if (!messageToSend) {
+      messageToSend = 'Please analyze the attached files';
+    }
 
     if (onBeforeSend) {
       messageToSend = onBeforeSend(messageToSend);
@@ -185,11 +232,22 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
     setIsLoading(true);
     
     try {
-      // Use multimodal send if files are attached or if onSendMultimodal is available
+      // Use multimodal send if files are attached (including voice files)
       if (attachedFiles.length > 0 && onSendMultimodal) {
-        await onSendMultimodal(messageToSend, attachedFiles);
+        // Pass intelligent mode settings as metadata
+        const metadata = {
+          intelligentMode,
+          isVoiceMessage: hasAudioFiles,
+          multimodal: true
+        };
+        await onSendMultimodal(messageToSend, attachedFiles, metadata);
       } else if (onSend) {
-        await onSend(messageToSend);
+        // For text-only messages, pass intelligent mode settings
+        const metadata = {
+          intelligentMode,
+          multimodal: false
+        };
+        await onSend(messageToSend, metadata);
       }
       
       setInputValue('');
@@ -359,6 +417,7 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
         showMagicButton={!!onShowWidgetSelector}
         onAttachFile={handleFileAttach}
         onVoiceRecord={toggleRecording}
+        isRecording={isRecording}
         onMagicAction={onShowWidgetSelector}
         intelligentMode={intelligentMode}
         onIntelligentModeChange={setIntelligentMode}
