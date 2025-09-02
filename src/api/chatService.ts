@@ -27,11 +27,21 @@ import { SSEParser, SSEParserCallbacks } from './SSEParser';
 import { logger, LogCategory } from '../utils/logger';
 
 // ================================================================================
+// New Architecture Imports (Optional/Feature-flagged)
+// ================================================================================
+import { chatServiceNew } from './ChatServiceNew';
+
+// ================================================================================
 // ChatService Class
 // ================================================================================
 
 export class ChatService {
   private apiService: BaseApiService;
+  
+  // ================================================================================
+  // New Architecture Feature Flag
+  // ================================================================================
+  private useNewArchitecture: boolean = process.env.NODE_ENV === 'development';
 
   constructor(apiService?: BaseApiService) {
     // Use provided or create dedicated agent service instance
@@ -55,6 +65,31 @@ export class ChatService {
     token: string,
     callbacks: SSEParserCallbacks
   ): Promise<void> {
+    // ================================================================================
+    // New Architecture Integration
+    // ================================================================================
+    if (this.useNewArchitecture) {
+      const payload = {
+        message,
+        user_id: metadata.user_id,
+        session_id: metadata.session_id || 'default',
+        prompt_name: metadata.prompt_name || null,
+        prompt_args: metadata.prompt_args || {}
+      };
+      
+      const url = `${config.api.baseUrl}/api/chat`;
+      
+      try {
+        return await chatServiceNew.sendMessageWithNewArchitecture(url, payload, callbacks as any, token);
+      } catch (error) {
+        console.warn('🔄 NEW_ARCHITECTURE: Failed, falling back to legacy:', error);
+        // Fall through to legacy implementation
+      }
+    }
+    
+    // ================================================================================
+    // Legacy Architecture Implementation
+    // ================================================================================
     const startTime = Date.now();
     
     try {
@@ -135,6 +170,32 @@ export class ChatService {
     token: string,
     callbacks: SSEParserCallbacks
   ): Promise<void> {
+    // ================================================================================
+    // New Architecture Integration
+    // ================================================================================
+    if (this.useNewArchitecture) {
+      const payload = {
+        message: content,
+        user_id: metadata.user_id || metadata.auth0_id,
+        session_id: metadata.session_id || 'default',
+        prompt_name: metadata.prompt_name || null,
+        prompt_args: metadata.prompt_args || {},
+        files: files.map(f => ({ name: f.name, size: f.size, type: f.type }))
+      };
+      
+      const url = `${config.api.baseUrl}/api/chat`;
+      
+      try {
+        return await chatServiceNew.sendMultimodalMessageWithNewArchitecture(url, payload, callbacks as any, token);
+      } catch (error) {
+        console.warn('🔄 NEW_ARCHITECTURE: Multimodal failed, falling back to legacy:', error);
+        // Fall through to legacy implementation
+      }
+    }
+    
+    // ================================================================================
+    // Legacy Architecture Implementation
+    // ================================================================================
     try {
       const endpoint = '/api/chat';
       
@@ -205,6 +266,29 @@ export class ChatService {
     token: string,
     callbacks: SSEParserCallbacks
   ): Promise<void> {
+    // ================================================================================
+    // New Architecture Integration
+    // ================================================================================
+    if (this.useNewArchitecture) {
+      const payload = {
+        session_id: sessionId,
+        user_id: userId,
+        resume_value: resumeValue
+      };
+      
+      const url = `${config.api.baseUrl}/api/chat/resume/${sessionId}`;
+      
+      try {
+        return await chatServiceNew.resumeHILWithNewArchitecture(url, payload, callbacks as any, token);
+      } catch (error) {
+        console.warn('🔄 NEW_ARCHITECTURE: HIL resume failed, falling back to legacy:', error);
+        // Fall through to legacy implementation
+      }
+    }
+    
+    // ================================================================================
+    // Legacy Architecture Implementation
+    // ================================================================================
     const startTime = Date.now();
     
     try {

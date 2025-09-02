@@ -4,9 +4,12 @@
  */
 import React, { useState } from 'react';
 import { Avatar } from './Avatar';
+import { ContentRenderer } from '../content/ContentRenderer';
+import { ParsedContent } from '../../../api/parsing/ContentParser';
 
 export interface GlassMessageBubbleProps {
   content: string;
+  parsedContent?: ParsedContent; // 可选的解析后内容
   role: 'user' | 'assistant' | 'system';
   timestamp: string;
   isStreaming?: boolean;
@@ -29,6 +32,7 @@ export interface GlassMessageBubbleProps {
 
 export const GlassMessageBubble: React.FC<GlassMessageBubbleProps> = ({
   content,
+  parsedContent,
   role,
   timestamp,
   isStreaming = false,
@@ -170,8 +174,33 @@ export const GlassMessageBubble: React.FC<GlassMessageBubbleProps> = ({
             animate-pulse
           `} />
           
-          <div className="relative text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium">
-            {content}
+          <div className="relative text-[15px] leading-relaxed break-words font-medium">
+            {parsedContent ? (
+              // Render parsed content elements
+              parsedContent.elements.map((element: any, index: number) => (
+                <div key={index} className={element.type === 'image' ? 'mb-3' : ''}>
+                  <ContentRenderer
+                    content={element.content}
+                    type={element.type}
+                    variant="chat"
+                    size="md"
+                    features={{
+                      markdown: element.type === 'markdown' || element.type === 'text',
+                      imagePreview: element.type === 'image',
+                      saveButton: element.type === 'image',
+                      copyButton: element.type === 'code' || element.type === 'json',
+                      wordBreak: true
+                    }}
+                    className={element.type === 'image' ? 'max-w-sm rounded-lg overflow-hidden' : ''}
+                  />
+                </div>
+              ))
+            ) : (
+              // Fallback to simple text rendering
+              <div className="whitespace-pre-wrap">
+                {content}
+              </div>
+            )}
             
             {/* Enhanced Streaming indicator */}
             {isStreaming && (

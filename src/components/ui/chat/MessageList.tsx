@@ -401,6 +401,7 @@ export const MessageList = memo<MessageListProps>(({
         <div className={message.role === 'assistant' ? 'ml-12' : ''}>
           <GlassMessageBubble
             content={message.content}
+            parsedContent={message.type === 'regular' ? message.parsedContent : undefined}
             role={message.role as 'user' | 'assistant' | 'system'}
             timestamp={message.timestamp}
             isStreaming={isStreaming}

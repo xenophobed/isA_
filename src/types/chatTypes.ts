@@ -37,6 +37,7 @@ export interface BaseMessage {
 export interface RegularMessage extends BaseMessage {
   type: 'regular';
   content: string;
+  parsedContent?: import('../api/parsing/ContentParser').ParsedContent; // 解析后的内容结构
   metadata?: {
     sender?: string;
     app?: string;

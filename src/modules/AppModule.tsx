@@ -325,7 +325,6 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
           <UserPortal
             isOpen={showUserPortal}
             onClose={() => setShowUserPortal(false)}
-            sidebarWidth="300px"
           />
         )
       })}

@@ -52,6 +52,7 @@ import { useUserStore } from './useUserStore';
 import { useSessionStore } from './useSessionStore';
 import { TaskItem, TaskProgress } from '../api/SSEParser';
 import { HILInterruptDetectedEvent, HILCheckpointCreatedEvent, HILExecutionStatusData } from '../types/aguiTypes';
+import { createContentParser, ParsedContent } from '../api/parsing/ContentParser';
 
 interface ChatStoreState {
   // 聊天消息
@@ -733,10 +734,31 @@ export const useChatStore = create<ChatStore>()(
         const lastMessage = state.messages[state.messages.length - 1];
         if (!lastMessage || !lastMessage.isStreaming) return state;
         
+        // 解析消息内容（仅对常规消息进行解析）
+        let parsedContent: ParsedContent | undefined;
+        if (lastMessage.type === 'regular' && lastMessage.content) {
+          try {
+            const contentParser = createContentParser();
+            parsedContent = contentParser.parse(lastMessage.content) || undefined;
+            console.log('🔍 CONTENT_PARSER: Parsed message content:', {
+              messageId: lastMessage.id,
+              contentLength: lastMessage.content.length,
+              primaryType: parsedContent?.primaryType,
+              elementCount: parsedContent?.elements.length,
+              isMixed: parsedContent?.isMixed
+            });
+          } catch (error) {
+            console.warn('🔍 CONTENT_PARSER: Failed to parse content:', error);
+          }
+        }
+        
         const finishedMessage = {
           ...lastMessage,
           isStreaming: false,
-          streamingStatus: undefined
+          streamingStatus: undefined,
+          ...(lastMessage.type === 'regular' && parsedContent && {
+            parsedContent
+          })
         };
         
         const updatedMessages = [...state.messages];
