@@ -15,9 +15,29 @@
 
 import React, { useState } from 'react';
 import { useUserHandler, formatCredits, getCreditColor, getPlanDisplayName } from '../../core/userHandler';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 export const UserProfile: React.FC = () => {
   const userHandler = useUserHandler();
+  
+  // 安全的翻译hook使用
+  let t: (key: string) => string;
+  try {
+    const translation = useTranslation();
+    t = translation.t as any;
+  } catch (error) {
+    // Fallback function if translation fails
+    t = (key: string) => {
+      const fallbacks: Record<string, string> = {
+        'user.refreshAccount': '刷新账户',
+        'user.upgradePlan': '升级套餐',
+        'navigation.preferences': '偏好设置',
+        'user.signOut': '退出登录'
+      };
+      return fallbacks[key] || key;
+    };
+  }
+  
   const [isOpen, setIsOpen] = useState(false);
 
   // Don't render if not authenticated
@@ -42,6 +62,7 @@ export const UserProfile: React.FC = () => {
     userHandler.handleLogout();
     setIsOpen(false);
   };
+
 
   return (
     <div className="relative">
@@ -137,21 +158,22 @@ export const UserProfile: React.FC = () => {
               disabled={userHandler.isLoading}
               className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
             >
-              🔄 Refresh Account
+              🔄 {t('user.refreshAccount')}
             </button>
             
             <button
               onClick={userHandler.handleViewPricing}
               className="w-full text-left px-3 py-2 text-sm text-blue-400 hover:bg-gray-700 rounded transition-colors"
             >
-              ⬆️ Upgrade Plan
+              ⬆️ {t('user.upgradePlan')}
             </button>
+            
             
             <button
               onClick={handleLogout}
               className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-gray-700 rounded transition-colors"
             >
-              🚪 Sign Out
+              🚪 {t('user.signOut')}
             </button>
           </div>
         </div>

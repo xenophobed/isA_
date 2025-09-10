@@ -49,61 +49,10 @@ import { useChatActions } from '../stores/useChatStore';
 import { widgetHandler } from '../components/core/WidgetHandler';
 import { logger, LogCategory } from '../utils/logger';
 import { AppId } from '../types/appTypes';
+import { useTranslation } from '../hooks/useTranslation';
 
 // 🆕 Plugin System Integration
 import { initializePluginSystem } from '../plugins';
-
-// Available apps configuration - managed by AppModule but business logic in respective modules
-const AVAILABLE_APPS = [
-  { 
-    id: 'dream', 
-    name: 'DreamForge AI', 
-    icon: '🎨', 
-    description: 'AI-powered image generation and creative design',
-    triggers: ['画', '生成图片', 'draw', 'create image', 'generate'],
-    category: 'creative'
-  },
-  { 
-    id: 'hunt', 
-    name: 'HuntAI', 
-    icon: '🔍', 
-    description: 'Search and discover information',
-    triggers: ['搜索', 'search', 'find', 'look up'],
-    category: 'search'
-  },
-  { 
-    id: 'omni', 
-    name: 'Omni Content', 
-    icon: '✨', 
-    description: 'Multi-purpose content generation',
-    triggers: ['内容', 'content', 'generate', 'create'],
-    category: 'content'
-  },
-  { 
-    id: 'data-scientist', 
-    name: 'DataWise Analytics', 
-    icon: '📊', 
-    description: 'Data analysis and visualization',
-    triggers: ['分析', 'analyze', 'data', 'chart', 'graph'],
-    category: 'analytics'
-  },
-  { 
-    id: 'knowledge', 
-    name: 'Knowledge Hub', 
-    icon: '📚', 
-    description: 'Knowledge management and research',
-    triggers: ['知识', 'knowledge', 'research', 'learn'],
-    category: 'research'
-  },
-  { 
-    id: 'assistant', 
-    name: 'AI Assistant', 
-    icon: '🤖', 
-    description: 'General AI assistance and conversation',
-    triggers: ['助手', 'assistant', 'help', 'ai'],
-    category: 'general'
-  }
-];
 
 interface AppModuleProps extends Omit<AppLayoutProps, 'children'> {
   // All AppLayout props except children that we'll provide from business logic
@@ -120,6 +69,8 @@ interface AppModuleProps extends Omit<AppLayoutProps, 'children'> {
  * - Keeps AppLayout as pure UI component
  */
 export const AppModule: React.FC<AppModuleProps> = (props) => {
+  const { t } = useTranslation();
+  
   // User Portal state
   const [showUserPortal, setShowUserPortal] = useState(false);
   
@@ -153,15 +104,59 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
     setTriggeredAppInput
   } = useAppStore();
 
-  // Reduced logging in production
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🏗️ APP_MODULE: Providing data to AppLayout', {
-      messagesCount: chatInterface.messages.length,
-      currentApp,
-      showRightSidebar,
-      availableAppsCount: AVAILABLE_APPS.length
-    });
-  }
+  // Create translated available apps
+  const availableApps = useMemo(() => [
+    { 
+      id: 'dream', 
+      name: t('widgets.dreamforge'), 
+      icon: '🎨', 
+      description: 'AI-powered image generation and creative design',
+      triggers: ['画', '生成图片', 'draw', 'create image', 'generate'],
+      category: 'creative'
+    },
+    { 
+      id: 'hunt', 
+      name: t('widgets.huntai'), 
+      icon: '🔍', 
+      description: 'Search and discover information',
+      triggers: ['搜索', 'search', 'find', 'look up'],
+      category: 'search'
+    },
+    { 
+      id: 'omni', 
+      name: t('widgets.omnicontent'), 
+      icon: '✨', 
+      description: 'Multi-purpose content generation',
+      triggers: ['内容', 'content', 'generate', 'create'],
+      category: 'content'
+    },
+    { 
+      id: 'data-scientist', 
+      name: t('widgets.datawise'), 
+      icon: '📊', 
+      description: 'Data analysis and visualization',
+      triggers: ['分析', 'analyze', 'data', 'chart', 'graph'],
+      category: 'analytics'
+    },
+    { 
+      id: 'knowledge', 
+      name: t('widgets.knowledgehub'), 
+      icon: '📚', 
+      description: 'Knowledge management and research',
+      triggers: ['知识', 'knowledge', 'research', 'learn'],
+      category: 'research'
+    },
+    { 
+      id: 'assistant', 
+      name: t('widgets.assistant'), 
+      icon: '🤖', 
+      description: 'General AI assistance and conversation',
+      triggers: ['助手', 'assistant', 'help', 'ai'],
+      category: 'general'
+    }
+  ], [t]);
+
+  // Module state management - no debug logging needed
 
   // Note: Widget trigger logic is now handled in useChatStore reactive subscriber
 
@@ -241,7 +236,7 @@ export const AppModule: React.FC<AppModuleProps> = (props) => {
     currentApp,
     showRightSidebar,
     triggeredAppInput,
-    availableApps: AVAILABLE_APPS,
+    availableApps,
     
     // App management callbacks
     onCloseApp: handleCloseApp,

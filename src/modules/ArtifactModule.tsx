@@ -43,11 +43,7 @@ export const useArtifactLogic = () => {
   const currentSession = getCurrentSession();
   const artifactMessages = currentSession ? getArtifactMessages(currentSession.id) : [];
   
-  console.log('🎨 ARTIFACT_MODULE: Combined artifact state:', {
-    legacyArtifacts: legacyArtifacts?.length || 0,
-    artifactMessages: artifactMessages.length,
-    currentSessionId: currentSession?.id
-  });
+  // Artifact state management - no debug logging needed
 
   // Business logic: Handle artifact reopening - supports both legacy and new system
   const handleReopenArtifact = useCallback((artifactId: string) => {

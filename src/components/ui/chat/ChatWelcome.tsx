@@ -25,7 +25,8 @@ import {
   useDreamActions,
   useKnowledgeActions 
 } from '../../../stores/useWidgetStores';
-import { welcomeConfig, validateWelcomeConfig } from '../../../config/welcomeConfig';
+import { createWelcomeConfig, validateWelcomeConfig } from '../../../config/welcomeConfig';
+import { useLanguageStore } from '../../../stores/useLanguageStore';
 
 interface ChatWelcomeProps {
   onSendMessage?: (message: string) => void;
@@ -43,16 +44,20 @@ export const ChatWelcome: React.FC<ChatWelcomeProps> = ({
   const { triggerHuntSearch } = useHuntActions();
   const { triggerDreamGeneration } = useDreamActions();
   const { triggerKnowledgeAnalysis } = useKnowledgeActions();
+  const { currentLanguage } = useLanguageStore();
+  
+  // Generate dynamic welcome config based on current language
+  const welcomeConfig = React.useMemo(() => createWelcomeConfig(currentLanguage), [currentLanguage]);
 
-  // Validate configuration on component mount
+  // Validate configuration on component mount and language change
   useEffect(() => {
     const isValid = validateWelcomeConfig();
     if (!isValid) {
       console.error('🎯 CHAT_WELCOME: Invalid welcome configuration detected');
     } else {
-      console.log('🎯 CHAT_WELCOME: Welcome configuration loaded successfully');
+      console.log('🎯 CHAT_WELCOME: Welcome configuration loaded successfully', { language: currentLanguage });
     }
-  }, []);
+  }, [currentLanguage]);
 
   // 处理widget卡片点击
   const handleWidgetClick = async (widget: typeof welcomeConfig.widgets[0]) => {

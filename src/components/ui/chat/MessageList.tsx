@@ -95,6 +95,8 @@ export interface MessageListProps {
   itemHeight?: number;
   containerHeight?: number;
   overscan?: number;
+  // Task information for status display
+  currentTasks?: any[];
 }
 
 // Virtual scrolling hook for performance optimization
@@ -164,6 +166,8 @@ export const MessageList = memo<MessageListProps>(({
   itemHeight = 120,
   containerHeight = 400,
   overscan = 5,
+  // Task information
+  currentTasks = [],
 }) => {
   // Virtual scrolling setup
   const virtualScroll = useVirtualScrolling(
@@ -410,6 +414,7 @@ export const MessageList = memo<MessageListProps>(({
             showTimestamp={showTimestamps}
             showActions={true}
             variant="default"
+            hasTasks={currentTasks.length > 0}
             onCopy={() => navigator.clipboard.writeText(message.content)}
           />
         </div>

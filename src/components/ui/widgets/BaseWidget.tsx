@@ -367,6 +367,13 @@ interface BaseWidgetProps {
   onBack?: () => void;
   showBackButton?: boolean;
   
+  // 🆕 Mode Switching
+  onToggleMode?: () => void;
+  
+  // 🆕 View Mode Switching (for form layouts)
+  viewMode?: 'modern' | 'classic';
+  onToggleViewMode?: () => void;
+  
   // Layout configuration
   useCompactLayout?: boolean;
   className?: string;
@@ -416,6 +423,13 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
   // Navigation props
   onBack,
   showBackButton = true,
+  
+  // 🆕 Mode Switching
+  onToggleMode,
+  
+  // 🆕 View Mode Switching
+  viewMode,
+  onToggleViewMode,
   
   // Custom empty state
   emptyStateConfig
@@ -582,17 +596,64 @@ export const BaseWidget: React.FC<BaseWidgetProps> = ({
             )}
           </div>
           
-          {/* Elegant Back Button with improved styling */}
+          {/* 🆕 View Mode Toggle Button (Classic/Modern Form) */}
+          {onToggleViewMode && (
+            <button
+              onClick={onToggleViewMode}
+              className="
+                w-8 h-8 flex items-center justify-center
+                text-gray-600 dark:text-gray-400
+                hover:text-gray-800 dark:hover:text-gray-200
+                hover:bg-white/20 dark:hover:bg-white/10
+                rounded-lg backdrop-blur-sm
+                transition-all duration-200
+              "
+              title={viewMode === 'classic' ? "Switch to Modern View" : "Switch to Classic Form"}
+            >
+              <span className="text-sm">
+                {viewMode === 'classic' ? "📋" : "🎨"}
+              </span>
+            </button>
+          )}
+
+          {/* 🆕 Mode Toggle Button - Glass Chat Input Style */}
+          {onToggleMode && (
+            <button
+              onClick={onToggleMode}
+              className="
+                w-8 h-8 flex items-center justify-center
+                text-gray-600 dark:text-gray-400
+                hover:text-gray-800 dark:hover:text-gray-200
+                hover:bg-white/20 dark:hover:bg-white/10
+                rounded-lg backdrop-blur-sm
+                transition-all duration-200
+              "
+              title={isPluginMode ? "Switch to Full Screen" : "Switch to Half Screen"}
+            >
+              <span className="text-sm">
+                {isPluginMode ? "⛶" : "📱"}
+              </span>
+            </button>
+          )}
+          
+          {/* Glass Chat Input Style Back Button */}
           {showBackButton && onBack && (
-            <Button
-              variant="primary"
-              size="sm"
-              icon="←"
+            <button
               onClick={onBack}
-              tooltipText="Back to Widget List"
-              onlyIcon
-              className="shadow-lg hover:shadow-xl backdrop-blur-xl hover:scale-105 transition-all duration-200"
-            />
+              className="
+                w-8 h-8 flex items-center justify-center
+                text-gray-600 dark:text-gray-400
+                hover:text-gray-800 dark:hover:text-gray-200
+                hover:bg-white/20 dark:hover:bg-white/10
+                rounded-lg backdrop-blur-sm
+                transition-all duration-200
+              "
+              title="Back to Widget List"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
           )}
         </div>
       </div>

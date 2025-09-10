@@ -3,6 +3,7 @@
  * Optimized header for mobile chat interface
  */
 import React from 'react';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 // Simple SVG icon components
 const Menu = ({ className }: { className?: string }) => (
@@ -82,6 +83,8 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   onUserAvatarClick,
   onNotificationsClick
 }) => {
+  const { t } = useTranslation();
+  
   // Connection status indicator
   const getConnectionColor = () => {
     switch (connectionStatus) {
@@ -94,10 +97,10 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
 
   const getConnectionText = () => {
     switch (connectionStatus) {
-      case 'connected': return 'Online';
-      case 'connecting': return 'Connecting...';
-      case 'disconnected': return 'Offline';
-      default: return 'Unknown';
+      case 'connected': return t('header.connectionStatus.connected');
+      case 'connecting': return t('header.connectionStatus.connecting');
+      case 'disconnected': return t('header.connectionStatus.disconnected');
+      default: return t('header.connectionStatus.unknown');
     }
   };
 
@@ -129,7 +132,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               transition-all duration-200 flex-shrink-0
               ${showLeftSidebar ? 'bg-blue-500/20 border-blue-500/30' : ''}
             `}
-            aria-label="Toggle menu"
+            aria-label={t('header.toggleSidebar')}
           >
             {showLeftSidebar ? (
               <X className="w-5 h-5 text-white" />
@@ -186,7 +189,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                 border border-white/10 hover:border-white/20
                 transition-all duration-200
               "
-              aria-label="Notifications"
+              aria-label={t('header.notifications')}
             >
               <Bell className="w-5 h-5 text-white" />
               {notificationCount > 0 && (
@@ -214,7 +217,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                 border border-white/20
                 transition-all duration-200 overflow-hidden shadow-lg
               "
-              aria-label={`User menu - ${userName || 'Profile'}`}
+              aria-label={`${t('header.menu')} - ${userName || t('header.profile')}`}
             >
               {userAvatarUrl ? (
                 <img 
@@ -242,7 +245,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               transition-all duration-200
               ${showRightSidebar ? 'bg-blue-500/20 border-blue-500/30' : ''}
             `}
-            aria-label="More options"
+            aria-label={t('header.menu')}
           >
             <MoreVertical className="w-5 h-5 text-white" />
           </button>

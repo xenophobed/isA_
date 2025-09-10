@@ -19,8 +19,9 @@
 import React, { useCallback, useEffect, useState, useRef, ReactNode } from 'react';
 import { useWidget, useWidgetActions } from '../../hooks/useWidget';
 import { logger, LogCategory } from '../../utils/logger';
-import { widgetHandler } from '../../components/core/WidgetHandler';
 import { WidgetType } from '../../types/widgetTypes';
+import { getChatServiceInstance } from '../../hooks/useChatService';
+import { useChatActions } from '../../stores/useChatStore';
 import { 
   BaseWidget, 
   OutputHistoryItem, 
@@ -313,16 +314,7 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
   const widgetState = widget.currentWidgetState;
   const widgetData = widget.currentWidgetData;
   
-  // Debug: Log widget data changes with more detail
-  console.log(`🔍 ${config.type.toUpperCase()}_MODULE: Widget data:`, {
-    widgetState,
-    widgetData,
-    hasGeneratedImage: !!widgetData?.generatedImage,
-    currentOutput: !!currentOutput,
-    generatedImageUrl: widgetData?.generatedImage?.substring(0, 80),
-    currentOutputContent: currentOutput?.content?.substring(0, 80),
-    isCurrentApp: config.type === widget.currentApp
-  });
+  // Widget data management - no debug logging needed
   
   useEffect(() => {
     // Monitor actual widget state changes instead of using placeholder timer
@@ -331,14 +323,7 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
       const isCurrentlyProcessing = widgetState !== 'idle';
       const currentOutputValue = currentOutputRef.current;
       
-      console.log(`🔍 ${config.type.toUpperCase()}_MODULE: State check:`, {
-        wasProcessing,
-        isCurrentlyProcessing,
-        widgetState,
-        hasWidgetData: !!widgetData,
-        generatedImage: widgetData?.generatedImage?.substring(0, 50),
-        currentOutputExists: !!currentOutputValue
-      });
+      // State monitoring - no debug logging needed
       
       // If processing just completed OR if we have new data that needs to be displayed
       const hasNewData = widgetData && (
@@ -349,14 +334,7 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
       );
       
       if ((wasProcessing && !isCurrentlyProcessing) || hasNewData) {
-        console.log(`✅ ${config.type.toUpperCase()}_MODULE: Updating output - processing completed or new data:`, {
-          wasProcessing,
-          isCurrentlyProcessing, 
-          hasNewData,
-          hasGeneratedImage: !!widgetData?.generatedImage,
-          hasCurrentOutput: !!currentOutputValue,
-          currentOutputContent: currentOutputValue?.content?.substring(0, 50)
-        });
+        // Processing completed or new data available - no debug logging needed
         
         // Get actual result from widget data using configurable extractor
         let finalResult = null;

@@ -14,7 +14,7 @@
  * API Response → chatService → stores → hooks → modules → UI
  */
 
-import { useDreamWidgetStore, useHuntWidgetStore, useOmniWidgetStore, useDataScientistWidgetStore, useKnowledgeWidgetStore } from '../../stores/useWidgetStores';
+import { useDreamWidgetStore, useHuntWidgetStore, useOmniWidgetStore, useDataScientistWidgetStore, useKnowledgeWidgetStore, useCustomAutomationWidgetStore } from '../../stores/useWidgetStores';
 import { logger, LogCategory } from '../../utils/logger';
 import { OutputHistoryItem, EditAction, ManagementAction } from '../ui/widgets/BaseWidget';
 import { WidgetType } from '../../types/widgetTypes';
@@ -50,6 +50,7 @@ type WidgetMode = 'independent' | 'plugin';
 interface PluginEventEmitter {
   emit: (event: string, data: any) => void;
   on: (event: string, handler: (data: any) => void) => void;
+  off: (event: string, handler: (data: any) => void) => void;
 }
 
 /**
@@ -99,25 +100,34 @@ export class WidgetHandler {
         
         // 创建Promise来等待ChatModule的结果
         return new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Plugin request timeout'));
-          }, 60000); // 60秒超时
-          
           // 监听结果事件
           const resultHandler = (eventData: any) => {
+            console.log('🔌 WIDGET_HANDLER: Received widget:result event:', eventData);
             if (eventData.requestId === requestId) {
               clearTimeout(timeout);
+              // Clean up listener after use
+              this.eventEmitter!.off('widget:result', resultHandler);
+              
               if (eventData.success) {
+                console.log('✅ WIDGET_HANDLER: Widget request succeeded, resolving promise');
                 resolve(eventData.result);
               } else {
+                console.error('❌ WIDGET_HANDLER: Widget request failed:', eventData.error);
                 reject(new Error(eventData.error || 'Plugin execution failed'));
               }
             }
           };
           
+          const timeout = setTimeout(() => {
+            // Clean up listener on timeout
+            this.eventEmitter!.off('widget:result', resultHandler);
+            reject(new Error('Plugin request timeout'));
+          }, 60000); // 60秒超时
+          
           this.eventEmitter!.on('widget:result', resultHandler);
           
           // 发出请求事件
+          console.log('🔌 WIDGET_HANDLER: Emitting widget:request with requestId:', requestId);
           this.eventEmitter!.emit('widget:request', {
             widgetType: request.type,
             action: 'process',
@@ -148,6 +158,9 @@ export class WidgetHandler {
           break;
         case 'data_scientist':
           await this.processDataScientistRequest(request.params, request.sessionId, request.userId);
+          break;
+        case 'custom_automation':
+          await this.processCustomAutomationRequest(request.params, request.sessionId, request.userId);
           break;
         default:
           throw new Error(`Unsupported widget type: ${request.type}`);
@@ -239,6 +252,22 @@ export class WidgetHandler {
     
     // Trigger data scientist analysis via store's chatService integration
     await dataScientistStore.triggerAction(params);
+  }
+
+  /**
+   * Process Custom Automation widget request - Route to Custom Automation store
+   */
+  private async processCustomAutomationRequest(params: any, sessionId?: string, userId?: string): Promise<void> {
+    const customAutomationStore = useCustomAutomationWidgetStore.getState();
+    
+    logger.debug(LogCategory.ARTIFACT_CREATION, 'Custom Automation request routed to store', { 
+      params, 
+      sessionId, 
+      userId 
+    });
+    
+    // Trigger custom automation via store's chatService integration
+    await customAutomationStore.triggerAction(params);
   }
 
   /**
@@ -366,6 +395,10 @@ export class WidgetHandler {
         case 'data_scientist':
           const dataScientistStore = useDataScientistWidgetStore.getState();
           dataScientistStore.clearData?.();
+          break;
+        case 'custom_automation':
+          const customAutomationStore = useCustomAutomationWidgetStore.getState();
+          customAutomationStore.clearData?.();
           break;
         default:
           console.log(`⚠️ Clear operation not implemented for widget type: ${type}`);

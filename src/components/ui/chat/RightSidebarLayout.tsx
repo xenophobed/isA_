@@ -33,11 +33,13 @@ import { HuntWidgetModule } from '../../../modules/widgets/HuntWidgetModule';
 import { OmniWidgetModule } from '../../../modules/widgets/OmniWidgetModule';
 import { KnowledgeWidgetModule } from '../../../modules/widgets/KnowledgeWidgetModule';
 import { DataScientistWidgetModule } from '../../../modules/widgets/DataScientistWidgetModule';
+import { CustomAutomationWidgetModule } from '../../../modules/widgets/CustomAutomationWidgetModule';
 import { DreamWidget } from '../widgets/DreamWidget';
 import { HuntWidget } from '../widgets/HuntWidget';
 import { OmniWidget } from '../widgets/OmniWidget';
 import { DataScientistWidget } from '../widgets/DataScientistWidget';
 import { KnowledgeWidget } from '../widgets/KnowledgeWidget';
+import { CustomAutomationWidget } from '../widgets/CustomAutomationWidget';
 
 import { logger, LogCategory } from '../../../utils/logger';
 
@@ -48,6 +50,7 @@ interface RightSidebarLayoutProps {
   onCloseApp: () => void;
   onBackToList?: () => void;
   onAppSelect?: (appId: string) => void;
+  onToggleMode?: () => void; // 🆕 模式切换回调
 }
 
 /**
@@ -65,7 +68,8 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
   triggeredAppInput,
   onCloseApp,
   onBackToList,
-  onAppSelect
+  onAppSelect,
+  onToggleMode
 }) => {
   // ⚠️ 必须在所有条件性 return 之前调用所有 hooks
   const sortedWidgets = useSortedWidgets();
@@ -91,7 +95,7 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
           <DreamWidgetModule 
             triggeredInput={triggeredAppInput}
           >
-            {(moduleProps) => (
+            {(moduleProps: any) => (
               <DreamWidget 
                 isGenerating={moduleProps.isGenerating}
                 generatedImage={moduleProps.generatedImage}
@@ -116,6 +120,7 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
                     onCloseApp();
                   }
                 }}
+                {...(onToggleMode && { onToggleMode })}
               />
             )}
           </DreamWidgetModule>
@@ -218,6 +223,45 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
           </DataScientistWidgetModule>
         );
       
+      case 'custom_automation':
+        return (
+          <CustomAutomationWidgetModule 
+            triggeredInput={triggeredAppInput}
+            onAutomationCompleted={(result) => {
+              console.log('🤖 RIGHT_SIDEBAR: Custom Automation completed:', result);
+            }}
+          >
+            {(moduleProps: any) => (
+              <CustomAutomationWidget 
+                isProcessing={moduleProps.isProcessing}
+                currentTemplate={null}
+                automationResults={[]}
+                processStatus="idle"
+                triggeredInput={triggeredAppInput}
+                outputHistory={moduleProps.outputHistory}
+                currentOutput={moduleProps.currentOutput}
+                isStreaming={moduleProps.isStreaming}
+                streamingContent={moduleProps.streamingContent}
+                onStartAutomation={moduleProps.startProcessing}
+                onClearData={moduleProps.clearData}
+                onSelectOutput={moduleProps.onSelectOutput}
+                onClearHistory={moduleProps.onClearHistory}
+                onBack={() => {
+                  logger.trackSidebarInteraction('widget_back_to_list_clicked', currentApp || undefined, { 
+                    widgetTitle: 'Custom Automation' 
+                  });
+                  if (onBackToList) {
+                    onBackToList();
+                  } else {
+                    onCloseApp();
+                  }
+                }}
+                {...(onToggleMode && { onToggleMode })}
+              />
+            )}
+          </CustomAutomationWidgetModule>
+        );
+      
       default:
         logger.warn(LogCategory.COMPONENT_RENDER, 'Unknown widget type', { currentApp });
         return <div className="p-4 text-gray-400">Unknown widget: {currentApp}</div>;
@@ -231,7 +275,8 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
       hunt: { icon: '🔍', title: 'HuntAI' },
       omni: { icon: '⚡', title: 'Omni Content' },
       'data-scientist': { icon: '📊', title: 'DataWise Analytics' },
-      knowledge: { icon: '🧠', title: 'Knowledge Hub' }
+      knowledge: { icon: '🧠', title: 'Knowledge Hub' },
+      custom_automation: { icon: '🤖', title: 'Custom Automation' }
     };
     return configs[appId] || { icon: '❓', title: 'Unknown Widget' };
   };
@@ -274,7 +319,8 @@ export const RightSidebarLayout: React.FC<RightSidebarLayoutProps> = ({
             hunt: { title: 'HuntAI', icon: '🔍', desc: 'Product search and comparison' },
             omni: { title: 'Omni Content', icon: '⚡', desc: 'Multi-purpose content creation' },
             'data-scientist': { title: 'DataWise Analytics', icon: '📊', desc: 'Data analysis and insights' },
-            knowledge: { title: 'Knowledge Hub', icon: '🧠', desc: 'Advanced document analysis with vector and graph RAG' }
+            knowledge: { title: 'Knowledge Hub', icon: '🧠', desc: 'Advanced document analysis with vector and graph RAG' },
+            custom_automation: { title: 'Custom Automation', icon: '🤖', desc: 'Intelligent business process automation' }
           };
           
           // 使用已经在组件顶部获取的 sortedWidgets

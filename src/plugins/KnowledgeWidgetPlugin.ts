@@ -54,7 +54,7 @@ export class KnowledgeWidgetPlugin implements WidgetPlugin {
   // ============================================================================
 
   async onInit(): Promise<void> {
-    logger.info(LogCategory.SYSTEM, '🧠 KnowledgeWidgetPlugin: Initializing...');
+    logger.debug(LogCategory.SYSTEM, 'KnowledgeWidgetPlugin: Initializing...');
   }
 
   onDestroy(): void {

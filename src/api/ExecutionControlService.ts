@@ -463,11 +463,13 @@ export class ExecutionControlService {
     // Use smart interval based on session activity
     const interval = pollInterval || this.DEFAULT_POLL_INTERVAL;
     
-    logger.info(LogCategory.CHAT_FLOW, 'Starting execution monitoring', { 
-      threadId, 
-      pollInterval: interval,
-      activePollers: this.activePollingTimers.size
-    });
+    // Only log if this is a new monitoring session
+    if (!this.activePollingTimers.has(threadId)) {
+      logger.debug(LogCategory.CHAT_FLOW, 'Starting execution monitoring', { 
+        threadId, 
+        pollInterval: interval
+      });
+    }
 
     let consecutiveIdleCount = 0;
     const maxIdleCount = 3; // Switch to slow polling after 3 idle checks
@@ -588,7 +590,8 @@ export class ExecutionControlService {
     if (timer) {
       clearTimeout(timer);
       this.activePollingTimers.delete(threadId);
-      logger.info(LogCategory.CHAT_FLOW, 'Stopped monitoring for thread', { 
+      // Only log if there was an active timer
+      logger.debug(LogCategory.CHAT_FLOW, 'Stopped monitoring for thread', { 
         threadId,
         remainingPollers: this.activePollingTimers.size
       });

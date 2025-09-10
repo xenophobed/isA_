@@ -36,11 +36,7 @@ export const Auth0Provider: React.FC<Auth0ProviderProps> = ({ children }) => {
   // 使用当前域名作为 redirectUri，支持多域名
   const redirectUri = window.location.origin;
 
-  console.log('🔐 Auth0Provider: Configuration check', { 
-    domain: domain ? 'Present' : 'Missing', 
-    clientId: clientId ? 'Present' : 'Missing',
-    audience: audience ? 'Present' : 'Missing'
-  });
+  // Auth0 configuration check
 
   if (!domain || !clientId) {
     console.error('Auth0 configuration missing:', { domain, clientId, audience });
@@ -92,7 +88,7 @@ export const Auth0Provider: React.FC<Auth0ProviderProps> = ({ children }) => {
 const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isLoading, isAuthenticated, loginWithRedirect, error } = useAuth0();
 
-  console.log('🔐 AuthGate: Status check', { isLoading, isAuthenticated, hasError: !!error });
+  // Auth0 status check
 
   // 如果有Auth0错误，显示错误信息
   if (error) {

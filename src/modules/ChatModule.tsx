@@ -34,7 +34,7 @@ import { ChatLayout, ChatLayoutProps } from '../components/ui/chat/ChatLayout';
 import { RightPanel } from '../components/ui/chat/RightPanel';
 import { AppId } from '../types/appTypes';
 import { useChat } from '../hooks/useChat';
-import { useChatActions } from '../stores/useChatStore';
+import { useChatActions, useChatStore } from '../stores/useChatStore';
 import { useAuth } from '../hooks/useAuth';
 import { useCurrentSession, useSessionActions } from '../stores/useSessionStore';
 import { logger, LogCategory } from '../utils/logger';
@@ -50,7 +50,7 @@ import { HILInterruptModal } from '../components/ui/hil/HILInterruptModal';
 import { HILStatusPanel } from '../components/ui/hil/HILStatusPanel';
 import { HILInteractionManager } from '../components/ui/hil/HILInteractionManager';
 import { executionControlService } from '../api/ExecutionControlService';
-import { defaultAGUIProcessor } from '../api/AGUIEventProcessor';
+// import { defaultAGUIProcessor } from '../api/AGUIEventProcessor'; // REMOVED - AGUIEventProcessor deleted
 import { 
   HILInterruptData, 
   HILCheckpointData, 
@@ -123,6 +123,9 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   // Get chat actions from store
   const chatActions = useChatActions();
   
+  // Get current tasks for status display
+  const currentTasks = useChatStore(state => state.currentTasks);
+  
   // Get user module for credit validation
   const userModule = useUserModule();
   
@@ -141,9 +144,11 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     listeners: { [event: string]: ((data: any) => void)[] };
     emit: (event: string, data: any) => void;
     on: (event: string, handler: (data: any) => void) => void;
+    off: (event: string, handler: (data: any) => void) => void;
   }>({
     listeners: {},
     emit: function(event: string, data: any) {
+      console.log(`🔌 EVENT_EMITTER: Emitting ${event} to ${this.listeners[event]?.length || 0} listeners:`, data);
       if (this.listeners[event]) {
         this.listeners[event].forEach(handler => handler(data));
       }
@@ -153,6 +158,16 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
         this.listeners[event] = [];
       }
       this.listeners[event].push(handler);
+      console.log(`🔌 EVENT_EMITTER: Added listener for ${event}, total: ${this.listeners[event].length}`);
+    },
+    off: function(event: string, handler: (data: any) => void) {
+      if (this.listeners[event]) {
+        const index = this.listeners[event].indexOf(handler);
+        if (index > -1) {
+          this.listeners[event].splice(index, 1);
+          console.log(`🔌 EVENT_EMITTER: Removed listener for ${event}, remaining: ${this.listeners[event].length}`);
+        }
+      }
     }
   });
 
@@ -204,16 +219,16 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
         // 始终激活HIL监控，以便处理ask_human工具调用
         setHilMonitoringActive(true);
         
-        // 🆕 注册全局HIL回调到SSEParser，以便处理ask_human工具调用
-        const { SSEParser } = await import('../api/SSEParser');
-        SSEParser.registerGlobalHILCallbacks({
-          onHILInterruptDetected: handleHILInterrupt,
-          onHILCheckpointCreated: handleHILCheckpoint,
-          onHILExecutionStatusChanged: handleHILStatusChange,
-          onHILApprovalRequired: handleHILApprovalRequired,
-          onHILReviewRequired: handleHILReviewRequired,
-          onHILInputRequired: handleHILInputRequired
-        });
+        // REMOVED: HIL回调注册 - SSEParser已删除
+        // const { SSEParser } = await import('../api/SSEParser');
+        // SSEParser.registerGlobalHILCallbacks({
+        //   onHILInterruptDetected: handleHILInterrupt,
+        //   onHILCheckpointCreated: handleHILCheckpoint,
+        //   onHILExecutionStatusChanged: handleHILStatusChange,
+        //   onHILApprovalRequired: handleHILApprovalRequired,
+        //   onHILReviewRequired: handleHILReviewRequired,
+        //   onHILInputRequired: handleHILInputRequired
+        // });
         
         // 检查HIL服务是否可用
         const isServiceAvailable = await executionControlService.isServiceAvailable();
@@ -224,32 +239,31 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
 
         console.log('🚀 CHAT_MODULE: HIL service available, initializing event handlers');
 
-        // 注册HIL事件回调到AGUI处理器 - 标准化转换
-        defaultAGUIProcessor.registerAGUICallbacks({
-          onHILInterruptDetected: (event) => {
-            // 使用标准转换工具
-            handleHILInterrupt(AGUIConverter.toHILInterruptData(event));
-          },
-          onHILCheckpointCreated: (event) => {
-            // 使用标准转换工具
-            handleHILCheckpoint(AGUIConverter.toHILCheckpointData(event));
-          },
-          onHILApprovalRequired: (event) => {
-            // HILApprovalRequired 事件暂时跳过，需要后端处理
-            console.log('HIL approval required:', event);
-          },
-          onHILReviewRequired: (event) => {
-            // HILReviewRequired 事件暂时跳过，需要后端处理
-            console.log('HIL review required:', event);
-          },
-          onHILInputRequired: (event) => {
-            // HILInputRequired 事件暂时跳过，需要后端处理
-            console.log('HIL input required:', event);
-          },
-          onRunStarted: handleExecutionStarted,
-          onRunFinished: handleExecutionFinished,
-          onRunError: handleExecutionError
-        });
+        // REMOVED: HIL事件回调注册 - defaultAGUIProcessor已删除
+        // defaultAGUIProcessor.registerAGUICallbacks({
+        //   onHILInterruptDetected: (event) => {
+        //     // 使用标准转换工具
+        //     handleHILInterrupt(AGUIConverter.toHILInterruptData(event));
+        //   },
+        //   onHILCheckpointCreated: (event) => {
+        //     // 使用标准转换工具
+        //     handleHILCheckpoint(AGUIConverter.toHILCheckpointData(event));
+        //   },
+        //   onHILApprovalRequired: (event) => {
+        //     console.log('HIL approval required:', event);
+        //   },
+        //   onHILReviewRequired: (event) => {
+        //     // HILReviewRequired 事件暂时跳过，需要后端处理
+        //     console.log('HIL review required:', event);
+        //   },
+        //   onHILInputRequired: (event) => {
+        //     // HILInputRequired 事件暂时跳过，需要后端处理
+        //     console.log('HIL input required:', event);
+        //   },
+        //   onRunStarted: handleExecutionStarted,
+        //   onRunFinished: handleExecutionFinished,
+        //   onRunError: handleExecutionError
+        // });
 
         // 注册Legacy回调到SSEParser（通过现有的chatActions）
         // 这样HIL事件也能通过现有的SSE流处理
@@ -300,7 +314,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       const threadId = currentSession.id;
       
       // 清理之前会话的监控以避免重复polling
-      logger.info(LogCategory.CHAT_FLOW, 'Starting HIL monitoring for new session', { 
+      logger.debug(LogCategory.CHAT_FLOW, 'Starting HIL monitoring for new session', { 
         threadId,
         previousPollers: executionControlService.getActiveMonitoringStats().activePollers
       });
@@ -718,7 +732,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       id: `user-widget-${requestId}`,
       type: 'regular' as const,
       role: 'user' as const,
-      content: params.prompt || `Generate ${widgetType} content`,
+      content: params.prompt || params.query || `Generate ${widgetType} content`,
       timestamp: new Date().toISOString(),
       sessionId: activeSessionId,
       metadata: {
@@ -896,7 +910,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       processed: true
     };
     
-    console.log('📨 CHAT_MODULE: Adding user message to store');
+    // Adding user message to store
     chatActions.addMessage(userMessage);
     
     // ✅ STEP 2: Check if message triggers a plugin
@@ -982,13 +996,13 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       
     } else {
       // 💬 REGULAR CHAT ROUTE: Handle via ChatService API
-      console.log('💬 CHAT_MODULE: No plugin detected, using ChatService API');
+      // No plugin detected, using ChatService API
       
       try {
         const token = await userModule.getAccessToken();
         
         await chatActions.sendMessage(content, enrichedMetadata, token);
-        console.log('✅ CHAT_MODULE: Regular chat message sent successfully');
+        // Regular chat message sent successfully
         
       } catch (error) {
         console.error('❌ CHAT_MODULE: Failed to send regular chat message:', error);
@@ -1137,6 +1151,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
           showRightSidebar={true}
           triggeredAppInput=""
           onCloseApp={handleCloseWidget}
+          onToggleMode={handleToggleWidgetMode}
           onAppSelect={(appId) => {
             console.log('Widget app selected:', appId);
           }}
@@ -1163,6 +1178,16 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     }
   }, []);
 
+  // 🆕 处理模式切换 (half ↔ full)
+  const handleToggleWidgetMode = useCallback(() => {
+    if (!currentWidgetMode) return;
+    
+    const newMode = currentWidgetMode === 'half' ? 'full' : 'half';
+    setCurrentWidgetMode(newMode);
+    
+    console.log('🔄 CHAT_MODULE: Widget mode toggled:', { from: currentWidgetMode, to: newMode });
+  }, [currentWidgetMode]);
+
 
   // Pass all data and business logic callbacks as props to pure UI component
   return (
@@ -1172,6 +1197,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
         messages={chatInterface.messages as any} // TODO: Fix type mismatch
         isLoading={chatInterface.isLoading}
         isTyping={chatInterface.isTyping}
+        currentTasks={currentTasks}
         onSendMessage={handleSendMessage}
         onSendMultimodal={handleSendMultimodal}
         onMessageClick={handleMessageClick}

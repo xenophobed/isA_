@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import Head from 'next/head'
+import { useAnalytics } from '../src/hooks/useAnalytics'
 import MarketingHeader from '../src/components/marketing/MarketingHeader'
 import HeroSection from '../src/components/marketing/homepage/HeroSection'
 import MainDemo from '../src/components/marketing/homepage/MainDemo'
@@ -17,6 +18,7 @@ import MarketingFooter from '../src/components/marketing/MarketingFooter'
 export default function MarketingHome() {
   const [activeDemo, setActiveDemo] = useState(0)
   const [currentTime, setCurrentTime] = useState('')
+  const { trackMarketingPageView, trackContentEngagement, trackCTAClick } = useAnalytics()
 
   const demos = [
     { 
@@ -78,6 +80,35 @@ export default function MarketingHome() {
 
     return () => clearInterval(timer)
   }, [demos.length])
+
+  // 追踪营销首页访问
+  useEffect(() => {
+    trackMarketingPageView('home', {
+      page_section: 'marketing_home',
+      demo_count: demos.length,
+      has_animations: true
+    })
+  }, [trackMarketingPageView, demos.length])
+
+  // 追踪demo轮播互动
+  useEffect(() => {
+    if (activeDemo > 0) { // 跳过初始状态
+      trackContentEngagement('demo', `demo_${activeDemo}`, 'auto_rotate', {
+        demo_index: activeDemo,
+        demo_user: demos[activeDemo]?.user,
+        demo_category: demos[activeDemo]?.category
+      })
+    }
+  }, [activeDemo, trackContentEngagement, demos])
+
+  // CTA点击处理函数
+  const handleCTAClick = (ctaName: string, location: string) => {
+    trackCTAClick(ctaName, location, {
+      page: 'home',
+      demo_visible: demos[activeDemo]?.category,
+      current_time: currentTime
+    })
+  }
 
   return (
     <>

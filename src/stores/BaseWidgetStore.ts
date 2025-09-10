@@ -334,9 +334,7 @@ export function createBaseWidgetStore<TSpecificState, TSpecificActions>(
           recordWidgetUsage(config.widgetType);
           
           // 设置处理状态和参数
-          console.log('🚨DEBUG_DUPLICATE🚨 BaseWidgetStore setProcessing(true):', config.widgetType);
           setProcessing(true);
-          console.log('🚨DEBUG_DUPLICATE🚨 BaseWidgetStore setParams:', params);
           setParams(params);
           
           // ❌ REMOVED: Message creation logic moved to Widget Modules
@@ -346,14 +344,10 @@ export function createBaseWidgetStore<TSpecificState, TSpecificActions>(
           try {
             // 检查是否有来自Module的模板参数
             if (params.templateParams) {
-              console.log(`${config.logEmoji} ${config.widgetType.toUpperCase()}_STORE: Using template params from module:`, params.templateParams);
-            } else {
-              console.log(`${config.logEmoji} ${config.widgetType.toUpperCase()}_STORE: No template params from module, using fallback`);
             }
             
             // 构建提示词 - 始终使用用户的原始 prompt
             const prompt = params.prompt || params.query || `${config.widgetType} request`;
-            console.log('🔥MODULE_DATA_FLOW🔥 使用用户原始prompt:', prompt);
             
             logger.info(LogCategory.ARTIFACT_CREATION, `${config.logEmoji} Starting ${config.widgetType} via chatService`, {
               params,

@@ -88,10 +88,7 @@ export const AIProvider: React.FC<AIProviderProps> = ({
   children, 
   apiEndpoint = process.env.REACT_APP_AGENT_SERVICE_URL || 'http://localhost:8080' 
 }) => {
-  console.log('🤖 AIProvider: Component rendering started', { 
-    apiEndpoint,
-    timestamp: new Date().toISOString()
-  });
+  // AIProvider component rendering
   
   const [chatService, setChatService] = useState<ChatService | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -142,12 +139,7 @@ export const AIProvider: React.FC<AIProviderProps> = ({
     error
   };
 
-  console.log('🤖 AIProvider: Rendering children with context', {
-    hasChatService: !!chatService,
-    isConnected,
-    hasError: !!error,
-    timestamp: new Date().toISOString()
-  });
+  // Rendering children with context
 
   return (
     <AIContext.Provider value={contextValue}>

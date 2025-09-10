@@ -67,7 +67,7 @@ export class PluginManager implements IPluginManager {
 
     this.plugins.set(plugin.id, registration);
 
-    logger.info(LogCategory.SYSTEM, `🔌 Plugin registered: ${plugin.name} (${plugin.id})`);
+    logger.debug(LogCategory.SYSTEM, `Plugin registered: ${plugin.name} (${plugin.id})`);
 
     // 初始化插件
     if (plugin.onInit) {

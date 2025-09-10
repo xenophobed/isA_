@@ -22,6 +22,7 @@ import React, { useState, useMemo } from 'react';
 import { TaskItem, TaskAction, TaskStatus } from '../../../types/taskTypes';
 import { TaskItemComponent, TaskProgressBar } from './index';
 import { logger, LogCategory } from '../../../utils/logger';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 // ================================================================================
 // 任务面板Props接口
@@ -54,6 +55,7 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
   showFailed = true,
   maxHeight = '400px'
 }) => {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'failed'>('all');
   const [sortBy, setSortBy] = useState<'created' | 'updated' | 'priority' | 'status'>('created');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -154,20 +156,20 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
     <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
       <div className="flex items-center space-x-4">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          任务管理
+Task Management
         </h3>
         <div className="flex space-x-2 text-sm">
           <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
-            总计: {stats.total}
+            {t('tasks.total' as any)}: {stats.total}
           </span>
           <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full">
-            活跃: {stats.active}
+            {t('tasks.active' as any)}: {stats.active}
           </span>
           <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full">
-            完成: {stats.completed}
+            {t('tasks.completed' as any)}: {stats.completed}
           </span>
           <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full">
-            失败: {stats.failed}
+            {t('tasks.failed' as any)}: {stats.failed}
           </span>
         </div>
       </div>
@@ -178,13 +180,13 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
             onClick={() => handleBatchAction('pause')}
             className="px-3 py-1 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600"
           >
-            暂停全部
+            {t('tasks.pauseAll' as any)}
           </button>
           <button
             onClick={() => handleBatchAction('cancel')}
             className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
           >
-            取消全部
+            {t('tasks.cancelAll' as any)}
           </button>
         </div>
       )}
@@ -199,10 +201,10 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
           onChange={(e) => setFilter(e.target.value as any)}
           className="px-3 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="all">全部任务</option>
-          <option value="active">活跃任务</option>
-          <option value="completed">已完成</option>
-          <option value="failed">失败/取消</option>
+          <option value="all">{t('tasks.filters.all' as any)}</option>
+          <option value="active">{t('tasks.filters.active' as any)}</option>
+          <option value="completed">{t('tasks.filters.completed' as any)}</option>
+          <option value="failed">{t('tasks.filters.failedCancelled' as any)}</option>
         </select>
         
         <select
@@ -210,10 +212,10 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
           onChange={(e) => setSortBy(e.target.value as any)}
           className="px-3 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="created">创建时间</option>
-          <option value="updated">更新时间</option>
-          <option value="priority">优先级</option>
-          <option value="status">状态</option>
+          <option value="created">{t('tasks.sorting.created' as any)}</option>
+          <option value="updated">{t('tasks.sorting.updated' as any)}</option>
+          <option value="priority">{t('tasks.sorting.priority' as any)}</option>
+          <option value="status">{t('tasks.sorting.status' as any)}</option>
         </select>
         
         <button
@@ -225,7 +227,7 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
       </div>
       
       <div className="text-sm text-gray-500">
-        显示 {filteredAndSortedTasks.length} / {tasks.length} 个任务
+        {t('tasks.showingTasks' as any, { showing: filteredAndSortedTasks.length, total: tasks.length })}
       </div>
     </div>
   );
@@ -239,7 +241,7 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
         <div className="flex items-center justify-center h-32 text-gray-500">
           <div className="text-center">
             <div className="text-4xl mb-2">📋</div>
-            <div className="text-sm">暂无任务</div>
+            <div className="text-sm">{t('tasks.noTasks' as any)}</div>
           </div>
         </div>
       ) : (

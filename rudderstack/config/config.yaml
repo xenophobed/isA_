@@ -1,0 +1,36 @@
+# RudderStack Configuration File
+maxProcess: 12
+gwDBRetention: 0
+routerDBRetention: 0
+enableProcessor: true
+enableRouter: true
+
+# Database configuration
+jobsDB:
+  host: "host.docker.internal"
+  port: 54322
+  user: "postgres"
+  password: "postgres"
+  name: "postgres"
+  sslMode: "disable"
+  maxOpenConns: 100
+  maxIdleConns: 10
+
+# Backend Config
+BackendConfig:
+  configFromFile: true
+  configJSONPath: "/etc/rudderstack/workspaceConfig.json"
+
+# Gateway configuration
+Gateway:
+  webPort: 8080
+  maxDBWriterProcess: 64
+  CustomVal: "gateway"
+  
+# Router configuration  
+Router:
+  routerConfigPath: "/etc/rudderstack/workspaceConfig.json"
+
+# Analytics configuration
+Analytics:
+  enabled: false

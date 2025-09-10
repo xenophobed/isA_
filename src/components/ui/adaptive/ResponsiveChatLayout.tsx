@@ -57,18 +57,10 @@ export const ResponsiveChatLayout: React.FC<ResponsiveChatLayoutProps> = ({
 
   // Determine which layout to use
   const layoutType = useMemo(() => {
-    console.log('🔍 ResponsiveChatLayout - Layout Decision:', {
-      forceLayout,
-      isNativeApp,
-      screenWidth,
-      mobileBreakpoint,
-      isMobile,
-      isTablet,
-      touchSupport
-    });
+    // Layout decision logic
 
     if (forceLayout !== 'auto') {
-      console.log('📱 Using forced layout:', forceLayout);
+      // Using forced layout
       return forceLayout;
     }
 
@@ -92,12 +84,12 @@ export const ResponsiveChatLayout: React.FC<ResponsiveChatLayoutProps> = ({
 
     // Check for explicit mobile device
     if (isMobile) {
-      console.log('📱 Mobile device detected, using mobile layout');
+      // Mobile device detected, using mobile layout
       return 'mobile';
     }
 
     // Default to desktop
-    console.log('🖥️ Using desktop layout');
+    // Using desktop layout
     return 'desktop';
   }, [
     forceLayout,

@@ -23,6 +23,7 @@ export interface MessageBubbleProps {
   onLike?: () => void;
   onDislike?: () => void;
   onRegenerate?: () => void;
+  hasTasks?: boolean;
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -39,9 +40,58 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onCopy,
   onLike,
   onDislike,
-  onRegenerate
+  onRegenerate,
+  hasTasks = false
 }) => {
   const [showActionButtons, setShowActionButtons] = useState(false);
+
+  // 根据用户要求确定头像状态：showing different event states (starting, processing), but processing only when tasks exist
+  const getAvatarStatus = () => {
+    if (!isStreaming) return 'online';
+    
+    // 解析streamingStatus来确定event类型
+    if (streamingStatus) {
+      const status = streamingStatus.toLowerCase();
+      
+      // starting events - 所有starting状态
+      if (status.includes('starting') || status.includes('start')) {
+        return 'thinking';
+      }
+      
+      // processing events - 但只有在有tasks时才显示
+      if ((status.includes('processing') || status.includes('process')) && hasTasks) {
+        return 'typing';
+      }
+      
+      // 其他streaming状态默认为thinking
+      return 'thinking';
+    }
+    
+    return 'thinking';
+  };
+
+  // 确定是否应该显示消息气泡内的streaming状态
+  const shouldShowBubbleStreamingStatus = () => {
+    if (!isStreaming || !streamingStatus) return false;
+    
+    // 只显示LLM token的streaming状态，过滤掉其他event状态
+    const status = streamingStatus.toLowerCase();
+    
+    // 过滤掉这些非LLM状态
+    if (status.includes('starting') || 
+        status.includes('processing') || 
+        status.includes('interrupt') ||
+        status.includes('checkpoint') ||
+        status.includes('execution') ||
+        status.includes('approved') ||
+        status.includes('rejected') ||
+        status.includes('resume')) {
+      return false;
+    }
+    
+    // 只显示纯粹的streaming状态
+    return true;
+  };
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -115,7 +165,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             src={avatar?.src}
             alt={avatar?.alt}
             variant={role}
-            status={isStreaming ? 'thinking' : 'online'}
+            status={role === 'assistant' ? getAvatarStatus() : 'online'}
             showStatus={role === 'assistant'}
             size="md"
           />
@@ -158,8 +208,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             )}
           </div>
           
-          {/* Streaming status */}
-          {isStreaming && streamingStatus && (
+          {/* Streaming status - 只显示LLM token状态 */}
+          {shouldShowBubbleStreamingStatus() && (
             <div className={`
               text-xs mt-2 px-2 py-1 rounded-full backdrop-blur-sm
               ${role === 'user' 

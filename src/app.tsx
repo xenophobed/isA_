@@ -24,8 +24,10 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Auth0Provider } from './providers/Auth0Provider';
 import { SessionProvider } from './providers/SessionProvider';
 import { AIProvider } from './providers/AIProvider';
+import { AnalyticsProvider } from './providers/AnalyticsProvider';
 import { UserModule } from './modules/UserModule';
 import { AppModule } from './modules/AppModule';
+import { initializeLanguage } from './stores/useLanguageStore';
 
 /**
  * Debug component to track initialization steps
@@ -36,6 +38,10 @@ const InitializationTracker: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     console.log('🚀 MainAppContainer: Starting application initialization');
     setInitSteps(prev => [...prev, 'App component mounted']);
+    
+    // Initialize language settings
+    initializeLanguage();
+    setInitSteps(prev => [...prev, 'Language initialized']);
     
     return () => {
       console.log('🏁 MainAppContainer: Application unmounting');
@@ -65,7 +71,7 @@ const InitializationTracker: React.FC<{ children: React.ReactNode }> = ({ childr
  * 这是应用的 Provider 链和模块入口，不是 Next.js 页面
  */
 export const MainAppContainer: React.FC = () => {
-  console.log('🏗️ MainAppContainer: Root component rendering');
+  // Main app container rendering
 
   return (
     <InitializationTracker>
@@ -147,15 +153,17 @@ export const MainAppContainer: React.FC = () => {
           </div>
         )}
       >
-        <Auth0Provider>
-          <UserModule>
-            <SessionProvider>
-              <AIProvider apiEndpoint={process.env.REACT_APP_AGENT_SERVICE_URL || "http://localhost:8080"}>
-                <AppModule />
-              </AIProvider>
-            </SessionProvider>
-          </UserModule>
-        </Auth0Provider>
+        <AnalyticsProvider>
+          <Auth0Provider>
+            <UserModule>
+              <SessionProvider>
+                <AIProvider apiEndpoint={process.env.REACT_APP_AGENT_SERVICE_URL || "http://localhost:8080"}>
+                  <AppModule />
+                </AIProvider>
+              </SessionProvider>
+            </UserModule>
+          </Auth0Provider>
+        </AnalyticsProvider>
       </ErrorBoundary>
     </InitializationTracker>
   );

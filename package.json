@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.3.0",
+    "@rudderstack/analytics-js": "^3.23.2",
+    "@supabase/supabase-js": "^2.57.2",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

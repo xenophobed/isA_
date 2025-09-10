@@ -9,6 +9,8 @@
 
 import React from 'react';
 import { WidgetType } from '../types/widgetTypes';
+import { getTranslation } from '../locales/translations';
+import { SupportedLanguage } from '../stores/useLanguageStore';
 
 export interface WelcomeWidget {
   id: WidgetType;
@@ -69,56 +71,59 @@ const KnowledgeIcon = React.createElement('svg',
   })
 );
 
-// Dynamic Welcome Configuration
-export const welcomeConfig: WelcomeConfig = {
-  title: "Welcome to Intelligent Systems Assistant",
-  subtitle: "Your AI-powered productivity companion. Select a specialized assistant or start chatting below.",
+// Dynamic configuration generator that supports translations
+export const createWelcomeConfig = (language: SupportedLanguage = 'zh-CN'): WelcomeConfig => ({
+  title: getTranslation('chat.welcomeTitle', language),
+  subtitle: getTranslation('chat.welcomeSubtitle', language),
   
   widgets: [
     {
       id: 'omni' as WidgetType,
-      title: 'Creative Projects',
+      title: getTranslation('widgets.omnicontent', language),
       icon: OmniIcon,
-      description: 'Generate content, write stories, or brainstorm ideas',
+      description: getTranslation('chat.widgetDescriptions.creative', language),
       accentColor: 'var(--color-primary)',
-      defaultPrompt: 'Help me create something amazing! I need assistance with creative content generation.',
+      defaultPrompt: getTranslation('chat.widgetPrompts.creative', language),
       featured: true // This will make it span more columns in the grid
     },
     {
       id: 'hunt' as WidgetType,
-      title: 'Product Search',
+      title: getTranslation('widgets.huntai', language),
       icon: HuntIcon,
-      description: 'Search and compare products, find the best deals',
+      description: getTranslation('chat.widgetDescriptions.search', language),
       accentColor: 'var(--color-secondary)',
-      defaultPrompt: 'Help me find and compare products. What are you looking for?'
+      defaultPrompt: getTranslation('chat.widgetPrompts.search', language)
     },
     {
       id: 'dream' as WidgetType,
-      title: 'Image Generation',
+      title: getTranslation('widgets.dreamforge', language),
       icon: DreamIcon,
-      description: 'Generate images, create artwork, or visualize ideas',
+      description: getTranslation('chat.widgetDescriptions.image', language),
       accentColor: 'var(--color-accent)',
-      defaultPrompt: 'Create a beautiful image for me. Describe what you want to see generated.'
+      defaultPrompt: getTranslation('chat.widgetPrompts.image', language)
     },
     {
       id: 'knowledge' as WidgetType,
-      title: 'Knowledge Analysis',
+      title: getTranslation('widgets.knowledgehub', language),
       icon: KnowledgeIcon,
-      description: 'Analyze documents, research topics, or get explanations',
+      description: getTranslation('chat.widgetDescriptions.knowledge', language),
       accentColor: 'var(--color-blue-500)',
-      defaultPrompt: 'Analyze this content or help me research a topic. What would you like to explore?'
+      defaultPrompt: getTranslation('chat.widgetPrompts.knowledge', language)
     }
   ],
   
   examplePrompts: [
-    "Create a logo for my startup",
-    "Help me debug this code", 
-    "Analyze this data trend",
-    "Explain quantum computing"
+    getTranslation('chat.examplePrompts.createLogo', language),
+    getTranslation('chat.examplePrompts.debugCode', language), 
+    getTranslation('chat.examplePrompts.analyzeData', language),
+    getTranslation('chat.examplePrompts.explainQuantum', language)
   ],
   
-  tipText: "Click any widget above to get started, or type your message below"
-};
+  tipText: getTranslation('chat.tipText', language)
+});
+
+// Default configuration (for backward compatibility)
+export const welcomeConfig: WelcomeConfig = createWelcomeConfig();
 
 // Utility functions for configuration management
 export const getWidgetById = (id: WidgetType): WelcomeWidget | undefined => {

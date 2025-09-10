@@ -415,24 +415,16 @@ export const useSessionStore = create<SessionStore>()(
         
         // Load current session ID
         const savedCurrentSessionId = localStorage.getItem('currentSessionId');
-        console.log('🔍 SESSION_STORE: Loading current session ID', {
-          savedCurrentSessionId,
-          parsedSessionsLength: parsedSessions.length,
-          parsedSessionIds: parsedSessions.map((s: ChatSession) => s.id)
-        });
+        // Loading current session ID
         
         if (savedCurrentSessionId) {
           // 验证保存的session ID是否存在于加载的sessions中
           const sessionExists = parsedSessions.some((s: ChatSession) => s.id === savedCurrentSessionId);
-          console.log('🔍 SESSION_STORE: Checking saved session ID', {
-            savedCurrentSessionId,
-            sessionExists,
-            allSessionIds: parsedSessions.map((s: ChatSession) => s.id)
-          });
+          // Checking saved session ID
           
           if (sessionExists) {
             set({ currentSessionId: savedCurrentSessionId });
-            console.log('✅ SESSION_STORE: Using saved session ID', { currentSessionId: savedCurrentSessionId });
+            // Using saved session ID
           } else {
             // 如果保存的session不存在，使用第一个session
             const firstSessionId = parsedSessions.length > 0 ? parsedSessions[0].id : 'default';
@@ -461,11 +453,7 @@ export const useSessionStore = create<SessionStore>()(
         }
         
         const finalCurrentSessionId = get().currentSessionId;
-        console.log('🏁 SESSION_STORE: Final session state', {
-          currentSessionId: finalCurrentSessionId,
-          sessionCount: parsedSessions.length,
-          hasCurrentSession: !!finalCurrentSessionId
-        });
+        // Final session state loaded
         
         logger.debug(LogCategory.CHAT_FLOW, 'Sessions loaded from localStorage', {
           sessionCount: parsedSessions.length,

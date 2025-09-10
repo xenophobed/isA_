@@ -6,7 +6,7 @@
 export type ContentType = 'image' | 'text' | 'file' | 'data' | 'video' | 'audio' | 'search_results' | 'analysis' | 'knowledge';
 
 // 应用ID类型
-export type AppId = 'dream' | 'hunt' | 'omni' | 'digitalhub' | 'data-scientist' | 'doc' | 'knowledge' | 'assistant' | 'code-reviewer' | 'translator';
+export type AppId = 'dream' | 'hunt' | 'omni' | 'digitalhub' | 'data-scientist' | 'doc' | 'knowledge' | 'assistant' | 'code-reviewer' | 'translator' | 'custom_automation';
 
 // 内容元数据接口
 export interface ContentMetadata {

@@ -3,6 +3,7 @@
  * Advanced chat input with glass effects and modern interactions
  */
 import React, { useState, useRef, useEffect } from 'react';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 // 智能模式设置接口
 interface IntelligentModeSettings {
@@ -38,11 +39,20 @@ const ConfigButton: React.FC<ConfigButtonProps> = ({
   isRecording = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const { track } = useAnalytics();
 
   // 智能模式变更处理
   const handleModeChange = (mode: IntelligentModeSettings['mode']) => {
     const newSettings = { ...intelligentMode, mode };
     onIntelligentModeChange?.(newSettings);
+    
+    // 追踪智能模式切换 - 这是后端无法获取的重要用户偏好数据
+    track('INTELLIGENT_MODE_CHANGED', {
+      previous_mode: intelligentMode.mode,
+      new_mode: mode,
+      confidence_threshold: intelligentMode.confidence_threshold,
+      predictions_enabled: intelligentMode.enable_predictions
+    });
   };
 
   // 模式配置 - 简洁版本
@@ -71,7 +81,22 @@ const ConfigButton: React.FC<ConfigButtonProps> = ({
     <div className="relative">
       {/* Config Toggle Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          const newState = !isOpen;
+          setIsOpen(newState);
+          
+          // 追踪配置菜单交互
+          if (newState) {
+            track('CONFIG_MENU_OPENED', {
+              available_features: {
+                attachButton: showAttachButton,
+                voiceButton: showVoiceButton, 
+                magicButton: showMagicButton,
+                intelligentMode: !!onIntelligentModeChange
+              }
+            });
+          }
+        }}
         disabled={disabled}
         className="
           w-10 h-10 flex items-center justify-center
@@ -256,6 +281,11 @@ export const GlassChatInput: React.FC<GlassChatInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [rows, setRows] = useState(minRows);
+  
+  // Analytics 追踪
+  const { trackChatMessage, track } = useAnalytics();
+  const [focusStartTime, setFocusStartTime] = useState<number | null>(null);
+  const [typingStartTime, setTypingStartTime] = useState<number | null>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -277,6 +307,12 @@ export const GlassChatInput: React.FC<GlassChatInputProps> = ({
 
   const handleSend = () => {
     if (value.trim() && !disabled && !isLoading) {
+      // 追踪发送消息事件
+      trackChatMessage('sent', value.trim(), {
+        message_length: value.trim().length,
+        session_message_count: 1 // 这里可以从父组件传入实际计数
+      } as any);
+      
       onSend(value.trim());
     }
   };
@@ -316,9 +352,10 @@ export const GlassChatInput: React.FC<GlassChatInputProps> = ({
             ${getVariantStyles()}
           `}
           style={{ 
-            border: `1px solid var(--glass-border)`,
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            borderColor: isFocused ? 'var(--glass-border-focused)' : 'var(--glass-border)',
             ...(isFocused && {
-              borderColor: 'var(--glass-border-focused)',
               boxShadow: 'var(--shadow-glow)'
             })
           }}
@@ -352,10 +389,23 @@ export const GlassChatInput: React.FC<GlassChatInputProps> = ({
               onKeyDown={handleKeyDown}
               onFocus={() => {
                 setIsFocused(true);
+                setFocusStartTime(Date.now());
                 onFocus?.();
               }}
               onBlur={() => {
                 setIsFocused(false);
+                
+                // 追踪输入框焦点时长
+                if (focusStartTime) {
+                  const focusDuration = Date.now() - focusStartTime;
+                  track('INPUT_FOCUS_TIME', {
+                    focus_duration: focusDuration,
+                    text_length: value.length,
+                    had_text_input: value.length > 0
+                  });
+                }
+                
+                setFocusStartTime(null);
                 onBlur?.();
               }}
               placeholder={placeholder}

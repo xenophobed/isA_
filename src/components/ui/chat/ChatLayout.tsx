@@ -90,6 +90,7 @@ export interface ChatLayoutProps {
   messages?: ChatMessage[];
   isLoading?: boolean;
   isTyping?: boolean;
+  currentTasks?: any[];
   
   // Event callbacks - handled by modules
   onSendMessage?: (content: string, metadata?: Record<string, any>) => Promise<void>;
@@ -156,6 +157,7 @@ export const ChatLayout = memo<ChatLayoutProps>(({
   messages = [],
   isLoading = false,
   isTyping = false,
+  currentTasks = [],
   
   // Event callbacks from modules
   onSendMessage,
@@ -331,6 +333,7 @@ export const ChatLayout = memo<ChatLayoutProps>(({
               messages={messages}
               isLoading={isLoading}
               isTyping={isTyping}
+              currentTasks={currentTasks}
               onMessageClick={onMessageClick}
               {...conversationProps}
             />

@@ -11,6 +11,8 @@ import React, { useState } from 'react';
 import { useUserModule, PRICING_PLANS, formatCredits } from '../../../modules/UserModule';
 import { useContextModule } from '../../../modules/ContextModule';
 import { useOrganizationModule } from '../../../modules/OrganizationModule';
+import { useTranslation } from '../../../hooks/useTranslation';
+import { useLanguageStore } from '../../../stores/useLanguageStore';
 import { PlanType } from '../../../types/userTypes';
 import { Modal } from '../../shared/ui/Modal';
 import { Avatar } from '../../shared/ui/Avatar';
@@ -26,11 +28,14 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
   const userModule = useUserModule();
   const contextModule = useContextModule();
   const organizationModule = useOrganizationModule();
-  const [activeTab, setActiveTab] = useState<'account' | 'billing' | 'usage' | 'organizations'>('account');
+  const { t } = useTranslation();
+  const { currentLanguage, availableLanguages, setLanguage } = useLanguageStore();
+  const [activeTab, setActiveTab] = useState<'account' | 'billing' | 'usage' | 'organizations' | 'preferences'>('account');
   const [upgradingPlan, setUpgradingPlan] = useState<string | null>(null);
   const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
 
   // Handle unauthenticated state
   if (!userModule.isAuthenticated || !userModule.auth0User) {
@@ -143,22 +148,22 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
         return (
           <div className="space-y-6">
             <div className="glass-secondary p-6 rounded-2xl" style={{ border: '1px solid var(--glass-border)' }}>
-              <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Account Information</h3>
+              <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>{t('user.accountInformation')}</h3>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span style={{ color: 'var(--text-secondary)' }}>User ID</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{t('user.userId')}</span>
                   <span className="font-mono text-xs" style={{ color: 'var(--text-primary)' }}>{user.sub || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span style={{ color: 'var(--text-secondary)' }}>Email</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{t('user.email')}</span>
                   <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{user.email || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span style={{ color: 'var(--text-secondary)' }}>Name</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{t('user.name')}</span>
                   <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{user.name || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span style={{ color: 'var(--text-secondary)' }}>Plan</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{t('user.plan')}</span>
                   <span className="font-medium capitalize" style={{ color: 'var(--text-primary)' }}>{getPlanDisplayName(currentPlan)}</span>
                 </div>
               </div>
@@ -175,7 +180,7 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
                   </svg>
                 }
               >
-                {userModule.isLoading ? 'Refreshing...' : 'Refresh Account Data'}
+                {userModule.isLoading ? t('user.refreshing') : t('user.refreshAccountData')}
               </Button>
               
               <DangerButton
@@ -187,7 +192,7 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
                   </svg>
                 }
               >
-                Sign Out
+                {t('user.signOut')}
               </DangerButton>
             </div>
           </div>
@@ -478,6 +483,85 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
           </div>
         );
 
+      case 'preferences':
+        const currentLanguageConfig = availableLanguages.find(lang => lang.code === currentLanguage);
+        
+        return (
+          <div className="space-y-6">
+            {/* Language Settings Section */}
+            <div className="glass-secondary p-6 rounded-2xl" style={{ border: '1px solid var(--glass-border)' }}>
+              <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+                {t('preferences.language.title')}
+              </h3>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+                {t('preferences.language.description')}
+              </p>
+
+              <div className="space-y-4">
+                {/* Language Options */}
+                <div className="space-y-2">
+                  {availableLanguages.map((language) => (
+                    <button
+                      key={language.code}
+                      onClick={() => setLanguage(language.code)}
+                      className={`w-full p-3 sm:p-4 text-left rounded-xl transition-all duration-200 ${
+                        currentLanguage === language.code 
+                          ? 'glass-primary border-2' 
+                          : 'glass-tertiary hover:glass-secondary'
+                      }`}
+                      style={{ 
+                        border: currentLanguage === language.code 
+                          ? '2px solid var(--color-primary)' 
+                          : '1px solid var(--glass-border)'
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-xl sm:text-2xl">{language.flag}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className={`font-medium text-sm sm:text-base truncate ${
+                              currentLanguage === language.code ? 'text-blue-400' : ''
+                            }`} style={{ 
+                              color: currentLanguage === language.code 
+                                ? 'var(--color-primary)' 
+                                : 'var(--text-primary)'
+                            }}>
+                              {language.nativeName}
+                            </div>
+                            <div className="text-xs sm:text-sm truncate" style={{ color: 'var(--text-secondary)' }}>
+                              {language.name}
+                            </div>
+                          </div>
+                        </div>
+                        {currentLanguage === language.code && (
+                          <div className="flex-shrink-0">
+                            <svg className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: 'var(--color-primary)' }} fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Future Features */}
+            <div className="glass-secondary p-6 rounded-2xl opacity-60" style={{ border: '1px solid var(--glass-border)' }}>
+              <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+                {t('preferences.theme.title')}
+              </h3>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+                {t('preferences.theme.description')}
+              </p>
+              <div className="text-center py-8" style={{ color: 'var(--text-muted)' }}>
+                {t('credits.comingSoon')}
+              </div>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -488,8 +572,8 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        size="lg"
-        className="max-h-[85vh]"
+        size="xl"
+        className="max-h-[90vh] w-full max-w-4xl mx-4"
       >
         {/* Header */}
         <div className="p-6 glass-primary" style={{ borderBottom: '1px solid var(--glass-border)' }}>
@@ -501,8 +585,8 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
               variant="user"
             />
             <div className="flex-1">
-              <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>{user.name || 'Unknown User'}</h2>
-              <p style={{ color: 'var(--text-secondary)' }}>{user.email || 'No email'}</p>
+              <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>{user.name || t('user.unknownUser')}</h2>
+              <p style={{ color: 'var(--text-secondary)' }}>{user.email || t('user.noEmail')}</p>
               <p className="text-sm capitalize font-medium" style={{ color: 'var(--text-muted)' }}>{getPlanDisplayName(currentPlan)} Plan</p>
             </div>
           </div>
@@ -513,11 +597,11 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="glass-tertiary p-4 rounded-xl" style={{ border: '1px solid var(--glass-border)' }}>
               <div className="text-2xl font-bold" style={{ color: 'var(--text-success)' }}>{formatCredits(credits)}</div>
-              <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>Credits Left</div>
+              <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('credits.creditsLeft')}</div>
             </div>
             <div className="glass-tertiary p-4 rounded-xl" style={{ border: '1px solid var(--glass-border)' }}>
               <div className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{formatCredits(totalCredits)}</div>
-              <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>Total Credits</div>
+              <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('credits.totalCredits')}</div>
             </div>
           </div>
 
@@ -534,11 +618,11 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Tabs */}
-        <div className="flex glass-secondary" style={{ borderBottom: '1px solid var(--glass-border)' }}>
+        <div className="flex glass-secondary overflow-x-auto scrollbar-hide" style={{ borderBottom: '1px solid var(--glass-border)' }}>
           {[
             { 
               id: 'account', 
-              label: 'Account', 
+              label: t('navigation.account'), 
               icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -547,7 +631,7 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
             },
             { 
               id: 'billing', 
-              label: 'Billing', 
+              label: t('navigation.billing'), 
               icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -556,7 +640,7 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
             },
             { 
               id: 'usage', 
-              label: 'Usage', 
+              label: t('navigation.usage'), 
               icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -565,10 +649,20 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
             },
             { 
               id: 'organizations', 
-              label: 'Organizations', 
+              label: t('navigation.organizations'), 
               icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              )
+            },
+            { 
+              id: 'preferences', 
+              label: t('navigation.preferences'), 
+              icon: (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               )
             }
@@ -576,26 +670,27 @@ export const UserPortal: React.FC<UserPortalProps> = ({ isOpen, onClose }) => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 px-4 py-4 text-sm font-medium transition-all duration-200 ${
+              className={`flex-none px-3 sm:px-4 py-4 text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'glass-primary'
                   : 'hover:glass-secondary'
               }`}
               style={{
                 color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-                borderBottom: activeTab === tab.id ? '2px solid var(--color-primary)' : 'none'
+                borderBottom: activeTab === tab.id ? '2px solid var(--color-primary)' : 'none',
+                minWidth: '80px'
               }}
             >
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
                 {tab.icon}
-                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="text-xs sm:text-sm">{tab.label}</span>
               </div>
             </button>
           ))}
         </div>
 
         {/* Content */}
-        <div className="p-6 max-h-96 overflow-y-auto glass-primary">
+        <div className="p-4 sm:p-6 max-h-[50vh] sm:max-h-96 overflow-y-auto glass-primary">
           {renderTabContent()}
         </div>
       </Modal>

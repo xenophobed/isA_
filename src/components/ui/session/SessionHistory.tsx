@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChatSession } from '../../../hooks/useSession';
 import { GlassButton } from '../../shared';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 export interface SessionHistoryProps {
   // Data props - provided by parent
@@ -51,27 +52,28 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
   showCreateButton = true,
   className = ''
 }) => {
+  const { t } = useTranslation();
   
 
   return (
     <div className={`session-history ${className} flex flex-col h-full`}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white/90">Chat Sessions</h3>
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <h3 className="text-lg font-semibold text-white/90 flex-1 min-w-0">{t('sessions.title')}</h3>
         {showCreateButton && (
           <button
             onClick={onNewSession}
             disabled={isLoading}
             className="
-              px-3 py-2 rounded-xl flex items-center gap-2
+              px-3 py-2 rounded-xl flex items-center gap-1.5 whitespace-nowrap
               bg-white/10 hover:bg-white/15 backdrop-blur-sm
               border border-white/20 hover:border-white/30
               text-white/90 hover:text-white
               transition-all duration-200
               disabled:opacity-50 disabled:cursor-not-allowed
-              text-sm font-medium
+              text-sm font-medium flex-shrink-0
             "
-            title="New Chat Session"
+            title={t('sessions.newSession')}
           >
             {isLoading ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -80,7 +82,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                 <path d="M12 5v14m-7-7h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
               </svg>
             )}
-            New
+            {t('sessions.new')}
           </button>
         )}
       </div>
@@ -90,8 +92,8 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
         {!Array.isArray(sessions) || sessions.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center p-8">
-              <div className="text-white/70 text-sm font-medium">No sessions yet</div>
-              <div className="text-white/50 text-xs mt-1">Create your first chat session</div>
+              <div className="text-white/70 text-sm font-medium">{t('sessions.noSessions')}</div>
+              <div className="text-white/50 text-xs mt-1">{t('sessions.newSession')}</div>
             </div>
           </div>
         ) : (
@@ -135,9 +137,9 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                             e.stopPropagation();
                             onStartRename?.(session.id, session.title);
                           }}
-                          title={String(session.title || 'Untitled Session')}
+                          title={String(session.title || t('sessions.untitledSession'))}
                         >
-                          {String(session.title || 'Untitled Session')}
+                          {String(session.title || t('sessions.untitledSession'))}
                         </h4>
                       )}
                       {isActive && editingSessionId !== session.id && (
@@ -159,10 +161,10 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                               if (session.lastMessage && typeof session.lastMessage === 'string') {
                                 return session.lastMessage.length > 60 ? session.lastMessage.substring(0, 60) + '...' : session.lastMessage;
                               }
-                              return 'No messages yet';
+                              return t('sessions.noMessages');
                             } catch (error) {
                               console.error('Error rendering session message:', error);
-                              return 'Error loading message';
+                              return t('sessions.errorLoadingMessage');
                             }
                           })()}
                         </div>
@@ -177,17 +179,12 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                             const diffTime = Math.abs(now.getTime() - date.getTime());
                             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                             
-                            if (diffDays === 1) return 'Today';
-                            if (diffDays === 2) return 'Yesterday';
-                            if (diffDays <= 7) return `${diffDays - 1} days ago`;
+                            if (diffDays === 1) return t('sessions.today');
+                            if (diffDays === 2) return t('sessions.yesterday');
+                            if (diffDays <= 7) return t('sessions.daysAgo', { days: diffDays - 1 });
                             return date.toLocaleDateString();
-                          })() : 'New Session'}
+                          })() : t('sessions.newSession')}
                         </span>
-                        {session.messages && session.messages.length > 0 && (
-                          <span className="text-white/40 text-xs">
-                            • {session.messages.length} {session.messages.length === 1 ? 'message' : 'messages'}
-                          </span>
-                        )}
                       </div>
                       </div>
                     </div>
@@ -202,7 +199,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                           onStartRename?.(session.id, session.title);
                         }}
                         className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 text-white/70 hover:text-white transition-all duration-200 flex items-center justify-center"
-                        title="Rename session"
+                        title={t('sessions.renameSession')}
                       >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -215,7 +212,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                           onDeleteSession?.(session.id);
                         }}
                         className="w-7 h-7 rounded-lg bg-white/10 hover:bg-red-500/20 border border-white/20 hover:border-red-500/30 text-white/70 hover:text-red-400 transition-all duration-200 flex items-center justify-center"
-                        title="Delete session"
+                        title={t('sessions.deleteSession')}
                       >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                           <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>

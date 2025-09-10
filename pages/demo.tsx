@@ -6,9 +6,10 @@ import React, { useState } from 'react';
 import { ComponentDemo } from '../src/components/shared/demo/ComponentDemo';
 import { WidgetOutputDemo } from '../src/components/demos/WidgetOutputDemo';
 import { ColorSchemeDemo } from '../src/components/demos/ColorSchemeDemo';
+import AutomationDemoShowcase from '../src/components/ui/widgets/demos/AutomationDemoShowcase';
 
 const DemoPage: React.FC = () => {
-  const [activeDemo, setActiveDemo] = useState<'components' | 'widget-output' | 'color-schemes'>('components');
+  const [activeDemo, setActiveDemo] = useState<'components' | 'widget-output' | 'color-schemes' | 'automation-widgets'>('automation-widgets');
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -47,6 +48,16 @@ const DemoPage: React.FC = () => {
             >
               🎨 Color Schemes
             </button>
+            <button
+              onClick={() => setActiveDemo('automation-widgets')}
+              className={`px-4 py-2 rounded transition-all ${
+                activeDemo === 'automation-widgets'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              🤖 Automation Widgets
+            </button>
           </div>
         </div>
       </div>
@@ -55,6 +66,11 @@ const DemoPage: React.FC = () => {
       {activeDemo === 'components' && <ComponentDemo />}
       {activeDemo === 'widget-output' && <WidgetOutputDemo />}
       {activeDemo === 'color-schemes' && <ColorSchemeDemo />}
+      {activeDemo === 'automation-widgets' && (
+        <div className="h-screen">
+          <AutomationDemoShowcase />
+        </div>
+      )}
     </div>
   );
 };

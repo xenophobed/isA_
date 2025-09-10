@@ -54,7 +54,7 @@ export class DreamWidgetPlugin implements WidgetPlugin {
   // ============================================================================
 
   async onInit(): Promise<void> {
-    logger.info(LogCategory.SYSTEM, '🎨 DreamWidgetPlugin: Initializing...');
+    logger.debug(LogCategory.SYSTEM, 'DreamWidgetPlugin: Initializing...');
     // 这里可以添加初始化逻辑，比如检查依赖、预加载资源等
     // 目前保持简单，因为 Dream Widget Store 已经处理了初始化
   }

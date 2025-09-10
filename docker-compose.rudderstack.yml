@@ -1,0 +1,61 @@
+version: "3.7"
+
+services:
+  # PostgreSQL 为 RudderStack 使用 - 使用自己的数据库实例
+  rudder-db:
+    image: postgres:15-alpine
+    container_name: rudder_db
+    environment:
+      POSTGRES_USER: rudder
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: jobsdb
+    ports:
+      - "6432:5432"
+    shm_size: 128mb
+    restart: unless-stopped
+
+  # RudderStack Backend
+  rudder-backend:
+    image: rudderlabs/rudder-server:latest
+    container_name: rudder_backend
+    depends_on:
+      - rudder-db
+      - rudder-transformer
+    ports:
+      - "8102:8080"  # 映射到 8102
+    environment:
+      # 数据库配置
+      JOBS_DB_HOST: rudder-db
+      JOBS_DB_USER: rudder
+      JOBS_DB_PORT: 5432
+      JOBS_DB_DB_NAME: jobsdb
+      JOBS_DB_PASSWORD: password
+      JOBS_DB_SSL_MODE: disable
+      
+      # Transformer 配置
+      DEST_TRANSFORM_URL: http://rudder-transformer:9090
+      
+      # 使用本地配置文件
+      RSERVER_BACKEND_CONFIG_CONFIG_FROM_FILE: true
+      RSERVER_BACKEND_CONFIG_CONFIG_JSONPATH: /etc/rudderstack/workspaceConfig.json
+      
+      # 基础配置
+      GO_ENV: development
+      LOG_LEVEL: INFO
+      INSTANCE_ID: local_dev
+      
+    volumes:
+      - ./rudderstack/config/workspaceConfig.json:/etc/rudderstack/workspaceConfig.json
+    restart: unless-stopped
+
+  # RudderStack Transformer
+  rudder-transformer:
+    image: rudderstack/rudder-transformer:latest
+    container_name: rudder_transformer
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+networks:
+  default:
+    name: rudder_network

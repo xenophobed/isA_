@@ -73,23 +73,11 @@ export class SSEConnection extends BaseConnection {
         credentials: this.withCredentials ? 'include' : 'same-origin'
       };
       
-      console.log('🔗 SSE_CONNECTION: Connecting to:', this.url);
-      console.log('🔗 SSE_CONNECTION: Request config:', {
-        method: requestInit.method,
-        headers: requestInit.headers,
-        bodyLength: requestInit.body ? String(requestInit.body).length : 0,
-        hasSignal: !!requestInit.signal
-      });
+      // Connecting to SSE endpoint
       
       const response = await fetch(this.url, requestInit);
       
-      console.log('🔗 SSE_CONNECTION: Got response:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        ok: response.ok,
-        hasBody: !!response.body
-      });
+      // Response received
       
       if (!response.ok) {
         throw this.createError(`HTTP ${response.status}: ${response.statusText}`, 'HTTP_ERROR');
@@ -108,7 +96,7 @@ export class SSEConnection extends BaseConnection {
       
       this.emit('open', { data: { status: response.status }, timestamp: Date.now() });
       
-      console.log('🔗 SSE_CONNECTION: Connected successfully');
+      // Connection established successfully
       
     } catch (error) {
       this.setState(ConnectionState.ERROR);
@@ -158,7 +146,7 @@ export class SSEConnection extends BaseConnection {
     } catch (error) {
       // AbortError 是正常的关闭行为，不应该记录为错误
       if (error instanceof Error && error.name === 'AbortError') {
-        console.log('🔗 SSE_CONNECTION: Connection aborted normally');
+        // Connection aborted normally
       } else {
         console.warn('🔗 SSE_CONNECTION: Error during close:', error);
       }
@@ -194,14 +182,32 @@ export class SSEConnection extends BaseConnection {
         const chunk = decoder.decode(value, { stream: true });
         buffer += chunk;
         
-        // 处理 SSE 数据
+        // 处理 SSE 数据 - 支持完整的 SSE 格式
         const lines = buffer.split('\n');
         buffer = lines.pop() || ''; // 保留最后一行（可能不完整）
         
         for (const line of lines) {
-          if (line.trim()) {
-            this.emit('data', { data: line, timestamp: Date.now() });
-            yield line;
+          const trimmedLine = line.trim();
+          if (trimmedLine) {
+            // 支持标准 SSE 格式: data: {...}, event: type, id: value
+            if (trimmedLine.startsWith('data:') || 
+                trimmedLine.startsWith('event:') || 
+                trimmedLine.startsWith('id:') || 
+                trimmedLine.startsWith('retry:')) {
+              this.emit('data', { data: trimmedLine, timestamp: Date.now() });
+              yield trimmedLine;
+            } else {
+              // 处理纯 JSON 数据行（无前缀）
+              try {
+                JSON.parse(trimmedLine); // 验证是否为有效 JSON
+                this.emit('data', { data: `data: ${trimmedLine}`, timestamp: Date.now() });
+                yield `data: ${trimmedLine}`;
+              } catch {
+                // 非JSON数据也要传递
+                this.emit('data', { data: trimmedLine, timestamp: Date.now() });
+                yield trimmedLine;
+              }
+            }
           }
         }
       }
@@ -214,7 +220,7 @@ export class SSEConnection extends BaseConnection {
       
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        console.log('🔗 SSE_CONNECTION: Stream was aborted');
+        // Stream was aborted
       } else {
         console.error('🔗 SSE_CONNECTION: Stream reading error:', error);
         const streamError = error instanceof Error ? error : new Error(String(error));

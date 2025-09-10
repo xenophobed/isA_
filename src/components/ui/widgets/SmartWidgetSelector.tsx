@@ -13,6 +13,7 @@
 import React, { useState, useMemo } from 'react';
 import { Modal } from '../../shared/ui/Modal';
 import { AppId } from '../../../types/appTypes';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 export interface WidgetInfo {
   id: string;
@@ -31,75 +32,6 @@ export interface SmartWidgetSelectorProps {
   availableWidgets?: WidgetInfo[];
 }
 
-// 默认可用的Widget配置
-const DEFAULT_WIDGETS: WidgetInfo[] = [
-  {
-    id: 'dream',
-    name: 'DreamForge AI',
-    description: 'AI-powered image generation and creative visual content',
-    icon: '🎨',
-    category: 'default',
-    triggers: ['image', 'generate', 'create', 'picture', 'art'],
-    color: 'from-purple-500 to-pink-500'
-  },
-  {
-    id: 'hunt',
-    name: 'HuntAI',
-    description: 'Product search, comparison and shopping assistance',
-    icon: '🔍',
-    category: 'default',
-    triggers: ['search', 'product', 'buy', 'compare', 'shop'],
-    color: 'from-blue-500 to-cyan-500'
-  },
-  {
-    id: 'omni',
-    name: 'Omni Content',
-    description: 'Multi-purpose content creation and writing assistant',
-    icon: '⚡',
-    category: 'default',
-    triggers: ['write', 'article', 'content', 'blog', 'text'],
-    color: 'from-green-500 to-emerald-500'
-  },
-  {
-    id: 'data-scientist',
-    name: 'DataWise Analytics',
-    description: 'Advanced data analysis and visualization tools',
-    icon: '📊',
-    category: 'default',
-    triggers: ['analyze', 'data', 'chart', 'graph', 'statistics'],
-    color: 'from-orange-500 to-red-500'
-  },
-  {
-    id: 'knowledge',
-    name: 'Knowledge Hub',
-    description: 'Document analysis with vector and graph RAG',
-    icon: '🧠',
-    category: 'default',
-    triggers: ['document', 'analyze', 'knowledge', 'pdf', 'file'],
-    color: 'from-indigo-500 to-purple-500'
-  }
-];
-
-const CUSTOM_WIDGETS: WidgetInfo[] = [
-  {
-    id: 'code-reviewer',
-    name: 'Code Reviewer',
-    description: 'AI-powered code review and optimization suggestions',
-    icon: '💻',
-    category: 'custom',
-    triggers: ['code', 'review', 'optimize', 'programming'],
-    color: 'from-gray-500 to-slate-600'
-  },
-  {
-    id: 'translator',
-    name: 'Universal Translator',
-    description: 'Multi-language translation and localization',
-    icon: '🌐',
-    category: 'custom',
-    triggers: ['translate', 'language', 'localize'],
-    color: 'from-teal-500 to-cyan-600'
-  }
-];
 
 export const SmartWidgetSelector: React.FC<SmartWidgetSelectorProps> = ({
   isOpen,
@@ -107,32 +39,102 @@ export const SmartWidgetSelector: React.FC<SmartWidgetSelectorProps> = ({
   onWidgetSelect,
   availableWidgets
 }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'default' | 'custom'>('default');
   const [selectedWidget, setSelectedWidget] = useState<string | null>(null);
   const [showModeSelector, setShowModeSelector] = useState(false);
 
+  // Generate translated widgets
+  const translatedDefaultWidgets = useMemo((): WidgetInfo[] => [
+    {
+      id: 'dream',
+      name: t('widgetInfo.dream.name'),
+      description: t('widgetInfo.dream.description'),
+      icon: '🎨',
+      category: 'default',
+      triggers: ['image', 'generate', 'create', 'picture', 'art'],
+      color: 'from-purple-500 to-pink-500'
+    },
+    {
+      id: 'hunt',
+      name: t('widgetInfo.hunt.name'),
+      description: t('widgetInfo.hunt.description'),
+      icon: '🔍',
+      category: 'default',
+      triggers: ['search', 'product', 'buy', 'compare', 'shop'],
+      color: 'from-blue-500 to-cyan-500'
+    },
+    {
+      id: 'omni',
+      name: t('widgetInfo.omni.name'),
+      description: t('widgetInfo.omni.description'),
+      icon: '⚡',
+      category: 'default',
+      triggers: ['write', 'article', 'content', 'blog', 'text'],
+      color: 'from-green-500 to-emerald-500'
+    },
+    {
+      id: 'data-scientist',
+      name: t('widgetInfo.dataScientist.name'),
+      description: t('widgetInfo.dataScientist.description'),
+      icon: '📊',
+      category: 'default',
+      triggers: ['analyze', 'data', 'chart', 'graph', 'statistics'],
+      color: 'from-orange-500 to-red-500'
+    },
+    {
+      id: 'knowledge',
+      name: t('widgetInfo.knowledge.name'),
+      description: t('widgetInfo.knowledge.description'),
+      icon: '🧠',
+      category: 'default',
+      triggers: ['document', 'analyze', 'knowledge', 'pdf', 'file'],
+      color: 'from-indigo-500 to-purple-500'
+    }
+  ], [t]);
+
+  const translatedCustomWidgets = useMemo((): WidgetInfo[] => [
+    {
+      id: 'custom_automation',
+      name: t('widgetInfo.customAutomation.name'),
+      description: t('widgetInfo.customAutomation.description'),
+      icon: '🤖',
+      category: 'custom',
+      triggers: ['automate', 'automation', 'workflow', 'process', 'streamline', 'etl', 'api integration'],
+      color: 'from-violet-500 to-purple-600'
+    }
+  ], [t]);
+
   // 合并默认和自定义Widget
   const allWidgets = useMemo(() => {
-    return availableWidgets || [...DEFAULT_WIDGETS, ...CUSTOM_WIDGETS];
-  }, [availableWidgets]);
+    return availableWidgets || [...translatedDefaultWidgets, ...translatedCustomWidgets];
+  }, [availableWidgets, translatedDefaultWidgets, translatedCustomWidgets]);
 
   // 按类别筛选Widget
   const filteredWidgets = useMemo(() => {
     return allWidgets.filter(widget => widget.category === activeTab);
   }, [allWidgets, activeTab]);
 
-  // 处理Widget点击 - 默认使用plugin模式，不显示模式选择器
+  // 处理Widget点击 - 显示模式选择器
   const handleWidgetClick = (widgetId: string) => {
-    onWidgetSelect(widgetId, 'half'); // 默认使用半屏模式（plugin模式）
-    onClose();
+    setSelectedWidget(widgetId);
+    setShowModeSelector(true);
   };
 
   // 处理模式选择
   const handleModeSelect = (mode: 'half' | 'full') => {
     if (selectedWidget) {
       onWidgetSelect(selectedWidget, mode);
+      setShowModeSelector(false);
+      setSelectedWidget(null);
       onClose();
     }
+  };
+  
+  // 取消模式选择
+  const handleCancelModeSelect = () => {
+    setShowModeSelector(false);
+    setSelectedWidget(null);
   };
 
   // 渲染Widget卡片
@@ -209,7 +211,7 @@ export const SmartWidgetSelector: React.FC<SmartWidgetSelectorProps> = ({
           <div className="text-center mb-6">
             <div className="text-4xl mb-2">{widget.icon}</div>
             <h3 className="text-white text-lg font-semibold mb-1">{widget.name}</h3>
-            <p className="text-white/70 text-sm">Choose display mode</p>
+            <p className="text-white/70 text-sm">{t('widgetSelector.modeSelector.chooseMode')}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -226,8 +228,8 @@ export const SmartWidgetSelector: React.FC<SmartWidgetSelectorProps> = ({
                 <div className="text-2xl mb-2 group-hover:scale-110 transition-transform duration-300">
                   📱
                 </div>
-                <h4 className="text-white font-medium text-sm mb-1">Half Screen</h4>
-                <p className="text-white/60 text-xs">Chat plugin mode</p>
+                <h4 className="text-white font-medium text-sm mb-1">{t('widgetSelector.modeSelector.halfScreen')}</h4>
+                <p className="text-white/60 text-xs">{t('widgetSelector.modeSelector.chatPluginMode')}</p>
               </div>
             </button>
 
@@ -244,17 +246,17 @@ export const SmartWidgetSelector: React.FC<SmartWidgetSelectorProps> = ({
                 <div className="text-2xl mb-2 group-hover:scale-110 transition-transform duration-300">
                   🖥️
                 </div>
-                <h4 className="text-white font-medium text-sm mb-1">Full Screen</h4>
-                <p className="text-white/60 text-xs">Widget standalone mode</p>
+                <h4 className="text-white font-medium text-sm mb-1">{t('widgetSelector.modeSelector.fullScreen')}</h4>
+                <p className="text-white/60 text-xs">{t('widgetSelector.modeSelector.standaloneMode')}</p>
               </div>
             </button>
           </div>
 
           <button
-            onClick={() => setShowModeSelector(false)}
+            onClick={handleCancelModeSelect}
             className="w-full py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors duration-300"
           >
-            Cancel
+            {t('widgetSelector.modeSelector.cancel')}
           </button>
         </div>
       </div>
@@ -266,7 +268,7 @@ export const SmartWidgetSelector: React.FC<SmartWidgetSelectorProps> = ({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title="Smart Widget Selector"
+        title={t('widgetSelector.title')}
         size="xl"
         className="max-w-4xl"
       >
@@ -284,7 +286,7 @@ export const SmartWidgetSelector: React.FC<SmartWidgetSelectorProps> = ({
               `}
             >
               <span className="mr-2">⭐</span>
-              Default Widgets
+              {t('widgetSelector.defaultTab')}
             </button>
             <button
               onClick={() => setActiveTab('custom')}
@@ -297,7 +299,7 @@ export const SmartWidgetSelector: React.FC<SmartWidgetSelectorProps> = ({
               `}
             >
               <span className="mr-2">🛠️</span>
-              Custom Widgets
+              {t('widgetSelector.customTab')}
             </button>
           </div>
 
@@ -311,12 +313,12 @@ export const SmartWidgetSelector: React.FC<SmartWidgetSelectorProps> = ({
             <div className="text-center py-12">
               <div className="text-4xl mb-4">🔍</div>
               <h3 className="text-white text-lg font-medium mb-2">
-                No {activeTab} widgets available
+                {t('widgetSelector.noWidgetsTitle', { type: activeTab })}
               </h3>
               <p className="text-white/60 text-sm">
                 {activeTab === 'custom' 
-                  ? 'Custom widgets will appear here when available' 
-                  : 'Default widgets should be available'}
+                  ? t('widgetSelector.noCustomWidgets')
+                  : t('widgetSelector.noDefaultWidgets')}
               </p>
             </div>
           )}
@@ -324,7 +326,7 @@ export const SmartWidgetSelector: React.FC<SmartWidgetSelectorProps> = ({
           {/* 底部提示 */}
           <div className="text-center pt-4 border-t border-white/10">
             <p className="text-white/60 text-xs">
-              💡 Tip: Click any widget to open it in plugin mode alongside your chat
+              {t('widgetSelector.tipText')}
             </p>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import React, { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
 import { GlassChatInput, GlassCard, GlassButton, IntelligentModeSettings } from '../../shared';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 export interface InputAreaLayoutProps {
   placeholder?: string;
@@ -48,6 +49,7 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
   showWidgetSelector,
   onShowChatConfig
 }) => {
+  const { t } = useTranslation();
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -408,7 +410,7 @@ export const InputAreaLayout: React.FC<InputAreaLayoutProps> = ({
         value={inputValue}
         onChange={setInputValue}
         onSend={handleSendMessage}
-        placeholder={placeholder || "Type your message..."}
+        placeholder={placeholder || t('placeholders.typeMessage')}
         disabled={disabled || isLoading}
         isLoading={isLoading}
         variant="elevated"

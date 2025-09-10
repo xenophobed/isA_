@@ -56,7 +56,7 @@ export class OmniWidgetPlugin implements WidgetPlugin {
   // ============================================================================
 
   async onInit(): Promise<void> {
-    logger.info(LogCategory.SYSTEM, '⚡ OmniWidgetPlugin: Initializing...');
+    logger.debug(LogCategory.SYSTEM, 'OmniWidgetPlugin: Initializing...');
   }
 
   onDestroy(): void {

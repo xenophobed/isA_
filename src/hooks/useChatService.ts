@@ -30,10 +30,7 @@ export const setChatServiceInstance = (instance: ChatService | null) => {
  * 优先使用 Context 中的实例，如果不可用则使用全局实例
  */
 export const getChatServiceInstance = (): ChatService | null => {
-  console.log('🔍 getChatServiceInstance called:', { 
-    hasGlobalInstance: !!globalChatServiceInstance,
-    instanceType: globalChatServiceInstance?.constructor?.name 
-  });
+  // Getting ChatService instance
   return globalChatServiceInstance;
 };
 

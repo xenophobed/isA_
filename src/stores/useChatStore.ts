@@ -50,7 +50,7 @@ import { getChatServiceInstance } from '../hooks/useChatService';
 import { ChatMetadata, ChatMessage, StreamingStatus } from '../types/chatTypes';
 import { useUserStore } from './useUserStore';
 import { useSessionStore } from './useSessionStore';
-import { TaskItem, TaskProgress } from '../api/SSEParser';
+import { TaskItem, TaskProgress } from '../types/taskTypes';
 import { HILInterruptDetectedEvent, HILCheckpointCreatedEvent, HILExecutionStatusData } from '../types/aguiTypes';
 import { createContentParser, ParsedContent } from '../api/parsing/ContentParser';
 
@@ -242,11 +242,6 @@ export const useChatStore = create<ChatStore>()(
       try {
         // 获取 ChatService 实例 - 添加重试机制
         let chatService = getChatServiceInstance();
-        console.log('💬 useChatStore.sendMessage: ChatService check', { 
-          hasChatService: !!chatService,
-          serviceType: chatService?.constructor?.name,
-          timestamp: new Date().toISOString()
-        });
         
         // 如果 ChatService 不可用，等待一下再重试
         if (!chatService) {
@@ -270,10 +265,6 @@ export const useChatStore = create<ChatStore>()(
           throw new Error(errorMsg);
         }
 
-        console.log('💬 useChatStore.sendMessage: Using ChatService instance', {
-          serviceReady: true,
-          timestamp: new Date().toISOString()
-        });
 
         logger.info(LogCategory.CHAT_FLOW, 'Sending message via chatService', {
           contentLength: content.length,
@@ -301,6 +292,73 @@ export const useChatStore = create<ChatStore>()(
             setIsTyping(false);
             setExecutingPlan(false); // 完成执行计划
             logger.info(LogCategory.CHAT_FLOW, 'Message sending completed successfully');
+          },
+          
+          // 🆕 工具执行事件处理
+          onToolStart: (toolName: string, toolCallId?: string, parameters?: any) => {
+            updateStreamingStatus(`🔧 Starting ${toolName}...`);
+            logger.debug(LogCategory.CHAT_FLOW, 'Tool started', { toolName, toolCallId });
+          },
+          onToolExecuting: (toolName: string, status?: string, progress?: number) => {
+            const statusText = progress !== undefined 
+              ? `🔧 ${toolName}: ${status} (${progress}%)`
+              : `🔧 ${toolName}: ${status || 'executing'}`;
+            updateStreamingStatus(statusText);
+          },
+          onToolCompleted: (toolName: string, result?: any, error?: string, durationMs?: number) => {
+            if (error) {
+              updateStreamingStatus(`❌ ${toolName} failed: ${error}`);
+            } else {
+              const durationText = durationMs ? ` (${durationMs}ms)` : '';
+              updateStreamingStatus(`✅ ${toolName} completed${durationText}`);
+            }
+          },
+          
+          // 🆕 LLM相关事件处理
+          onLLMCompleted: (model?: string, tokenCount?: number, finishReason?: string) => {
+            const modelText = model ? ` (${model})` : '';
+            const tokenText = tokenCount ? `, ${tokenCount} tokens` : '';
+            updateStreamingStatus(`🧠 LLM completed${modelText}${tokenText}`);
+          },
+          
+          // 🆕 系统状态事件处理
+          onNodeUpdate: (nodeName: string, status: 'started' | 'completed' | 'failed', data?: any) => {
+            const statusEmoji = status === 'completed' ? '✅' : status === 'failed' ? '❌' : '🔄';
+            updateStreamingStatus(`${statusEmoji} Node: ${nodeName}`);
+            
+            // 处理节点数据中的信用信息
+            if (data?.credits !== undefined) {
+              const userStore = useUserStore.getState();
+              userStore.updateCredits(data.credits, 'node_update');
+            }
+          },
+          onStateUpdate: (stateData: any, node?: string) => {
+            const nodeText = node ? ` [${node}]` : '';
+            updateStreamingStatus(`📊 State updated${nodeText}`);
+          },
+          onPaused: (reason?: string, checkpointId?: string) => {
+            updateStreamingStatus(`⏸️ Paused${reason ? `: ${reason}` : ''}`);
+            setHILStatus('waiting_for_human');
+          },
+          
+          // 🆕 业务功能事件处理
+          onMemoryUpdate: (memoryData: any, operation: string) => {
+            updateStreamingStatus(`🧠 Memory ${operation}: ${JSON.stringify(memoryData).substring(0, 50)}...`);
+          },
+          
+          // 🆕 Resume事件处理
+          onResumeStart: (resumedFrom?: string, checkpointId?: string) => {
+            updateStreamingStatus(`🔄 Resuming${resumedFrom ? ` from ${resumedFrom}` : ''}...`);
+            setHILStatus('processing_response');
+          },
+          onResumeEnd: (success: boolean, result?: any) => {
+            if (success) {
+              updateStreamingStatus('✅ Resume completed successfully');
+              setHILStatus('idle');
+            } else {
+              updateStreamingStatus('❌ Resume failed');
+              setHILStatus('error');
+            }
           },
           onBillingUpdate: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => {
             // 📡 智能信用余额更新
@@ -410,11 +468,7 @@ export const useChatStore = create<ChatStore>()(
         
         // 获取 ChatService 实例 - 添加重试机制
         let chatService = getChatServiceInstance();
-        console.log('💬 useChatStore.sendMultimodalMessage: ChatService check', { 
-          hasChatService: !!chatService,
-          serviceType: chatService?.constructor?.name,
-          timestamp: new Date().toISOString()
-        });
+        // ChatService instance check
         
         // 如果 ChatService 不可用，等待一下再重试
         if (!chatService) {
@@ -456,6 +510,63 @@ export const useChatStore = create<ChatStore>()(
             setIsTyping(false);
             setExecutingPlan(false);
             logger.info(LogCategory.CHAT_FLOW, 'Multimodal message sending completed successfully');
+          },
+          
+          // 🆕 工具执行事件处理
+          onToolStart: (toolName: string, toolCallId?: string, parameters?: any) => {
+            updateStreamingStatus(`🔧 Starting ${toolName}...`);
+          },
+          onToolExecuting: (toolName: string, status?: string, progress?: number) => {
+            const statusText = progress !== undefined 
+              ? `🔧 ${toolName}: ${status} (${progress}%)`
+              : `🔧 ${toolName}: ${status || 'executing'}`;
+            updateStreamingStatus(statusText);
+          },
+          onToolCompleted: (toolName: string, result?: any, error?: string, durationMs?: number) => {
+            if (error) {
+              updateStreamingStatus(`❌ ${toolName} failed: ${error}`);
+            } else {
+              const durationText = durationMs ? ` (${durationMs}ms)` : '';
+              updateStreamingStatus(`✅ ${toolName} completed${durationText}`);
+            }
+          },
+          
+          // 🆕 LLM相关事件处理
+          onLLMCompleted: (model?: string, tokenCount?: number, finishReason?: string) => {
+            updateStreamingStatus(`🧠 LLM completed (${model || 'multimodal'})`);
+          },
+          
+          // 🆕 系统状态事件处理
+          onNodeUpdate: (nodeName: string, status: 'started' | 'completed' | 'failed', data?: any) => {
+            const statusEmoji = status === 'completed' ? '✅' : status === 'failed' ? '❌' : '🔄';
+            updateStreamingStatus(`${statusEmoji} Node: ${nodeName}`);
+            
+            if (data?.credits !== undefined) {
+              const userStore = useUserStore.getState();
+              userStore.updateCredits(data.credits, 'multimodal_node_update');
+            }
+          },
+          onStateUpdate: (stateData: any, node?: string) => {
+            updateStreamingStatus(`📊 Processing multimodal content...`);
+          },
+          onPaused: (reason?: string, checkpointId?: string) => {
+            updateStreamingStatus(`⏸️ Multimodal processing paused`);
+            setHILStatus('waiting_for_human');
+          },
+          
+          // 🆕 Resume事件处理
+          onResumeStart: (resumedFrom?: string, checkpointId?: string) => {
+            updateStreamingStatus(`🔄 Resuming multimodal processing...`);
+            setHILStatus('processing_response');
+          },
+          onResumeEnd: (success: boolean, result?: any) => {
+            if (success) {
+              updateStreamingStatus('✅ Multimodal resume completed');
+              setHILStatus('idle');
+            } else {
+              updateStreamingStatus('❌ Multimodal resume failed');
+              setHILStatus('error');
+            }
           },
           onBillingUpdate: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number }) => {
             // 📡 智能信用余额更新
@@ -572,7 +683,12 @@ export const useChatStore = create<ChatStore>()(
         isExecutingPlan: executing,
         hasExecutedTasks: executing ? true : state.hasExecutedTasks // 一旦执行过就永远为true
       }));
-      logger.info(LogCategory.CHAT_FLOW, `Plan execution ${executing ? 'started' : 'stopped'}`);
+      // Only log for actual plan execution, not regular message sending
+      if (executing) {
+        logger.debug(LogCategory.CHAT_FLOW, 'Message processing started');
+      } else {
+        logger.debug(LogCategory.CHAT_FLOW, 'Message processing completed');
+      }
     },
 
     clearTasks: () => {
@@ -614,7 +730,7 @@ export const useChatStore = create<ChatStore>()(
           msg.isStreaming ? { ...msg, isStreaming: false, streamingStatus: undefined } : msg
         );
         
-        console.log('🔥 CHAT_STORE: Creating new streaming message', { id, status, currentMessageCount: updatedMessages.length });
+        // Creating new streaming message
         
         // Get current session for proper session ID
         const sessionStore = useSessionStore.getState();
@@ -635,7 +751,7 @@ export const useChatStore = create<ChatStore>()(
         // 这样避免创建两条消息：一条空的，一条完整的
         
         const newMessages = [...updatedMessages, streamingMessage];
-        console.log('🔥 CHAT_STORE: New messages array length:', newMessages.length);
+        // Messages array updated
         
         return {
           messages: newMessages
@@ -646,39 +762,19 @@ export const useChatStore = create<ChatStore>()(
 
     appendToStreamingMessage: (content) => {
       set((state) => {
-        console.log('📝 CHAT_STORE: appendToStreamingMessage called with content:', content);
-        console.log('📋 CHAT_STORE: Current messages count:', state.messages.length);
-        
         const lastMessage = state.messages[state.messages.length - 1];
         
         if (!lastMessage) {
-          console.log('❌ CHAT_STORE: No messages in array - cannot append');
           return state;
         }
         
         // Handle both RegularMessage and ArtifactMessage types
         if (lastMessage.type === 'regular') {
-          console.log('📋 CHAT_STORE: Last message details (regular):', {
-            id: lastMessage.id,
-            role: lastMessage.role,
-            isStreaming: lastMessage.isStreaming,
-            contentLength: lastMessage.content.length,
-            hasStreamingStatus: !!lastMessage.streamingStatus
-          });
-          
           if (!lastMessage.isStreaming) {
-            console.log('❌ CHAT_STORE: Last message is not streaming - cannot append');
             return state;
           }
           
           const newContent = lastMessage.content + content;
-          console.log('✅ CHAT_STORE: Appending content successfully', { 
-            messageId: lastMessage.id,
-            appendedContent: content,
-            oldLength: lastMessage.content.length,
-            newLength: newContent.length,
-            totalContent: newContent.substring(0, 50) + '...'
-          });
           
           const updatedMessages = [...state.messages];
           updatedMessages[updatedMessages.length - 1] = {
@@ -688,29 +784,13 @@ export const useChatStore = create<ChatStore>()(
           
           return { messages: updatedMessages };
         } else if (lastMessage.type === 'artifact') {
-          console.log('📋 CHAT_STORE: Last message details (artifact):', {
-            id: lastMessage.id,
-            role: lastMessage.role,
-            isStreaming: lastMessage.isStreaming,
-            artifactContent: lastMessage.artifact.content,
-            hasStreamingStatus: !!lastMessage.streamingStatus
-          });
-          
           if (!lastMessage.isStreaming) {
-            console.log('❌ CHAT_STORE: Last artifact message is not streaming - cannot append');
             return state;
           }
           
           // For artifact messages, append to the artifact content
           const currentArtifactContent = typeof lastMessage.artifact.content === 'string' ? lastMessage.artifact.content : '';
           const newArtifactContent = currentArtifactContent + content;
-          
-          console.log('✅ CHAT_STORE: Appending content to artifact successfully', { 
-            messageId: lastMessage.id,
-            appendedContent: content,
-            oldLength: currentArtifactContent.length,
-            newLength: newArtifactContent.length
-          });
           
           const updatedMessages = [...state.messages];
           updatedMessages[updatedMessages.length - 1] = {
@@ -723,7 +803,6 @@ export const useChatStore = create<ChatStore>()(
           
           return { messages: updatedMessages };
         } else {
-          console.log('❌ CHAT_STORE: Unknown message type - cannot append');
           return state;
         }
       });
@@ -740,13 +819,7 @@ export const useChatStore = create<ChatStore>()(
           try {
             const contentParser = createContentParser();
             parsedContent = contentParser.parse(lastMessage.content) || undefined;
-            console.log('🔍 CONTENT_PARSER: Parsed message content:', {
-              messageId: lastMessage.id,
-              contentLength: lastMessage.content.length,
-              primaryType: parsedContent?.primaryType,
-              elementCount: parsedContent?.elements.length,
-              isMixed: parsedContent?.isMixed
-            });
+            // Content parsed successfully
           } catch (error) {
             console.warn('🔍 CONTENT_PARSER: Failed to parse content:', error);
           }

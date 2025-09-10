@@ -15,7 +15,7 @@ import React, { useState, useMemo } from 'react';
 import { useCurrentTasks, useTaskProgress, useIsExecutingPlan, useChatMessages } from '../../../stores/useChatStore';
 import { useSessionStore } from '../../../stores/useSessionStore';
 import { useUserModule } from '../../../modules/UserModule';
-import { TaskProgress, TaskItem } from '../../../api/SSEParser';
+import { TaskProgress, TaskItem } from '../../../types/taskTypes';
 import { HILStatusPanel } from '../hil/HILStatusPanel';
 import { HILInterruptData, HILCheckpointData, HILExecutionStatusData } from '../../../types/aguiTypes';
 
@@ -147,7 +147,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
         {taskProgress && (
           <div className="bg-blue-500/10 rounded-lg p-3 border border-blue-500/20">
             <div className="text-blue-400 text-xs mb-1">Current Task</div>
-            <div className="text-white text-sm font-medium mb-1 truncate">{taskProgress.toolName}</div>
+            <div className="text-white text-sm font-medium mb-1 truncate">{taskProgress.currentStepName || 'AI Assistant'}</div>
             {taskProgress.currentStep && taskProgress.totalSteps && (
               <div>
                 <div className="flex justify-between text-xs mb-1">
@@ -225,7 +225,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
             </div>
             {taskProgress && (
               <>
-                <div className="text-white text-sm mb-1 truncate">{taskProgress.toolName}</div>
+                <div className="text-white text-sm mb-1 truncate">{taskProgress.currentStepName || 'AI Assistant'}</div>
                 {taskProgress.currentStep && taskProgress.totalSteps && (
                   <div className="text-xs text-white/60">
                     Step {taskProgress.currentStep} of {taskProgress.totalSteps}
@@ -268,7 +268,9 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                 )}
                 {task.result && (
                   <div className="text-green-400 text-xs bg-green-500/10 px-2 py-1 rounded mt-1 truncate">
-                    ✓ {task.result}
+                    ✓ {typeof task.result === 'string' ? task.result : 
+                      task.result.success ? (task.result.data ? JSON.stringify(task.result.data) : 'Success') :
+                      (task.result.error || 'Failed')}
                   </div>
                 )}
               </div>

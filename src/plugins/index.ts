@@ -15,6 +15,7 @@ import omniWidgetPlugin from './OmniWidgetPlugin';
 import huntWidgetPlugin from './HuntWidgetPlugin';
 import dataScientistWidgetPlugin from './DataScientistWidgetPlugin';
 import knowledgeWidgetPlugin from './KnowledgeWidgetPlugin';
+import customAutomationWidgetPlugin from './CustomAutomationWidgetPlugin';
 import { logger, LogCategory } from '../utils/logger';
 
 // ============================================================================
@@ -26,7 +27,8 @@ export {
   omniWidgetPlugin,
   huntWidgetPlugin,
   dataScientistWidgetPlugin,
-  knowledgeWidgetPlugin
+  knowledgeWidgetPlugin,
+  customAutomationWidgetPlugin
 };
 export { pluginManager };
 
@@ -68,16 +70,9 @@ function registerAllPlugins(): void {
   pluginManager.register(huntWidgetPlugin);
   pluginManager.register(dataScientistWidgetPlugin);
   pluginManager.register(knowledgeWidgetPlugin);
+  pluginManager.register(customAutomationWidgetPlugin);
   
-  logger.info(LogCategory.SYSTEM, '🔌 All widget plugins registered successfully', {
-    registeredPlugins: [
-      'dreamWidgetPlugin',
-      'omniWidgetPlugin', 
-      'huntWidgetPlugin',
-      'dataScientistWidgetPlugin',
-      'knowledgeWidgetPlugin'
-    ]
-  });
+  logger.debug(LogCategory.SYSTEM, 'All widget plugins registered successfully');
 }
 
 /**

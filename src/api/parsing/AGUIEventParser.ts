@@ -34,6 +34,15 @@ export type AGUIEventType =
   | 'text_message_end'
   | 'tool_call_start'
   | 'tool_call_end'
+  | 'tool_executing'
+  | 'llm_completed'
+  | 'node_update'
+  | 'state_update'
+  | 'memory_update'
+  | 'billing'
+  | 'paused'
+  | 'resume_start'
+  | 'resume_end'
   | 'image_generation_start'
   | 'image_generation_content'
   | 'image_generation_end'
@@ -121,6 +130,70 @@ export interface ToolCallEndEvent extends BaseAGUIEvent {
   duration_ms?: number;
 }
 
+// 新增后端事件类型
+export interface ToolExecutingEvent extends BaseAGUIEvent {
+  type: 'tool_executing';
+  tool_name: string;
+  tool_call_id?: string;
+  status?: string;
+  progress?: number;
+}
+
+export interface LLMCompletedEvent extends BaseAGUIEvent {
+  type: 'llm_completed';
+  model?: string;
+  token_count?: number;
+  finish_reason?: string;
+}
+
+export interface NodeUpdateEvent extends BaseAGUIEvent {
+  type: 'node_update';
+  node_name: string;
+  status: 'started' | 'completed' | 'failed';
+  credits?: number;
+  messages_count?: number;
+  data?: any;
+}
+
+export interface StateUpdateEvent extends BaseAGUIEvent {
+  type: 'state_update';
+  state_data: any;
+  node?: string;
+}
+
+export interface MemoryUpdateEvent extends BaseAGUIEvent {
+  type: 'memory_update';
+  memory_data: any;
+  operation: 'store' | 'retrieve' | 'update' | 'delete';
+}
+
+export interface BillingEvent extends BaseAGUIEvent {
+  type: 'billing';
+  credits_remaining: number;
+  total_credits: number;
+  model_calls: number;
+  tool_calls: number;
+  cost?: number;
+}
+
+export interface PausedEvent extends BaseAGUIEvent {
+  type: 'paused';
+  reason?: string;
+  checkpoint_id?: string;
+}
+
+export interface ResumeStartEvent extends BaseAGUIEvent {
+  type: 'resume_start';
+  resumed_from?: string;
+  checkpoint_id?: string;
+}
+
+export interface ResumeEndEvent extends BaseAGUIEvent {
+  type: 'resume_end';
+  success: boolean;
+  result?: any;
+}
+
 export interface HILInterruptDetectedEvent extends BaseAGUIEvent {
   type: 'hil_interrupt_detected';
   interrupt: {
@@ -169,6 +242,15 @@ export type AGUIEvent =
   | TextMessageEndEvent
   | ToolCallStartEvent
   | ToolCallEndEvent
+  | ToolExecutingEvent
+  | LLMCompletedEvent
+  | NodeUpdateEvent
+  | StateUpdateEvent
+  | MemoryUpdateEvent
+  | BillingEvent
+  | PausedEvent
+  | ResumeStartEvent
+  | ResumeEndEvent
   | HILInterruptDetectedEvent
   | TaskProgressUpdateEvent
   | ArtifactCreatedEvent
@@ -267,12 +349,7 @@ export class AGUIEventParser extends BaseParser<string | LegacySSEEvent, AGUIEve
         eventData = data;
       }
       
-      console.log('🎯 AGUI_EVENT_PARSER: Parsing event data:', {
-        type: eventData.type || eventData.event_type,
-        hasThreadId: !!(eventData.thread_id || eventData.sessionId),
-        enableLegacyConversion: options.enableLegacyConversion,
-        dataPreview: JSON.stringify(eventData).substring(0, 100) + '...'
-      });
+      // Parsing event data
       
       let aguiEvent: AGUIEvent;
       
@@ -315,12 +392,7 @@ export class AGUIEventParser extends BaseParser<string | LegacySSEEvent, AGUIEve
         };
       }
       
-      console.log('🎯 AGUI_EVENT_PARSER: Successfully parsed event:', {
-        type: aguiEvent.type,
-        thread_id: aguiEvent.thread_id,
-        message_id: aguiEvent.message_id,
-        timestamp: aguiEvent.timestamp
-      });
+      // Event parsed successfully
       
       return aguiEvent;
       
@@ -344,18 +416,31 @@ export class AGUIEventParser extends BaseParser<string | LegacySSEEvent, AGUIEve
    * 判断是否为 Legacy 事件格式
    */
   private isLegacyEvent(eventData: any): boolean {
-    // 基于现有 SSEParser.ts 的事件类型判断
+    // 基于您后端的完整事件类型列表
     const legacyEventTypes = [
-      'start', 'custom_event', 'custom_stream', 'message_stream', 
-      'graph_update', 'complete', 'end', 'error', 'task_progress',
-      'hil_interrupt_detected', 'artifact_update', 'memory_update', 'billing'
+      // 基础控制事件
+      'start', 'end', 'error', 'resume_start', 'resume_end', 'paused',
+      // 消息内容事件
+      'content', 'message_stream', 'message_event', 'tool_calls', 'tool_result_msg',
+      // 工具执行事件  
+      'tool_start', 'tool_executing', 'tool_completed',
+      // LLM相关事件
+      'token', 'llm_completed',
+      // 系统状态事件
+      'node_update', 'state_update', 'graph_update', 'update_event',
+      'interrupt', 'custom_stream', 'custom_event',
+      // 业务功能事件
+      'memory_update', 'billing', 'credits',
+      // HIL相关
+      'hil_interrupt_detected', 'artifact_update', 'task_progress'
     ];
     
     return legacyEventTypes.includes(eventData.type) ||
            !eventData.thread_id ||
            eventData.sessionId ||
            eventData.conversationId ||
-           eventData.custom_llm_chunk !== undefined; // Legacy chunk content
+           eventData.custom_llm_chunk !== undefined || // Legacy chunk content
+           eventData.resumed !== undefined; // Resume标记
   }
   
   /**
@@ -387,6 +472,7 @@ export class AGUIEventParser extends BaseParser<string | LegacySSEEvent, AGUIEve
           ...baseEvent,
           type: 'run_started' as const,
           run_id: runId,
+          message_id: legacyEvent.message_id || `msg_${Date.now()}`,
           model: legacyEvent.model,
           instructions: legacyEvent.instructions
         };
@@ -415,7 +501,11 @@ export class AGUIEventParser extends BaseParser<string | LegacySSEEvent, AGUIEve
           ...baseEvent,
           type: 'text_message_content' as const,
           message_id: legacyEvent.message_id || `msg_${Date.now()}`,
-          delta: legacyEvent.content || legacyEvent.delta || ''
+          delta: legacyEvent.custom_llm_chunk || 
+                 (legacyEvent.content && typeof legacyEvent.content === 'object' && legacyEvent.content.custom_llm_chunk) ||
+                 legacyEvent.content || 
+                 legacyEvent.delta || 
+                 ''
         };
         
       case 'complete':
@@ -480,17 +570,137 @@ export class AGUIEventParser extends BaseParser<string | LegacySSEEvent, AGUIEve
           }
         };
         
-      case 'graph_update':
-        // Graph update 作为自定义事件处理
+      // 工具执行事件转换
+      case 'tool_start':
         return {
           ...baseEvent,
-          type: 'custom_event' as const,
-          metadata: {
-            ...baseEvent.metadata,
-            custom_type: 'graph_update',
-            graph_data: legacyEvent.graph
-          }
-        } as BaseAGUIEvent;
+          type: 'tool_call_start' as const,
+          tool_call_id: legacyEvent.tool_call_id || `tool_${Date.now()}`,
+          tool_name: legacyEvent.tool_name || 'unknown_tool',
+          parameters: legacyEvent.tool_args || legacyEvent.parameters
+        };
+        
+      case 'tool_executing':
+        return {
+          ...baseEvent,
+          type: 'tool_executing' as const,
+          tool_name: legacyEvent.tool_name || 'unknown_tool',
+          tool_call_id: legacyEvent.tool_call_id,
+          status: legacyEvent.status,
+          progress: legacyEvent.progress
+        };
+        
+      case 'tool_completed':
+        return {
+          ...baseEvent,
+          type: 'tool_call_end' as const,
+          tool_call_id: legacyEvent.tool_call_id || `tool_${Date.now()}`,
+          tool_name: legacyEvent.tool_name || 'unknown_tool',
+          result: legacyEvent.result,
+          error: legacyEvent.error,
+          duration_ms: legacyEvent.duration_ms
+        };
+        
+      // LLM相关事件
+      case 'token':
+        return {
+          ...baseEvent,
+          type: 'text_message_content' as const,
+          message_id: legacyEvent.message_id || `msg_${Date.now()}`,
+          delta: legacyEvent.content || legacyEvent.token || ''
+        };
+        
+      case 'llm_completed':
+        return {
+          ...baseEvent,
+          type: 'llm_completed' as const,
+          model: legacyEvent.model,
+          token_count: legacyEvent.token_count,
+          finish_reason: legacyEvent.finish_reason
+        };
+        
+      // 系统状态事件
+      case 'node_update':
+        return {
+          ...baseEvent,
+          type: 'node_update' as const,
+          node_name: legacyEvent.node || 'unknown_node',
+          status: this.mapNodeStatus(legacyEvent.status),
+          credits: legacyEvent.credits,
+          messages_count: legacyEvent.messages_count,
+          data: legacyEvent.data
+        };
+        
+      case 'state_update':
+      case 'update_event':
+        return {
+          ...baseEvent,
+          type: 'state_update' as const,
+          state_data: legacyEvent.state || legacyEvent.data || legacyEvent,
+          node: legacyEvent.node
+        };
+        
+      case 'interrupt':
+        return {
+          ...baseEvent,
+          type: 'paused' as const,
+          reason: legacyEvent.reason,
+          checkpoint_id: legacyEvent.checkpoint_id
+        };
+        
+      case 'paused':
+        return {
+          ...baseEvent,
+          type: 'paused' as const,
+          reason: legacyEvent.reason,
+          checkpoint_id: legacyEvent.checkpoint_id
+        };
+        
+      // 业务功能事件
+      case 'memory_update':
+        return {
+          ...baseEvent,
+          type: 'memory_update' as const,
+          memory_data: legacyEvent.memory || legacyEvent.data,
+          operation: legacyEvent.operation || 'update'
+        };
+        
+      case 'billing':
+      case 'credits':
+        return {
+          ...baseEvent,
+          type: 'billing' as const,
+          credits_remaining: legacyEvent.creditsRemaining || legacyEvent.credits_remaining,
+          total_credits: legacyEvent.totalCredits || legacyEvent.total_credits,
+          model_calls: legacyEvent.modelCalls || legacyEvent.model_calls || 0,
+          tool_calls: legacyEvent.toolCalls || legacyEvent.tool_calls || 0,
+          cost: legacyEvent.cost
+        };
+        
+      // Resume事件
+      case 'resume_start':
+        return {
+          ...baseEvent,
+          type: 'resume_start' as const,
+          resumed_from: legacyEvent.resumed_from,
+          checkpoint_id: legacyEvent.checkpoint_id
+        };
+        
+      case 'resume_end':
+        return {
+          ...baseEvent,
+          type: 'resume_end' as const,
+          success: legacyEvent.success !== false,
+          result: legacyEvent.result
+        };
+        
+      case 'graph_update':
+        return {
+          ...baseEvent,
+          type: 'state_update' as const,
+          state_data: legacyEvent.graph || legacyEvent.data,
+          node: legacyEvent.node
+        };
         
       default:
         // 未知类型作为自定义事件
@@ -500,7 +710,9 @@ export class AGUIEventParser extends BaseParser<string | LegacySSEEvent, AGUIEve
           metadata: {
             ...baseEvent.metadata,
             custom_type: legacyEvent.type,
-            custom_data: legacyEvent
+            custom_data: legacyEvent,
+            // 检测Resume标记
+            resumed: legacyEvent.resumed === true
           }
         } as BaseAGUIEvent;
     }
@@ -654,6 +866,27 @@ export class AGUIEventParser extends BaseParser<string | LegacySSEEvent, AGUIEve
         return 'failed';
       default:
         return 'pending';
+    }
+  }
+  
+  /**
+   * 映射节点状态
+   */
+  private mapNodeStatus(legacyStatus?: string): 'started' | 'completed' | 'failed' {
+    switch (legacyStatus?.toLowerCase()) {
+      case 'completed':
+      case 'done':
+      case 'finished':
+      case 'success':
+        return 'completed';
+      case 'failed':
+      case 'error':
+        return 'failed';
+      case 'started':
+      case 'running':
+      case 'active':
+      default:
+        return 'started';
     }
   }
   

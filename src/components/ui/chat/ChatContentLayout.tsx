@@ -33,6 +33,7 @@ export interface ChatContentLayoutProps {
   isLoading?: boolean;       // Accept loading state as prop
   isTyping?: boolean;        // Accept typing state as prop
   onSendMessage?: (message: string) => void;
+  currentTasks?: any[];      // Accept current tasks for status display
 }
 
 /**
@@ -53,7 +54,8 @@ export const ChatContentLayout: React.FC<ChatContentLayoutProps> = ({
   messages = [],  // Use prop instead of context
   isLoading = false,
   isTyping = false,
-  onSendMessage
+  onSendMessage,
+  currentTasks = []
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -95,6 +97,7 @@ export const ChatContentLayout: React.FC<ChatContentLayoutProps> = ({
         customMessageRenderer={customMessageRenderer}
         className="isa-conversation-stream"
         messages={messages}
+        currentTasks={currentTasks}
         isLoading={isLoading}
         isTyping={isTyping}
         onSendMessage={onSendMessage}

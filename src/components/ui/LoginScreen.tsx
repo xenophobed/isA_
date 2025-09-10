@@ -1,10 +1,13 @@
 import React from 'react';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface LoginScreenProps {
   onLogin: () => void;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
+  const { t } = useTranslation();
+  
   return (
     <div className="w-full h-screen relative overflow-hidden">
       {/* Animated Background */}
@@ -45,26 +48,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           {/* Title */}
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 animate-fade-in">
             <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-              AI Agent SDK
+              {t('app.appName')}
             </span>
           </h1>
           
           <h2 className="text-xl md:text-2xl text-gray-300 mb-2 animate-fade-in-delay">
-            Your Intelligent Assistant
+            {t('app.tagline')}
           </h2>
           
-          <p className="text-gray-400 mb-8 animate-fade-in-delay-2">
-            Unlock the power of AI with multiple specialized agents.<br />
-            Chat, create, analyze, and more - all in one place.
+          <p className="text-gray-400 mb-8 animate-fade-in-delay-2 whitespace-pre-line">
+            {t('app.description')}
           </p>
 
           {/* Features */}
           <div className="grid grid-cols-2 gap-4 mb-8 animate-fade-in-delay-3">
             {[
-              { icon: '🎨', text: 'Image Generation' },
-              { icon: '💬', text: 'Smart Chat' },
-              { icon: '📊', text: 'Data Analysis' },
-              { icon: '🔍', text: 'AI Search' }
+              { icon: '🎨', text: t('app.features.imageGeneration') },
+              { icon: '💬', text: t('app.features.smartChat') },
+              { icon: '📊', text: t('app.features.dataAnalysis') },
+              { icon: '🔍', text: t('app.features.aiSearch') }
             ].map((feature, index) => (
               <div key={index} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-3 hover:bg-white/10 transition-all">
                 <div className="text-2xl mb-1">{feature.icon}</div>
@@ -82,7 +84,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
               </svg>
-              <span>Sign In to Continue</span>
+              <span>{t('auth.signInToContinue')}</span>
             </span>
             
             {/* Button Glow Effect */}
@@ -91,7 +93,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
           {/* Security Notice */}
           <p className="text-xs text-gray-500 mt-6 animate-fade-in-delay-5">
-            🔒 Secure authentication powered by Auth0
+            🔒 {t('auth.secureAuthentication')}
           </p>
         </div>
       </div>

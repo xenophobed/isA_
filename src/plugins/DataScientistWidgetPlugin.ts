@@ -54,7 +54,7 @@ export class DataScientistWidgetPlugin implements WidgetPlugin {
   // ============================================================================
 
   async onInit(): Promise<void> {
-    logger.info(LogCategory.SYSTEM, '📊 DataScientistWidgetPlugin: Initializing...');
+    logger.debug(LogCategory.SYSTEM, 'DataScientistWidgetPlugin: Initializing...');
   }
 
   onDestroy(): void {

@@ -2,6 +2,7 @@ import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
+import { AnalyticsProvider } from '../src/providers/AnalyticsProvider'
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
@@ -19,6 +20,11 @@ export default function App({ Component, pageProps }: AppProps) {
 
   // 移除重复的 Auth0Provider 包装
   // Auth0Provider 现在只在 src/app.tsx 中使用，避免双重包装
-  console.log('📄 _app.tsx: Rendering without duplicate Auth0 wrapper')
-  return <Component {...pageProps} />
+  // Rendering with AnalyticsProvider
+  
+  return (
+    <AnalyticsProvider>
+      <Component {...pageProps} />
+    </AnalyticsProvider>
+  )
 }

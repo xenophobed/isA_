@@ -55,7 +55,7 @@ export class HuntWidgetPlugin implements WidgetPlugin {
   // ============================================================================
 
   async onInit(): Promise<void> {
-    logger.info(LogCategory.SYSTEM, '🔍 HuntWidgetPlugin: Initializing...');
+    logger.debug(LogCategory.SYSTEM, 'HuntWidgetPlugin: Initializing...');
   }
 
   onDestroy(): void {

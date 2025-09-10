@@ -1,660 +1,448 @@
 /**
  * ============================================================================
- * Chat Service (chatService.ts) - Unified Chat API Service
+ * Chat Service - 聊天服务
  * ============================================================================
  * 
- * Core Responsibilities:
- * - Uses BaseApiService for robust network transport
- * - Built-in SSE data parsing (SSEProcessor logic)
- * - Provides clean callback interface for state management
- * - Supports text and multimodal messages
+ * 简化的3层架构:
+ * 1. Transport Layer: SSETransport - 处理 SSE 连接和原始数据
+ * 2. Parser Layer: AGUIEventParser - 解析事件为标准格式
+ * 3. Callback Layer: 直接调用回调函数
  * 
- * Architecture Benefits:
- * ✅ Transport: BaseApiService robust HTTP/SSE handling
- * ✅ Parsing: Built-in SSE event parsing, no global variable hack
- * ✅ Interface: Structured callbacks with parsed data
- * ✅ Separation: chatService=transport+parsing, Store=state management
- * 
- * vs Old Architecture:
- * Old: AIClient(fetch) → window.streamingParser(SSEProcessor) → useChatStore
- * New: ChatService(BaseApiService + built-in parsing) → useChatStore
+ * 核心特性:
+ * - 清晰的职责分离
+ * - 高性能事件处理
+ * - 完善的错误处理和连接管理
+ * - 类型安全的消息处理
  */
 
-import { BaseApiService } from './BaseApiService';
-import { config } from '../config';
-import { ChatServiceCallbacks, ChatMetadata } from '../types/chatTypes';
-import { SSEParser, SSEParserCallbacks } from './SSEParser';
-import { logger, LogCategory } from '../utils/logger';
+import { createSSETransport } from './transport/SSETransport';
+import { createAGUIEventParser } from './parsing/AGUIEventParser';
 
-// ================================================================================
-// New Architecture Imports (Optional/Feature-flagged)
-// ================================================================================
-import { chatServiceNew } from './ChatServiceNew';
-
-// ================================================================================
-// ChatService Class
-// ================================================================================
-
-export class ChatService {
-  private apiService: BaseApiService;
+// 定义标准的回调接口 - 扩展支持所有事件类型
+export interface ChatServiceCallbacks {
+  // 基础流程回调
+  onStreamStart?: (messageId: string, status?: string) => void;
+  onStreamContent?: (contentChunk: string) => void;
+  onStreamStatus?: (status: string) => void;
+  onStreamComplete?: (finalContent?: string) => void;
+  onError?: (error: Error) => void;
   
-  // ================================================================================
-  // New Architecture Feature Flag
-  // ================================================================================
-  private useNewArchitecture: boolean = process.env.NODE_ENV === 'development';
-
-  constructor(apiService?: BaseApiService) {
-    // Use provided or create dedicated agent service instance
-    this.apiService = apiService || new BaseApiService(config.api.baseUrl);
-  }
-
-  // ================================================================================
-  // Public Methods - Message Sending Interface
-  // ================================================================================
-
-  /**
-   * Send a message to the chat API with streaming response
-   * @param message - The message content
-   * @param metadata - Additional metadata (user_id, session_id, etc.)
-   * @param token - Authentication token from Auth0
-   * @param callbacks - Event callbacks for handling streaming responses
-   */
-  async sendMessage(
-    message: string,
-    metadata: ChatMetadata = {},
-    token: string,
-    callbacks: SSEParserCallbacks
-  ): Promise<void> {
-    // ================================================================================
-    // New Architecture Integration
-    // ================================================================================
-    if (this.useNewArchitecture) {
-      const payload = {
-        message,
-        user_id: metadata.user_id,
-        session_id: metadata.session_id || 'default',
-        prompt_name: metadata.prompt_name || null,
-        prompt_args: metadata.prompt_args || {}
-      };
-      
-      const url = `${config.api.baseUrl}/api/chat`;
-      
-      try {
-        return await chatServiceNew.sendMessageWithNewArchitecture(url, payload, callbacks as any, token);
-      } catch (error) {
-        console.warn('🔄 NEW_ARCHITECTURE: Failed, falling back to legacy:', error);
-        // Fall through to legacy implementation
-      }
-    }
-    
-    // ================================================================================
-    // Legacy Architecture Implementation
-    // ================================================================================
-    const startTime = Date.now();
-    
-    try {
-      logger.info(LogCategory.CHAT_FLOW, 'Starting chat request', {
-        messageLength: message.length,
-        metadata: {
-          ...metadata,
-          // Don't log sensitive data
-          user_id: metadata.user_id ? '[REDACTED]' : undefined,
-          session_id: metadata.session_id ? '[REDACTED]' : undefined
-        }
-      });
-
-      // Check if user is authenticated - this should NEVER be empty
-      const userId = metadata.user_id;
-      if (!userId) {
-        throw new Error('CHAT_SERVICE: No user_id provided. User must be authenticated before sending messages.');
-      }
-
-      // Prepare request body
-      const requestBody = JSON.stringify({
-        message,
-        user_id: userId,
-        session_id: metadata.session_id || 'default',
-        prompt_name: metadata.prompt_name || null,
-        prompt_args: metadata.prompt_args || {}
-      });
-
-      const url = `${config.api.baseUrl}/api/chat`;
-      
-      console.log('🌐 CHAT_SERVICE: Full request details:');
-      console.log('  URL:', url);
-      console.log('  Method: POST');
-      console.log('  Headers:', {
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Authorization': `Bearer ${token.substring(0, 20)}...` // Log partial token for debugging
-      });
-      console.log('  Body:', requestBody);
-      console.log('  Body length:', requestBody.length);
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Authorization': `Bearer ${token}`
-        },
-        body: requestBody
-      });
-
-      console.log('🌐 CHAT_SERVICE: Response status:', response.status);
-      console.log('🌐 CHAT_SERVICE: Response headers:', Object.fromEntries(response.headers.entries()));
-      console.log('🌐 CHAT_SERVICE: Response ok:', response.ok);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log('🌐 CHAT_SERVICE: Error response body:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
-      }
-
-      await this.processStreamingResponse(response, callbacks);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      callbacks.onError?.(new Error(`ChatService: ${errorMessage}`));
-    }
-  }
-
-  /**
-   * Send multimodal message (text + files)
-   */
-  async sendMultimodalMessage(
-    content: string,
-    files: File[] = [],
-    metadata: ChatMetadata = {},
-    token: string,
-    callbacks: SSEParserCallbacks
-  ): Promise<void> {
-    // ================================================================================
-    // New Architecture Integration
-    // ================================================================================
-    if (this.useNewArchitecture) {
-      const payload = {
-        message: content,
-        user_id: metadata.user_id || metadata.auth0_id,
-        session_id: metadata.session_id || 'default',
-        prompt_name: metadata.prompt_name || null,
-        prompt_args: metadata.prompt_args || {},
-        files: files.map(f => ({ name: f.name, size: f.size, type: f.type }))
-      };
-      
-      const url = `${config.api.baseUrl}/api/chat`;
-      
-      try {
-        return await chatServiceNew.sendMultimodalMessageWithNewArchitecture(url, payload, callbacks as any, token);
-      } catch (error) {
-        console.warn('🔄 NEW_ARCHITECTURE: Multimodal failed, falling back to legacy:', error);
-        // Fall through to legacy implementation
-      }
-    }
-    
-    // ================================================================================
-    // Legacy Architecture Implementation
-    // ================================================================================
-    try {
-      const endpoint = '/api/chat';
-      
-      if (files.length === 0) {
-        // Text-only message - use new API format
-        // Use exact same field order as successful curl request
-        const requestPayload = {
-          message: content,
-          session_id: metadata.session_id || 'test_session_fixed',
-          user_id: metadata.auth0_id || metadata.user_id || 'test_user_fixed',
-          prompt_name: metadata.prompt_name || null,
-          prompt_args: metadata.prompt_args || {}
-        };
-        
-        console.log('🌐 CHAT_SERVICE: Sending request payload:', JSON.stringify(requestPayload, null, 2));
-        console.log('🌐 CHAT_SERVICE: Original metadata:', JSON.stringify(metadata, null, 2));
-        console.log('🌐 CHAT_SERVICE: Request endpoint:', endpoint);
-        
-        await this.handleStreamingRequest(endpoint, requestPayload, callbacks);
-
-      } else {
-        // Multimodal message - use multimodal API endpoint for voice transcription support
-        const multimodalEndpoint = '/api/chat/multimodal';
-        
-        // Check if we have audio files for voice processing
-        const hasAudioFiles = files.some(file => file.type.startsWith('audio/'));
-        
-        const additionalData = {
-          message: content,
-          user_id: metadata.auth0_id || metadata.user_id || 'test_user',
-          session_id: metadata.session_id || 'default',
-          prompt_name: metadata.template_parameters?.template_id || null,
-          prompt_args: JSON.stringify(metadata.template_parameters?.prompt_args || {}),
-          // Add intelligent mode settings if available
-          proactive_enabled: metadata.intelligentMode?.mode === 'proactive' ? 'true' : 'false',
-          collaborative_enabled: metadata.intelligentMode?.mode === 'collaborative' || metadata.intelligentMode?.mode === 'proactive' ? 'true' : 'false',
-          confidence_threshold: metadata.intelligentMode?.confidence_threshold?.toString() || '0.7'
-        };
-
-        console.log('🎤 CHAT_SERVICE: Using multimodal endpoint for files', {
-          endpoint: multimodalEndpoint,
-          hasAudioFiles,
-          fileTypes: files.map(f => f.type),
-          intelligentMode: metadata.intelligentMode
-        });
-
-        await this.handleMultimodalStreamingRequest(multimodalEndpoint, files, additionalData, callbacks);
-      }
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      callbacks.onError?.(new Error(`ChatService: ${errorMessage}`));
-    }
-  }
-
-  /**
-   * Resume a chat session after HIL interrupt (based on actual 2025-08-16 tested API)
-   * @param sessionId - The session ID to resume
-   * @param userId - User ID 
-   * @param resumeValue - The user's response to the HIL interrupt
-   * @param token - Authentication token
-   * @param callbacks - Event callbacks for handling streaming responses
-   */
-  async resumeChat(
-    sessionId: string,
-    userId: string,
-    resumeValue: any,
-    token: string,
-    callbacks: SSEParserCallbacks
-  ): Promise<void> {
-    // ================================================================================
-    // New Architecture Integration
-    // ================================================================================
-    if (this.useNewArchitecture) {
-      const payload = {
-        session_id: sessionId,
-        user_id: userId,
-        resume_value: resumeValue
-      };
-      
-      const url = `${config.api.baseUrl}/api/chat/resume/${sessionId}`;
-      
-      try {
-        return await chatServiceNew.resumeHILWithNewArchitecture(url, payload, callbacks as any, token);
-      } catch (error) {
-        console.warn('🔄 NEW_ARCHITECTURE: HIL resume failed, falling back to legacy:', error);
-        // Fall through to legacy implementation
-      }
-    }
-    
-    // ================================================================================
-    // Legacy Architecture Implementation
-    // ================================================================================
-    const startTime = Date.now();
-    
-    try {
-      logger.info(LogCategory.CHAT_FLOW, 'Starting chat resume request', {
-        sessionId,
-        userId,
-        resumeValueType: typeof resumeValue
-      });
-
-      // Prepare request body based on actual tested API format
-      const requestBody = JSON.stringify({
-        session_id: sessionId,
-        user_id: userId,
-        resume_value: resumeValue
-      });
-
-      const url = `${config.api.baseUrl}/api/chat/resume`;
-      
-      console.log('🔄 CHAT_SERVICE: HIL Resume request details:');
-      console.log('  URL:', url);
-      console.log('  Method: POST');
-      console.log('  Headers:', {
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Authorization': `Bearer ${token.substring(0, 20)}...`
-      });
-      console.log('  Body:', requestBody);
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Authorization': `Bearer ${token}`
-        },
-        body: requestBody
-      });
-
-      console.log('🔄 CHAT_SERVICE: Resume response status:', response.status);
-      console.log('🔄 CHAT_SERVICE: Resume response headers:', Object.fromEntries(response.headers.entries()));
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log('🔄 CHAT_SERVICE: Resume error response body:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
-      }
-
-      // Process the streaming response with special handling for resume events
-      await this.processResumeStreamingResponse(response, callbacks, sessionId);
-      
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(LogCategory.CHAT_FLOW, 'Chat resume failed', { error: errorMessage, sessionId });
-      callbacks.onError?.(new Error(`ChatService Resume: ${errorMessage}`));
-    }
-  }
-
-  // ================================================================================
-  // Private Methods - Streaming Request Handling
-  // ================================================================================
-
-  /**
-   * Handle streaming text request
-   */
-  private async handleStreamingRequest(
-    endpoint: string,
-    data: any,
-    callbacks: ChatServiceCallbacks
-  ): Promise<void> {
-    try {
-      // Build full URL
-      const url = this.apiService['buildUrl'](endpoint);
-      
-      const requestBody = JSON.stringify(data);
-      console.log('🌐 CHAT_SERVICE: Full request details:');
-      console.log('  URL:', url);
-      console.log('  Method: POST');
-      console.log('  Headers:', {
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Authorization': 'Bearer dev_key_test'
-      });
-      console.log('  Body:', requestBody);
-      console.log('  Body length:', requestBody.length);
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Authorization': 'Bearer dev_key_test'
-        },
-        body: requestBody
-      });
-
-      console.log('🌐 CHAT_SERVICE: Response status:', response.status);
-      console.log('🌐 CHAT_SERVICE: Response headers:', Object.fromEntries(response.headers.entries()));
-      console.log('🌐 CHAT_SERVICE: Response ok:', response.ok);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log('🌐 CHAT_SERVICE: Error response body:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
-      }
-
-      await this.processStreamingResponse(response, callbacks);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      callbacks.onError?.(new Error(`Streaming request failed: ${errorMessage}`));
-    }
-  }
-
-  /**
-   * Handle multimodal streaming request with file upload
-   */
-  private async handleMultimodalStreamingRequest(
-    endpoint: string,
-    files: File[],
-    additionalData: any,
-    callbacks: ChatServiceCallbacks
-  ): Promise<void> {
-    try {
-      const formData = new FormData();
-      
-      // Add files
-      files.forEach((file, index) => {
-        if (file.type.startsWith('audio/')) {
-          formData.append('audio', file);
-        } else {
-          formData.append(`file_${index}`, file);
-        }
-      });
-
-      // Add additional data
-      Object.entries(additionalData).forEach(([key, value]) => {
-        formData.append(key, String(value));
-      });
-
-      // Build full URL  
-      const url = this.apiService['buildUrl'](endpoint);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Authorization': 'Bearer dev_key_test'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      await this.processStreamingResponse(response, callbacks);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      callbacks.onError?.(new Error(`Multimodal streaming failed: ${errorMessage}`));
-    }
-  }
-
-  /**
-   * Process streaming response body
-   */
-  private async processStreamingResponse(
-    response: Response,
-    callbacks: SSEParserCallbacks
-  ): Promise<void> {
-    if (!response.body) {
-      callbacks.onError?.(new Error('No response body'));
-      return;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.trim() && line.startsWith('data: ')) {
-            const dataContent = line.slice(6).trim();
-            
-            // Handle [DONE] marker
-            if (dataContent === '[DONE]') {
-              callbacks.onStreamComplete?.();
-              continue;
-            }
-            
-            // Parse and handle SSE event using SSEParser (恢复简洁的架构)
-            SSEParser.parseSSEEvent(dataContent, callbacks);
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-  }
-
-  /**
-   * Process streaming response specifically for HIL resume operations
-   * Handles special resume event types based on actual 2025-08-16 test data
-   */
-  private async processResumeStreamingResponse(
-    response: Response,
-    callbacks: SSEParserCallbacks,
-    sessionId: string
-  ): Promise<void> {
-    if (!response.body) {
-      callbacks.onError?.(new Error('No response body for resume'));
-      return;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    try {
-      let resumeStarted = false;
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.trim() && line.startsWith('data: ')) {
-            const dataContent = line.slice(6).trim();
-            
-            // Handle [DONE] marker
-            if (dataContent === '[DONE]') {
-              callbacks.onStreamComplete?.();
-              continue;
-            }
-            
-            try {
-              const eventData = JSON.parse(dataContent);
-              
-              // Handle special resume event types based on actual API responses
-              if (eventData.type === 'resume_start') {
-                resumeStarted = true;
-                callbacks.onStreamStatus?.('🔄 Resuming execution...');
-                console.log('🔄 CHAT_SERVICE: Resume started for session:', eventData.session_id);
-                continue;
-              }
-              
-              if (eventData.type === 'resume_end') {
-                callbacks.onStreamStatus?.('✅ Resume completed');
-                console.log('🔄 CHAT_SERVICE: Resume completed for session:', eventData.session_id);
-                continue;
-              }
-              
-              // Mark events as resumed for proper handling
-              if (resumeStarted && eventData.session_id === sessionId) {
-                eventData.resumed = true;
-              }
-              
-              // Parse using standard SSEParser with resume context
-              SSEParser.parseSSEEvent(dataContent, callbacks);
-              
-            } catch (parseError) {
-              console.warn('🔄 CHAT_SERVICE: Failed to parse resume event:', parseError);
-              // Fallback to standard parsing
-              SSEParser.parseSSEEvent(dataContent, callbacks);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('🔄 CHAT_SERVICE: Resume streaming error:', error);
-      callbacks.onError?.(error instanceof Error ? error : new Error(String(error)));
-    } finally {
-      reader.releaseLock();
-    }
-  }
-
-  // ================================================================================
-  // Utility Methods
-  // ================================================================================
-
-  /**
-   * Get execution status for a session/thread (based on actual 2025-08-16 tested API)
-   * @param sessionId - The session ID to check status for
-   * @param token - Authentication token
-   * @returns Promise with execution status data
-   */
-  async getExecutionStatus(sessionId: string, token: string): Promise<any> {
-    try {
-      const url = `${config.api.baseUrl}/api/execution/status/${sessionId}`;
-      
-      console.log('📊 CHAT_SERVICE: Getting execution status for session:', sessionId);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
-      }
-
-      const statusData = await response.json();
-      
-      console.log('📊 CHAT_SERVICE: Execution status received:', statusData);
-      logger.info(LogCategory.CHAT_FLOW, 'Execution status retrieved', {
-        sessionId,
-        status: statusData.status,
-        currentNode: statusData.current_node,
-        checkpoints: statusData.checkpoints
-      });
-      
-      return statusData;
-      
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(LogCategory.CHAT_FLOW, 'Failed to get execution status', { 
-        error: errorMessage,
-        sessionId
-      });
-      throw new Error(`ChatService Status: ${errorMessage}`);
-    }
-  }
-
-  /**
-   * Cancel all active requests
-   */
-  cancelAllRequests(): void {
-    this.apiService.cancelRequest();
-    console.log('🛑 ChatService: All requests cancelled');
-  }
-
-  /**
-   * Set authentication token
-   */
-  setAuthToken(token: string, type: 'Bearer' | 'API-Key' | 'Basic' = 'Bearer'): void {
-    this.apiService.setAuthToken(token, type);
-  }
-
-  /**
-   * Clear authentication
-   */
-  clearAuth(): void {
-    this.apiService.clearAuth();
-  }
+  // 工具执行回调
+  onToolStart?: (toolName: string, toolCallId?: string, parameters?: any) => void;
+  onToolExecuting?: (toolName: string, status?: string, progress?: number) => void;
+  onToolCompleted?: (toolName: string, result?: any, error?: string, durationMs?: number) => void;
+  
+  // LLM相关回调
+  onLLMCompleted?: (model?: string, tokenCount?: number, finishReason?: string) => void;
+  
+  // 系统状态回调
+  onNodeUpdate?: (nodeName: string, status: 'started' | 'completed' | 'failed', data?: any) => void;
+  onStateUpdate?: (stateData: any, node?: string) => void;
+  onPaused?: (reason?: string, checkpointId?: string) => void;
+  
+  // 业务功能回调
+  onMemoryUpdate?: (memoryData: any, operation: string) => void;
+  onBillingUpdate?: (billingData: { creditsRemaining: number; totalCredits: number; modelCalls: number; toolCalls: number; cost?: number }) => void;
+  
+  // Resume相关回调
+  onResumeStart?: (resumedFrom?: string, checkpointId?: string) => void;
+  onResumeEnd?: (success: boolean, result?: any) => void;
+  
+  // 任务管理回调
+  onTaskProgress?: (progress: any) => void;
+  onTaskListUpdate?: (tasks: any[]) => void;
+  onTaskStatusUpdate?: (taskId: string, status: string, result?: any) => void;
+  
+  // HIL回调
+  onHILInterruptDetected?: (hilEvent: any) => void;
+  onHILCheckpointCreated?: (checkpoint: any) => void;
+  onHILExecutionStatusChanged?: (statusData: any) => void;
+  
+  // Artifact回调
+  onArtifactCreated?: (artifact: any) => void;
+  onArtifactUpdated?: (artifact: any) => void;
 }
 
 // ================================================================================
-// Default Instance Export
+// 简化的 ChatService 实现
 // ================================================================================
 
-// Using AI-dedicated BaseApiService instance
-export const chatService = new ChatService();
+export class ChatService {
+  private readonly name = 'chat_service';
+  private readonly version = '3.0.0';
+  
+  /**
+   * 发送消息 - 符合 how_to_chat.md 标准格式
+   */
+  async sendMessage(
+    message: string,
+    metadata: {
+      user_id: string;
+      session_id: string;
+      prompt_name?: string | null;
+      prompt_args?: any;
+      proactive_enabled?: boolean;
+      collaborative_enabled?: boolean;
+      confidence_threshold?: number;
+      proactive_predictions?: any;
+    },
+    token: string,
+    callbacks: ChatServiceCallbacks
+  ): Promise<void> {
+    // Starting message processing
+    
+    try {
+      // 构建标准的Chat API payload (符合 how_to_chat.md)
+      const payload = {
+        message,
+        user_id: metadata.user_id,
+        session_id: metadata.session_id,
+        prompt_name: metadata.prompt_name || null,
+        prompt_args: metadata.prompt_args || {},
+        proactive_enabled: metadata.proactive_enabled || false,
+        collaborative_enabled: metadata.collaborative_enabled || false,
+        confidence_threshold: metadata.confidence_threshold || 0.7,
+        proactive_predictions: metadata.proactive_predictions || null
+      };
 
-export default chatService;
+      // 使用固定的Chat API endpoint
+      const endpoint = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080'}/api/chat`;
+      
+      // 1. 创建 SSE 传输层
+      const transport = createSSETransport({
+        url: endpoint,
+        timeout: 300000, // 5分钟超时
+        retryConfig: {
+          maxRetries: 3,
+          retryDelay: 1000
+        }
+      });
+      
+      // 2. 创建 AGUI 事件解析器
+      const aguiParser = createAGUIEventParser({
+        enableLegacyConversion: true,
+        validateEventStructure: false,
+        autoFillMissingFields: true,
+        preserveRawData: true
+      });
+      
+      // 3. 建立连接
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+        'Cache-Control': 'no-cache'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const connection = await transport.connect(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      
+      // Connection established, starting data processing
+      
+      // 4. 处理数据流
+      return new Promise<void>((resolve, reject) => {
+        let streamEnded = false;
+        
+        // 处理完成时关闭连接
+        const handleComplete = async (finalContent?: string) => {
+          if (!streamEnded) {
+            streamEnded = true;
+            await connection.close();
+            callbacks.onStreamComplete?.(finalContent);
+            resolve();
+          }
+        };
+        
+        // 处理错误时关闭连接
+        const handleError = async (error: Error) => {
+          if (!streamEnded) {
+            streamEnded = true;
+            await connection.close();
+            callbacks.onError?.(error);
+            reject(error);
+          }
+        };
+        
+        // 处理数据流
+        const processData = async () => {
+          try {
+            for await (const rawData of connection.stream()) {
+              
+              // 解析 SSE 数据
+              const lines = rawData.split('\n');
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const dataContent = line.slice(6).trim();
+                  
+                  // 处理结束标记
+                  if (dataContent === '[DONE]') {
+                    await handleComplete();
+                    return;
+                  }
+                  
+                  try {
+                    const eventData = JSON.parse(dataContent);
+                    
+                    // 通过 AGUI 解析器处理
+                    const aguiEvent = aguiParser.parse(eventData);
+                    if (!aguiEvent) continue;
+                    
+                    // 直接调用相应的回调函数
+                    this.handleAGUIEvent(aguiEvent, callbacks);
+                    
+                  } catch (parseError) {
+                    console.warn('🔗 CHAT_SERVICE: Failed to parse event:', parseError);
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+              console.log('🔗 CHAT_SERVICE: Data processing aborted normally');
+            } else {
+              console.error('🔗 CHAT_SERVICE: Data processing error:', error);
+              await handleError(error instanceof Error ? error : new Error(String(error)));
+            }
+          }
+        };
+        
+        // 启动数据处理
+        processData();
+      });
+      
+    } catch (error) {
+      console.error('🚀 CHAT_SERVICE: Failed to initialize:', error);
+      callbacks.onError?.(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
+  /**
+   * 处理 AGUI 事件，直接调用相应回调 - 支持所有事件类型
+   */
+  private handleAGUIEvent(event: any, callbacks: ChatServiceCallbacks): void {
+    // 记录事件处理（开发模式）
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🎯 CHAT_SERVICE: Processing AGUI event:', event.type, event);
+    }
+    
+    switch (event.type) {
+      // 基础流程事件
+      case 'run_started':
+        callbacks.onStreamStart?.(event.message_id || event.run_id, 'Starting...');
+        break;
+        
+      case 'text_delta':
+      case 'text_message_content':
+        if (event.delta || event.content) {
+          callbacks.onStreamContent?.(event.delta || event.content);
+        }
+        break;
+        
+      case 'run_finished':
+      case 'run_completed':
+        callbacks.onStreamComplete?.(event.content || event.result);
+        break;
+        
+      case 'run_error':
+      case 'error':
+        callbacks.onError?.(new Error(event.error?.message || event.message || 'Unknown error'));
+        break;
+        
+      case 'stream_done':
+        callbacks.onStreamComplete?.();
+        break;
+        
+      // 工具执行事件
+      case 'tool_call_start':
+        callbacks.onToolStart?.(event.tool_name, event.tool_call_id, event.parameters);
+        break;
+        
+      case 'tool_executing':
+        callbacks.onToolExecuting?.(event.tool_name, event.status, event.progress);
+        break;
+        
+      case 'tool_call_end':
+        callbacks.onToolCompleted?.(event.tool_name, event.result, event.error, event.duration_ms);
+        break;
+        
+      // LLM相关事件
+      case 'llm_completed':
+        callbacks.onLLMCompleted?.(event.model, event.token_count, event.finish_reason);
+        break;
+        
+      // 系统状态事件
+      case 'node_update':
+        callbacks.onNodeUpdate?.(event.node_name, event.status, { 
+          credits: event.credits, 
+          messages_count: event.messages_count, 
+          data: event.data 
+        });
+        break;
+        
+      case 'state_update':
+        callbacks.onStateUpdate?.(event.state_data, event.node);
+        break;
+        
+      case 'paused':
+        callbacks.onPaused?.(event.reason, event.checkpoint_id);
+        break;
+        
+      // 业务功能事件
+      case 'memory_update':
+        callbacks.onMemoryUpdate?.(event.memory_data, event.operation);
+        break;
+        
+      case 'billing':
+        callbacks.onBillingUpdate?.({
+          creditsRemaining: event.credits_remaining,
+          totalCredits: event.total_credits,
+          modelCalls: event.model_calls,
+          toolCalls: event.tool_calls,
+          cost: event.cost
+        });
+        break;
+        
+      // Resume事件
+      case 'resume_start':
+        callbacks.onResumeStart?.(event.resumed_from, event.checkpoint_id);
+        break;
+        
+      case 'resume_end':
+        callbacks.onResumeEnd?.(event.success, event.result);
+        break;
+        
+      // 任务管理事件
+      case 'task_progress_update':
+        callbacks.onTaskProgress?.(event.task);
+        break;
+        
+      // HIL事件
+      case 'hil_interrupt_detected':
+        callbacks.onHILInterruptDetected?.(event);
+        break;
+        
+      case 'hil_checkpoint_created':
+        callbacks.onHILCheckpointCreated?.(event);
+        break;
+        
+      // Artifact事件
+      case 'artifact_created':
+        callbacks.onArtifactCreated?.(event.artifact);
+        break;
+        
+      case 'artifact_updated':
+        callbacks.onArtifactUpdated?.(event.artifact);
+        break;
+        
+      // 状态更新
+      case 'status_update':
+        callbacks.onStreamStatus?.(event.status);
+        break;
+        
+      // 自定义事件（包含Resume标记）
+      case 'custom_event':
+        if (event.metadata?.resumed) {
+          // 处理带Resume标记的事件
+          callbacks.onStreamStatus?.(`🔄 Resumed: ${event.metadata.custom_type || 'Unknown event'}`);
+        }
+        // 根据custom_type进一步处理
+        if (event.metadata?.custom_type) {
+          this.handleCustomEvent(event, callbacks);
+        }
+        break;
+        
+      default:
+        console.warn('🚨 CHAT_SERVICE: Unhandled AGUI event type:', event.type, event);
+        break;
+    }
+  }
+  
+  /**
+   * 处理自定义事件类型
+   */
+  private handleCustomEvent(event: any, callbacks: ChatServiceCallbacks): void {
+    const customType = event.metadata?.custom_type;
+    const customData = event.metadata?.custom_data || {};
+    
+    switch (customType) {
+      case 'graph_update':
+        callbacks.onStateUpdate?.(event.metadata.graph_data);
+        break;
+        
+      case 'billing':
+      case 'credits':
+        callbacks.onBillingUpdate?.({
+          creditsRemaining: customData.creditsRemaining || customData.credits_remaining || 0,
+          totalCredits: customData.totalCredits || customData.total_credits || 0,
+          modelCalls: customData.modelCalls || customData.model_calls || 0,
+          toolCalls: customData.toolCalls || customData.tool_calls || 0,
+          cost: customData.cost
+        });
+        break;
+        
+      default:
+        console.log('🔍 CHAT_SERVICE: Custom event:', customType, customData);
+        break;
+    }
+  }
+  
+  /**
+   * 发送多模态消息
+   */
+  async sendMultimodalMessage(
+    message: string,
+    metadata: {
+      user_id: string;
+      session_id: string;
+      prompt_name?: string | null;
+      prompt_args?: any;
+      proactive_enabled?: boolean;
+      collaborative_enabled?: boolean;
+      confidence_threshold?: number;
+      proactive_predictions?: any;
+    },
+    token: string,
+    callbacks: ChatServiceCallbacks,
+    files?: File[]
+  ): Promise<void> {
+    console.log('🖼️ CHAT_SERVICE: Starting multimodal message');
+    
+    // TODO: 实现多模态文件上传逻辑
+    // 目前复用text chat逻辑
+    return this.sendMessage(message, metadata, token, callbacks);
+  }
+  
+  /**
+   * 恢复HIL会话
+   */
+  async resumeHIL(
+    message: string,
+    metadata: {
+      user_id: string;
+      session_id: string;
+      prompt_name?: string | null;
+      prompt_args?: any;
+      proactive_enabled?: boolean;
+      collaborative_enabled?: boolean;
+      confidence_threshold?: number;
+      proactive_predictions?: any;
+    },
+    token: string,
+    callbacks: ChatServiceCallbacks
+  ): Promise<void> {
+    console.log('⏭️ CHAT_SERVICE: Resuming HIL session');
+    
+    // HIL恢复使用相同的架构模式
+    return this.sendMessage(message, metadata, token, callbacks);
+  }
+}
+
+// 导出实例
+export const chatService = new ChatService();

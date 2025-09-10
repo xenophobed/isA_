@@ -19,7 +19,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useCurrentTasks, useTaskProgress, useIsExecutingPlan, useHasExecutedTasks, useChatMessages } from '../../../stores/useChatStore';
 import { useTaskHandler } from '../../core/TaskHandler';
-import { TaskProgress, TaskItem } from '../../../api/SSEParser';
+import { TaskProgress, TaskItem } from '../../../types/taskTypes';
 
 export interface ChatEmbeddedTaskPanelProps {
   className?: string;
@@ -97,7 +97,10 @@ export const ChatEmbeddedTaskPanel: React.FC<ChatEmbeddedTaskPanelProps> = ({
   // Demo progress calculation
   const demoProgress = useMemo(() => {
     if (taskProgress) {
-      return taskProgress;
+      return {
+        ...taskProgress,
+        toolName: taskProgress.currentStepName || 'AI Assistant' // 使用currentStepName作为toolName
+      };
     }
     
     if (isExecutingPlan || hasStreamingMessage) {
@@ -106,7 +109,8 @@ export const ChatEmbeddedTaskPanel: React.FC<ChatEmbeddedTaskPanelProps> = ({
         description: 'Generating intelligent response...',
         currentStep: 3,
         totalSteps: 4,
-        status: 'running' as const
+        status: 'running' as const,
+        percentage: 75
       };
     }
     
@@ -296,7 +300,9 @@ export const ChatEmbeddedTaskPanel: React.FC<ChatEmbeddedTaskPanelProps> = ({
                   
                   {task.result && (
                     <div className="text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded mb-2 line-clamp-1 sm:line-clamp-none">
-                      Result: {task.result}
+                      Result: {typeof task.result === 'string' ? task.result : 
+                        task.result.success ? (task.result.data ? JSON.stringify(task.result.data) : 'Success') :
+                        (task.result.error || 'Failed')}
                     </div>
                   )}
                   
@@ -304,10 +310,10 @@ export const ChatEmbeddedTaskPanel: React.FC<ChatEmbeddedTaskPanelProps> = ({
                     <div className="w-full task-progress-bar h-2 bg-gray-700 rounded-full mt-2">
                       <div 
                         className="h-full bg-blue-400 rounded-full transition-all duration-300"
-                        style={{ width: `${task.progress || 0}%` }}
+style={{ width: `${typeof task.progress === 'number' ? task.progress : task.progress?.percentage || 0}%` }}
                       />
                       <div className="text-xs text-blue-400 mt-1 sm:hidden">
-                        {task.progress || 0}%
+{typeof task.progress === 'number' ? task.progress : task.progress?.percentage || 0}%
                       </div>
                     </div>
                   )}

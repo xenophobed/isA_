@@ -19,6 +19,7 @@
 import React, { useState } from 'react';
 import { DreamWidgetParams } from '../../../types/widgetTypes';
 import { BaseWidget, OutputHistoryItem, EditAction, ManagementAction, EmptyStateConfig } from './BaseWidget';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 // Atomic Image Intelligence Service modes (copied from dream_sidebar.tsx)
 interface ImageMode {
@@ -33,121 +34,122 @@ interface ImageMode {
   requiresImage: boolean;
 }
 
-const imageModes: ImageMode[] = [
+// Create a factory function that uses translation
+const createImageModes = (t: any): ImageMode[] => [
   {
     id: 'text_to_image',
-    name: 'Create from Text',
-    description: 'Generate entirely new images from your description',
+    name: t('dreamWidget.modes.textToImage.name'),
+    description: t('dreamWidget.modes.textToImage.description'),
     icon: '✨',
     cost: '$3/1000 images',
     estimatedTime: '10-15 seconds',
-    useCase: 'Perfect for: Artwork, concepts, creative ideas',
+    useCase: t('dreamWidget.modes.textToImage.useCase'),
     keywords: ['create', 'generate', 'new', 'imagine', 'design', 'art'],
     requiresImage: false
   },
   {
     id: 'image_to_image',
-    name: 'Transform Image',
-    description: 'Modify an existing image based on your description',
+    name: t('dreamWidget.modes.imageToImage.name'),
+    description: t('dreamWidget.modes.imageToImage.description'),
     icon: '🔄',
     cost: '$0.04/image',
     estimatedTime: '15-20 seconds',
-    useCase: 'Perfect for: Editing, variations, improvements',
+    useCase: t('dreamWidget.modes.imageToImage.useCase'),
     keywords: ['modify', 'change', 'edit', 'transform', 'improve'],
     requiresImage: true
   },
   {
     id: 'style_transfer',
-    name: 'Change Style',
-    description: 'Apply artistic styles to your images',
+    name: t('dreamWidget.modes.styleTransfer.name'),
+    description: t('dreamWidget.modes.styleTransfer.description'),
     icon: '🎨',
     cost: '$0.04/image',
     estimatedTime: '15-20 seconds',
-    useCase: 'Perfect for: Artistic effects, style matching',
+    useCase: t('dreamWidget.modes.styleTransfer.useCase'),
     keywords: ['style', 'artistic', 'painting', 'effect', 'filter'],
     requiresImage: true
   },
   {
     id: 'sticker_generation',
-    name: 'Make Stickers',
-    description: 'Create fun stickers from images or text',
+    name: t('dreamWidget.modes.stickerGeneration.name'),
+    description: t('dreamWidget.modes.stickerGeneration.description'),
     icon: '🏷️',
     cost: '$0.0024/image',
     estimatedTime: '10 seconds',
-    useCase: 'Perfect for: Chat stickers, emojis, fun graphics',
+    useCase: t('dreamWidget.modes.stickerGeneration.useCase'),
     keywords: ['sticker', 'emoji', 'cute', 'cartoon', 'fun'],
     requiresImage: false
   },
   {
     id: 'face_swap',
-    name: 'Swap Faces',
-    description: 'Replace faces in images naturally',
+    name: t('dreamWidget.modes.faceSwap.name'),
+    description: t('dreamWidget.modes.faceSwap.description'),
     icon: '👥',
     cost: '$0.04/image',
     estimatedTime: '20-25 seconds',
-    useCase: 'Perfect for: Fun photos, character changes',
+    useCase: t('dreamWidget.modes.faceSwap.useCase'),
     keywords: ['face', 'swap', 'replace', 'person', 'character'],
     requiresImage: true
   },
   {
     id: 'professional_headshot',
-    name: 'Pro Headshots',
-    description: 'Create professional headshots from casual photos',
+    name: t('dreamWidget.modes.professionalHeadshot.name'),
+    description: t('dreamWidget.modes.professionalHeadshot.description'),
     icon: '👔',
     cost: '$0.04/image',
     estimatedTime: '20-25 seconds',
-    useCase: 'Perfect for: LinkedIn, resumes, business cards',
+    useCase: t('dreamWidget.modes.professionalHeadshot.useCase'),
     keywords: ['professional', 'headshot', 'business', 'linkedin', 'formal'],
     requiresImage: true
   },
   {
     id: 'photo_inpainting',
-    name: 'Remove Objects',
-    description: 'Remove unwanted objects or fill in missing parts',
+    name: t('dreamWidget.modes.photoInpainting.name'),
+    description: t('dreamWidget.modes.photoInpainting.description'),
     icon: '🔧',
     cost: '$0.04/image',
     estimatedTime: '15-20 seconds',
-    useCase: 'Perfect for: Photo cleanup, object removal',
+    useCase: t('dreamWidget.modes.photoInpainting.useCase'),
     keywords: ['remove', 'erase', 'clean', 'fix', 'repair', 'fill'],
     requiresImage: true
   },
   {
     id: 'photo_outpainting',
-    name: 'Extend Images',
-    description: 'Expand image boundaries with AI-generated content',
+    name: t('dreamWidget.modes.photoOutpainting.name'),
+    description: t('dreamWidget.modes.photoOutpainting.description'),
     icon: '📐',
     cost: '$0.04/image',
     estimatedTime: '20-25 seconds',
-    useCase: 'Perfect for: Expanding scenes, changing aspect ratios',
+    useCase: t('dreamWidget.modes.photoOutpainting.useCase'),
     keywords: ['extend', 'expand', 'widen', 'enlarge', 'border'],
     requiresImage: true
   },
   {
     id: 'emoji_generation',
-    name: 'Custom Emojis',
-    description: 'Generate custom emoji-style images',
+    name: t('dreamWidget.modes.emojiGeneration.name'),
+    description: t('dreamWidget.modes.emojiGeneration.description'),
     icon: '😊',
     cost: '$0.0024/image',
     estimatedTime: '8-10 seconds',
-    useCase: 'Perfect for: Custom reactions, brand emojis',
+    useCase: t('dreamWidget.modes.emojiGeneration.useCase'),
     keywords: ['emoji', 'reaction', 'expression', 'custom', 'face'],
     requiresImage: false
   }
 ];
 
 // Smart mode detection based on user input (exact copy from dream_sidebar.tsx)
-const detectBestMode = (input: string, hasImage: boolean): ImageMode => {
+const detectBestMode = (input: string, hasImage: boolean, modes: ImageMode[]): ImageMode => {
   const lowerInput = input.toLowerCase();
   
   // Find modes that match keywords and image requirements
-  const possibleModes = imageModes.filter(mode => {
+  const possibleModes = modes.filter(mode => {
     const keywordMatch = mode.keywords.some(keyword => lowerInput.includes(keyword));
     const imageRequirementMet = !mode.requiresImage || hasImage;
     return keywordMatch && imageRequirementMet;
   });
   
   // Return best match or default to text-to-image
-  return possibleModes[0] || imageModes[0];
+  return possibleModes[0] || modes[0];
 };
 
 interface DreamWidgetProps {
@@ -178,6 +180,11 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
   onGenerateImage,
   onClearImage
 }) => {
+  const { t } = useTranslation();
+  
+  // Get localized image modes
+  const imageModes = createImageModes(t);
+  
   // Modern state management with enhanced parameters
   const [prompt, setPrompt] = useState('');
   const [selectedMode, setSelectedMode] = useState<ImageMode>(imageModes[0]);
@@ -196,7 +203,7 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
   // Real-time mode recommendations (exact copy from dream_sidebar.tsx)
   React.useEffect(() => {
     if (prompt.trim()) {
-      const bestMode = detectBestMode(prompt, !!uploadedImage);
+      const bestMode = detectBestMode(prompt, !!uploadedImage, imageModes);
       if (bestMode.id !== selectedMode.id) {
         setSelectedMode(bestMode);
         console.log('🎨 Mode recommendation updated:', bestMode.id);
@@ -210,7 +217,7 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
     
     // Check if mode requires image but none is uploaded
     if (selectedMode.requiresImage && !uploadedImage) {
-      alert(`${selectedMode.name} requires an uploaded image. Please upload an image first.`);
+      alert(`${selectedMode.name} ${t('dreamWidget.ui.noImageSelected')}`);
       return;
     }
 
@@ -255,7 +262,7 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
         
         // Update mode recommendation based on having an image
         if (prompt.trim()) {
-          const bestMode = detectBestMode(prompt, true);
+          const bestMode = detectBestMode(prompt, true, imageModes);
           setSelectedMode(bestMode);
           console.log('🎨 Mode updated after image upload:', bestMode.id);
         }
@@ -293,8 +300,8 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
             setPrompt(newValue);
           }}
           placeholder={selectedMode.requiresImage 
-            ? `Describe changes for ${selectedMode.name.toLowerCase()}...`
-            : "Describe what you want to create..."}
+            ? t('dreamWidget.ui.placeholderImage')
+            : t('dreamWidget.ui.placeholderText')}
           className="w-full p-2 bg-white/5 border border-white/10 rounded text-white placeholder-white/40 focus:outline-none focus:border-blue-500 resize-none text-sm"
           rows={2}
         />
@@ -310,7 +317,7 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
         {uploadedImage && (
           <div className="flex items-center gap-2 p-2 bg-white/5 border border-white/10 rounded">
             <img src={uploadedImage} alt="Uploaded" className="w-6 h-6 object-cover rounded" />
-            <span className="text-xs text-white/60">Image uploaded</span>
+            <span className="text-xs text-white/60">{t('dreamWidget.ui.uploadImage')}</span>
             <button 
               onClick={() => setUploadedImage(null)}
               className="ml-auto text-xs text-white/60 hover:text-white"
@@ -581,12 +588,12 @@ const DreamInputArea: React.FC<DreamWidgetProps> = ({
         {isGenerating ? (
           <>
             <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-            Processing...
+            {t('common.loading')}
           </>
         ) : (
           <>
             <span>{selectedMode.icon}</span>
-            Generate with {selectedMode.name}
+            {t('dreamWidget.ui.generateButton')} {selectedMode.name}
           </>
         )}
       </button>
@@ -612,12 +619,16 @@ export const DreamWidget: React.FC<DreamWidgetProps> = ({
   onClearHistory,
   onBack
 }) => {
+  const { t } = useTranslation();
+  
+  // Get localized image modes
+  const imageModes = createImageModes(t);
   
   // Simplified edit actions for generated images - only essential ones
   const editActions: EditAction[] = [
     {
       id: 'download',
-      label: 'Save',
+      label: t('dreamWidget.ui.downloadImage'),
       icon: '💾',
       onClick: (content) => {
         if (typeof content === 'string' && (content.startsWith('data:') || content.startsWith('http'))) {

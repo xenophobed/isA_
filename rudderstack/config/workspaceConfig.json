@@ -1,0 +1,42 @@
+{
+  "sources": [
+    {
+      "id": "1pYpnSEfaRJmdyfF4tuvJBw5gu8",
+      "name": "JavaScript Source",
+      "writeKey": "your-dev-write-key",
+      "enabled": true,
+      "sourceDefinitionId": "1aIXqM806xAVm92nx07YwKbRrO9",
+      "config": {},
+      "destinations": [
+        {
+          "id": "1pYpnSEfaRJmdyfF4tuvJBw5gu9",
+          "name": "Webhook Destination",
+          "enabled": true,
+          "destinationDefinitionId": "1aL6wZM906ftQHKnADhWStPKh2h",
+          "config": {
+            "webhookUrl": "http://host.docker.internal:5173/api/analytics/webhook",
+            "webhookMethod": "POST",
+            "headers": {}
+          },
+          "transformations": [],
+          "isProcessorEnabled": true,
+          "isConnectionEnabled": true
+        }
+      ],
+      "dgSourceTrackingPlanConfig": {
+        "sourceId": "",
+        "trackingPlan": {
+          "id": "",
+          "version": 0
+        }
+      }
+    }
+  ],
+  "libraries": [],
+  "connectionFlags": {
+    "url": "https://api.rudderlabs.com",
+    "services": {
+      "warehouse": "http://rudderstack-backend:8080"
+    }
+  }
+}

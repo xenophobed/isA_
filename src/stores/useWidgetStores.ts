@@ -435,6 +435,119 @@ export const useKnowledgeWidgetStore = createBaseWidgetStore(
 export type KnowledgeWidgetStore = KnowledgeSpecificState & KnowledgeSpecificActions;
 
 // ============================================================================
+// Custom Automation Widget State (Business Process Automation)
+// ============================================================================
+
+interface AutomationSpecificState {
+  currentTemplate: string | null;
+  automationResults: any[];
+  processStatus: 'idle' | 'configuring' | 'running' | 'completed' | 'error';
+  currentStep: number;
+  totalSteps: number;
+}
+
+interface AutomationSpecificActions {
+  setCurrentTemplate: (template: string | null) => void;
+  setAutomationResults: (results: any[]) => void;
+  setProcessStatus: (status: 'idle' | 'configuring' | 'running' | 'completed' | 'error') => void;
+  setCurrentStep: (step: number) => void;
+  setTotalSteps: (total: number) => void;
+}
+
+// Create CustomAutomation store using BaseWidgetStore factory
+export const useCustomAutomationWidgetStore = createBaseWidgetStore(
+  // Widget configuration
+  {
+    widgetType: 'custom_automation',
+    logEmoji: '🤖',
+    defaultTemplateName: 'automation_workflow'
+  },
+  
+  // Specific initial state
+  {
+    currentTemplate: null,
+    automationResults: [],
+    processStatus: 'idle',
+    currentStep: 0,
+    totalSteps: 0
+  },
+  
+  // Specific actions factory
+  (set: any, get: any, helpers: any) => ({
+    setCurrentTemplate: (template: string | null) => {
+      set((state: any) => ({ ...state, currentTemplate: template }));
+      helpers.logger.debug('ARTIFACT_CREATION', `${helpers.config.logEmoji} Automation template set`, { 
+        template 
+      });
+    },
+    setAutomationResults: (results: any[]) => {
+      set((state: any) => ({ ...state, automationResults: results }));
+      helpers.logger.debug('ARTIFACT_CREATION', `${helpers.config.logEmoji} Automation results updated`, { 
+        resultCount: results.length 
+      });
+    },
+    setProcessStatus: (status: 'idle' | 'configuring' | 'running' | 'completed' | 'error') => {
+      set((state: any) => ({ ...state, processStatus: status }));
+      helpers.logger.debug('ARTIFACT_CREATION', `${helpers.config.logEmoji} Process status changed`, { 
+        status 
+      });
+    },
+    setCurrentStep: (step: number) => {
+      set((state: any) => ({ ...state, currentStep: step }));
+    },
+    setTotalSteps: (total: number) => {
+      set((state: any) => ({ ...state, totalSteps: total }));
+    }
+  }),
+  
+  // Custom result handlers
+  {
+    buildTemplateParams: (params: any) => {
+      // Build automation template parameters based on input
+      return {
+        templateId: params.templateId,
+        inputs: params.inputs,
+        mode: params.mode || 'guided',
+        chatContext: params.chatContext
+      };
+    },
+    onMessageComplete: (completeMessage?: string, params?: any, helpers?: any, get?: any) => {
+      const store = get();
+      const setAutomationResults = store.setAutomationResults;
+      const setProcessStatus = store.setProcessStatus;
+      
+      if (completeMessage && helpers) {
+        // Process automation results from message
+        try {
+          const results = JSON.parse(completeMessage);
+          if (results.automationResults) {
+            setAutomationResults(results.automationResults);
+            setProcessStatus('completed');
+          }
+        } catch (error) {
+          // Fallback to text extraction
+          extractTextFromMessage(completeMessage, setAutomationResults, helpers);
+          setProcessStatus('completed');
+        }
+      }
+    },
+    onArtifactCreated: (artifact: any, params: any, helpers: any, get: any) => {
+      const store = get();
+      const setAutomationResults = store.setAutomationResults;
+      const setProcessStatus = store.setProcessStatus;
+      
+      if (artifact.content && artifact.type === 'data') {
+        setAutomationResults([artifact.content]);
+        setProcessStatus('completed');
+        helpers.markWithArtifacts();
+      }
+    }
+  }
+);
+
+export type CustomAutomationWidgetStore = AutomationSpecificState & AutomationSpecificActions;
+
+// ============================================================================
 // 选择性订阅 Widget Hooks - 避免流数据重复处理
 // ============================================================================
 
@@ -547,6 +660,7 @@ export const clearAllWidgetData = () => {
   useOmniWidgetStore.getState().clearData();
   useDataScientistWidgetStore.getState().clearData();
   useKnowledgeWidgetStore.getState().clearData();
+  useCustomAutomationWidgetStore.getState().clearData();
   logger.debug(LogCategory.ARTIFACT_CREATION, 'All widget data cleared');
 };
 
