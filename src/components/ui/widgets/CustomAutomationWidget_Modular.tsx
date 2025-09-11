@@ -98,9 +98,9 @@ export const CustomAutomationWidget_Modular: React.FC<CustomAutomationWidgetProp
     try {
       setActiveMode('running');
       await onStartAutomation(request);
-      logger.info(LogCategory.WIDGET, 'Automation started', { templateId: request.templateId });
+      logger.info(LogCategory.ARTIFACT_CREATION, 'Automation started', { templateId: request.templateId });
     } catch (error) {
-      logger.error(LogCategory.WIDGET, 'Failed to start automation', error);
+      logger.error(LogCategory.ARTIFACT_CREATION, 'Failed to start automation', error);
       setActiveMode('configure'); // Return to configuration on error
     }
   }, [onStartAutomation]);
@@ -109,17 +109,17 @@ export const CustomAutomationWidget_Modular: React.FC<CustomAutomationWidgetProp
   const handleExecutionCancel = useCallback(() => {
     // Cancel current execution
     setActiveMode('results');
-    logger.info(LogCategory.WIDGET, 'Execution cancelled');
+    logger.info(LogCategory.ARTIFACT_CREATION, 'Execution cancelled');
   }, []);
 
   const handleExecutionRetry = useCallback((stepId?: string) => {
     // Retry execution or specific step
-    logger.info(LogCategory.WIDGET, 'Execution retry', { stepId });
+    logger.info(LogCategory.ARTIFACT_CREATION, 'Execution retry', { stepId });
   }, []);
 
   const handleStepIntervention = useCallback((step: any) => {
     // Handle manual intervention for a step
-    logger.info(LogCategory.WIDGET, 'Step intervention', { stepId: step.id });
+    logger.info(LogCategory.ARTIFACT_CREATION, 'Step intervention', { stepId: step.id });
   }, []);
 
   // Navigation Handlers
@@ -162,35 +162,35 @@ export const CustomAutomationWidget_Modular: React.FC<CustomAutomationWidgetProp
   const managementActions: ManagementAction[] = useMemo(() => [
     {
       id: 'dashboard',
-      label: t('Dashboard'),
+      label: 'Dashboard',
       icon: '📊',
       onClick: () => handleMenuChange('dashboard'),
       variant: 'secondary'
     },
     {
       id: 'templates',
-      label: t('Templates'),
+      label: 'Templates',
       icon: '🎯',
       onClick: () => handleMenuChange('templates'),
       variant: 'secondary'
     },
     {
       id: 'scheduled',
-      label: t('Scheduled'),
+      label: 'Scheduled',
       icon: '⏰',
       onClick: () => handleMenuChange('scheduled'),
       variant: 'secondary'
     },
     {
       id: 'settings',
-      label: t('Settings'),
+      label: 'Settings',
       icon: '⚙️',
       onClick: () => handleMenuChange('settings'),
       variant: 'secondary'
     },
     {
       id: 'clear',
-      label: t('Clear'),
+      label: 'Clear',
       icon: '🗑️',
       onClick: onClearData,
       variant: 'secondary'
@@ -201,7 +201,7 @@ export const CustomAutomationWidget_Modular: React.FC<CustomAutomationWidgetProp
   const editActions: EditAction[] = useMemo(() => [
     {
       id: 'toggle_mode',
-      label: viewMode === 'modern' ? t('Classic View') : t('Modern View'),
+      label: viewMode === 'modern' ? 'Classic View' : 'Modern View',
       icon: viewMode === 'modern' ? '📋' : '🎨',
       onClick: () => setViewMode(viewMode === 'modern' ? 'classic' : 'modern'),
       variant: 'secondary'
@@ -244,10 +244,10 @@ export const CustomAutomationWidget_Modular: React.FC<CustomAutomationWidgetProp
         <Dashboard
           onCreateNewAutomation={handleCreateNewAutomation}
           onViewTask={(taskId) => {
-            logger.info(LogCategory.WIDGET, 'View task', { taskId });
+            logger.info(LogCategory.ARTIFACT_CREATION, 'View task', { taskId });
           }}
           onManageConnectors={() => {
-            logger.info(LogCategory.WIDGET, 'Manage connectors');
+            logger.info(LogCategory.ARTIFACT_CREATION, 'Manage connectors');
           }}
           onViewSettings={() => handleMenuChange('settings')}
         />
@@ -278,7 +278,7 @@ export const CustomAutomationWidget_Modular: React.FC<CustomAutomationWidgetProp
           onSubmit={handleConfigurationSubmit}
           onBack={handleBackToTemplates}
           onPreview={(config) => {
-            logger.info(LogCategory.WIDGET, 'Preview configuration', { config });
+            logger.info(LogCategory.ARTIFACT_CREATION, 'Preview configuration', { config });
           }}
         />
       );
@@ -291,10 +291,10 @@ export const CustomAutomationWidget_Modular: React.FC<CustomAutomationWidgetProp
           template={selectedTemplate}
           currentExecution={executionData}
           isProcessing={isProcessing}
-          currentStep={currentTemplate}
+          currentStep={currentTemplate || undefined}
           steps={selectedTemplate.steps}
           onStepClick={(step) => {
-            logger.info(LogCategory.WIDGET, 'Step clicked', { stepId: step.id });
+            logger.info(LogCategory.ARTIFACT_CREATION, 'Step clicked', { stepId: step.id });
           }}
           onCancel={handleExecutionCancel}
           onRetry={handleExecutionRetry}
@@ -331,7 +331,7 @@ export const CustomAutomationWidget_Modular: React.FC<CustomAutomationWidgetProp
           template={selectedTemplate}
           result={mockResult}
           onExport={(format) => {
-            logger.info(LogCategory.WIDGET, 'Export results', { format });
+            logger.info(LogCategory.ARTIFACT_CREATION, 'Export results', { format });
           }}
           onRetryFromResult={() => {
             setActiveMode('configure');
@@ -368,10 +368,7 @@ export const CustomAutomationWidget_Modular: React.FC<CustomAutomationWidgetProp
         icon: '🚀',
         title: '开始自动化',
         description: '选择一个模板开始你的自动化流程',
-        action: {
-          label: '选择模板',
-          onClick: handleCreateNewAutomation
-        }
+        onAction: handleCreateNewAutomation
       }}
       className={`custom-automation-widget ${viewMode}`}
     >

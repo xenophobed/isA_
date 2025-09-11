@@ -171,47 +171,64 @@ export class DataScientistWidgetPlugin implements WidgetPlugin {
 
         let analysisResult: any = null;
         let messageCount = 0;
-        let lastMessage = '';
+        let accumulatedContent = '';
 
         const callbacks = {
-          onMessageComplete: (message?: string) => {
+          onStreamContent: (contentChunk: string) => {
+            console.log(`📊 DATASCIENTIST_PLUGIN: onStreamContent chunk:`, contentChunk?.substring(0, 50) + '...');
+            accumulatedContent += contentChunk;
+          },
+          
+          onStreamComplete: (finalContent?: string) => {
             messageCount++;
-            console.log(`📊 DATASCIENTIST_PLUGIN: onMessageComplete #${messageCount}:`, message?.substring(0, 100) + '...');
+            console.log(`📊 DATASCIENTIST_PLUGIN: onStreamComplete - Final message (${messageCount} total):`, finalContent?.substring(0, 100) + '...');
             
-            if (message && message.trim()) {
-              lastMessage = message;
+            // Only process on [DONE] or when we have substantial accumulated content
+            if (finalContent === '[DONE]' || accumulatedContent.length > 100) {
+              clearTimeout(timeout);
               
-              // 不要立即resolve，等待可能的后续消息
-              // 使用较短的延迟等待，如果没有新消息就resolve
-              setTimeout(() => {
-                if (lastMessage === message) { // 确认这是最后一条消息
-                  clearTimeout(timeout);
-                  console.log(`📊 DATASCIENTIST_PLUGIN: Final message selected (${messageCount} total):`, message.substring(0, 100) + '...');
-                  
-                  try {
-                    // Try to parse JSON analysis result
-                    const result = JSON.parse(message);
-                    analysisResult = result;
-                    resolve(result);
-                  } catch (parseError) {
-                    // If parsing fails, create structured analysis from text
-                    const structuredResult = {
-                      analysis: {
-                        summary: message,
-                        insights: [],
-                        recommendations: []
-                      },
-                      visualizations: [],
-                      statistics: {
-                        dataPoints: 0,
-                        columns: []
-                      }
-                    };
-                    resolve(structuredResult);
-                  }
+              // Use accumulated streaming content as the real result
+              const completeMessage = accumulatedContent.trim();
+              console.log(`📊 DATASCIENTIST_PLUGIN: Processing final result with accumulated content (${completeMessage.length} chars):`, completeMessage.substring(0, 100) + '...');
+            
+              if (completeMessage) {
+                try {
+                  // Try to parse JSON analysis result
+                  const result = JSON.parse(completeMessage);
+                  analysisResult = result;
+                  resolve(result);
+                } catch (parseError) {
+                  // If parsing fails, create structured analysis from text
+                  const structuredResult = {
+                    analysis: {
+                      summary: completeMessage,
+                      insights: [],
+                      recommendations: []
+                    },
+                    visualizations: [],
+                    statistics: {
+                      dataPoints: 0,
+                      columns: []
+                    }
+                  };
+                  resolve(structuredResult);
                 }
-              }, 500); // 500ms延迟，等待可能的后续消息
+              } else {
+                // No substantial content accumulated
+                reject(new Error('No analysis result generated'));
+              }
+            } else {
+              // Skip this onStreamComplete call - waiting for the final one
+              console.log(`📊 DATASCIENTIST_PLUGIN: Skipping intermediate completion (${finalContent}), waiting for [DONE] or substantial content...`);
             }
+          },
+          
+          onStreamStart: (messageId: string, status?: string) => {
+            console.log(`📊 DATASCIENTIST_PLUGIN: onStreamStart:`, { messageId, status });
+          },
+          
+          onStreamStatus: (status: string) => {
+            console.log(`📊 DATASCIENTIST_PLUGIN: onStreamStatus:`, status);
           },
           
           onArtifactCreated: (artifact: any) => {
@@ -241,12 +258,7 @@ export class DataScientistWidgetPlugin implements WidgetPlugin {
           onError: (error: any) => {
             clearTimeout(timeout);
             reject(error);
-          },
-          
-          // 其他回调保持空实现
-          onMessageStart: () => {},
-          onMessageContent: () => {},
-          onMessageStatus: () => {}
+          }
         };
 
         // 调用现有的 chatService

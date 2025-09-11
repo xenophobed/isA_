@@ -153,7 +153,7 @@ const HuntInputArea: React.FC<{
     }
   }, [query, selectedMode.id]);
 
-  // Handle search processing using WidgetHandler
+  // Handle search processing using Module onSearch
   const handleSearchProcessing = async () => {
     if (!query.trim() || isSearching) return;
     
@@ -169,13 +169,18 @@ const HuntInputArea: React.FC<{
       const params: HuntWidgetParams = {
         query: query,
         category: selectedMode.id,
-        // Add simplified search-specific parameters if supported
-        ...(searchDepth && { searchDepth }),
-        ...(resultFormat && { resultFormat })
+        search_depth: searchDepth || 'standard',
+        result_format: resultFormat || 'summary'
       };
       
-      // Use WidgetHandler instead of direct store/onSearch
-      await processHuntWidget(params);
+      // Use Module's onSearch instead of direct processHuntWidget
+      if (onSearch) {
+        console.log('🔍 HUNT_WIDGET: Using module onSearch function');
+        await onSearch(params);
+      } else {
+        console.log('🔍 HUNT_WIDGET: Fallback to processHuntWidget (no onSearch prop)');
+        await processHuntWidget(params);
+      }
       
       console.log('🚀 Search processing request sent with mode:', selectedMode.name);
     } catch (error) {

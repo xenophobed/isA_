@@ -145,9 +145,12 @@ export class ExecutionControlService {
   private hilBaseUrl: string;
   private activePollingTimers: Map<string, NodeJS.Timeout> = new Map();
   private statusCache: Map<string, { status: ExecutionStatus; timestamp: number }> = new Map();
+  private isPageVisible: boolean = true;
   private readonly CACHE_DURATION = 2000; // 2 seconds cache
   private readonly DEFAULT_POLL_INTERVAL = 3000; // Increased from 2s to 3s
   private readonly IDLE_POLL_INTERVAL = 10000; // 10s for idle sessions
+  private readonly MAX_RETRY_ATTEMPTS = 3; // Maximum retry attempts for network errors
+  private readonly RETRY_DELAY = 1000; // Base delay for retries (1s)
 
   constructor(apiService?: BaseApiService) {
     // 使用专用的HIL服务URL或复用现有的BaseApiService
@@ -159,6 +162,18 @@ export class ExecutionControlService {
     setInterval(() => {
       this.cleanupCache();
     }, 60000);
+
+    // 监听页面可见性变化
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        this.isPageVisible = !document.hidden;
+        if (this.isPageVisible) {
+          logger.debug(LogCategory.CHAT_FLOW, 'Page became visible, resuming monitoring');
+        } else {
+          logger.debug(LogCategory.CHAT_FLOW, 'Page became hidden, monitoring continues with reduced frequency');
+        }
+      });
+    }
   }
 
   // ================================================================================
@@ -192,10 +207,10 @@ export class ExecutionControlService {
   }
 
   /**
-   * 获取线程执行状态 (with caching)
+   * 获取线程执行状态 (带重试机制和缓存)
    */
   async getExecutionStatus(threadId: string): Promise<ExecutionStatus> {
-    try {
+    return this.retryWithBackoff(async () => {
       // Check cache first
       const cached = this.statusCache.get(threadId);
       const now = Date.now();
@@ -231,10 +246,58 @@ export class ExecutionControlService {
         status: status.status 
       });
       return status;
+    }, `getExecutionStatus-${threadId}`);
+  }
+
+  /**
+   * 带指数退避的重试机制
+   */
+  private async retryWithBackoff<T>(
+    operation: () => Promise<T>, 
+    operationName: string,
+    attempt: number = 1
+  ): Promise<T> {
+    try {
+      return await operation();
     } catch (error) {
-      logger.error(LogCategory.CHAT_FLOW, 'Failed to get execution status', { threadId, error });
-      throw error;
+      const isNetworkError = this.isNetworkError(error);
+      
+      if (!isNetworkError || attempt >= this.MAX_RETRY_ATTEMPTS) {
+        logger.error(LogCategory.CHAT_FLOW, `Operation failed after ${attempt} attempts`, { 
+          operationName, 
+          error,
+          isNetworkError,
+          finalAttempt: attempt >= this.MAX_RETRY_ATTEMPTS
+        });
+        throw error;
+      }
+
+      // 指数退避延迟
+      const delay = this.RETRY_DELAY * Math.pow(2, attempt - 1);
+      logger.warn(LogCategory.CHAT_FLOW, `Network error, retrying in ${delay}ms`, { 
+        operationName, 
+        attempt, 
+        delay,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return this.retryWithBackoff(operation, operationName, attempt + 1);
     }
+  }
+
+  /**
+   * 判断是否为网络错误
+   */
+  private isNetworkError(error: unknown): boolean {
+    if (error instanceof TypeError) {
+      const message = error.message.toLowerCase();
+      return message.includes('failed to fetch') || 
+             message.includes('network error') ||
+             message.includes('network_io_suspended') ||
+             message.includes('socket_not_connected');
+    }
+    return false;
   }
 
   // ================================================================================
@@ -554,12 +617,17 @@ export class ExecutionControlService {
       }
     };
 
-    // Smart polling with adaptive intervals
+    // Smart polling with adaptive intervals and page visibility awareness
     const scheduleNextPoll = () => {
       // Use longer interval for idle sessions
-      const nextInterval = consecutiveIdleCount >= maxIdleCount ? 
+      let nextInterval = consecutiveIdleCount >= maxIdleCount ? 
         this.IDLE_POLL_INTERVAL : 
         interval;
+      
+      // If page is not visible, use longer intervals to reduce network load
+      if (!this.isPageVisible) {
+        nextInterval = Math.max(nextInterval * 2, 15000); // At least 15s when page is hidden
+      }
       
       const timer = setTimeout(async () => {
         if (await poll()) {

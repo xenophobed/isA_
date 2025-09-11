@@ -66,7 +66,7 @@ const prepareHuntTemplateParams = (params: HuntWidgetParams) => {
   
   // Build prompt_args dynamically - much cleaner approach
   const prompt_args: Record<string, any> = {
-    query: query || 'Search for information',
+    query: query, // Don't use fallback here - let the actual query be empty if user hasn't entered anything
     search_depth,
     result_format,
     ...(priceRange && { 
@@ -232,9 +232,9 @@ export const HuntWidgetModule: React.FC<HuntWidgetModuleProps> = ({
         if (React.isValidElement(children)) {
           return React.cloneElement(children, {
             ...children.props,
-            // Store state
+            // Store state (use BaseWidgetModule state instead of store state for consistency)
             searchResults,
-            isSearching,
+            isSearching: moduleProps.isProcessing, // Use BaseWidgetModule state for button status
             lastQuery,
             // Add onSearch function with template parameter preparation (like Dream)
             onSearch: async (params: HuntWidgetParams) => {

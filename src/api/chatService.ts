@@ -238,6 +238,15 @@ export class ChatService {
         callbacks.onStreamStart?.(event.message_id || event.run_id, 'Starting...');
         break;
         
+      case 'text_message_start':
+        // 只是标记开始，不创建消息。实际内容由 token 事件处理
+        console.log('🎬 CHAT_SERVICE: Message generation started', event.message_id || event.run_id);
+        break;
+        
+      case 'text_message_end':
+        callbacks.onStreamComplete?.(event.content || event.result);
+        break;
+        
       case 'text_delta':
       case 'text_message_content':
         if (event.delta || event.content) {
@@ -290,6 +299,10 @@ export class ChatService {
         callbacks.onStateUpdate?.(event.state_data, event.node);
         break;
         
+      case 'graph_update':
+        callbacks.onStateUpdate?.(event.graph_data);
+        break;
+        
       case 'paused':
         callbacks.onPaused?.(event.reason, event.checkpoint_id);
         break;
@@ -332,6 +345,26 @@ export class ChatService {
         callbacks.onHILCheckpointCreated?.(event);
         break;
         
+      case 'hil_approval_required':
+        // 使用现有的HIL interrupt回调处理approval required事件
+        callbacks.onHILInterruptDetected?.(event);
+        break;
+        
+      // 图像生成事件
+      case 'image_generation_start':
+        callbacks.onStreamStart?.(event.message_id || event.run_id, 'Generating image...');
+        break;
+        
+      case 'image_generation_content':
+        if (event.image_url || event.content) {
+          callbacks.onStreamContent?.(event.image_url || event.content);
+        }
+        break;
+        
+      case 'image_generation_end':
+        callbacks.onStreamComplete?.(event.image_url || event.result);
+        break;
+        
       // Artifact事件
       case 'artifact_created':
         callbacks.onArtifactCreated?.(event.artifact);
@@ -346,10 +379,10 @@ export class ChatService {
         callbacks.onStreamStatus?.(event.status);
         break;
         
-      // 自定义事件（包含Resume标记）
+      // 标准AGUI事件处理 - 不再处理Legacy格式
       case 'custom_event':
+        // 处理Resume标记和其他自定义事件
         if (event.metadata?.resumed) {
-          // 处理带Resume标记的事件
           callbacks.onStreamStatus?.(`🔄 Resumed: ${event.metadata.custom_type || 'Unknown event'}`);
         }
         // 根据custom_type进一步处理
@@ -372,6 +405,15 @@ export class ChatService {
     const customData = event.metadata?.custom_data || {};
     
     switch (customType) {
+      case 'content':
+        // 处理streaming内容 - 这是关键的修复！
+        if (event.metadata?.content || customData.content) {
+          const content = event.metadata?.content || customData.content;
+          callbacks.onStreamContent?.(content);
+          console.log('🎯 CHAT_SERVICE: Streaming content forwarded to callbacks:', content.substring(0, 50) + '...');
+        }
+        break;
+        
       case 'graph_update':
         callbacks.onStateUpdate?.(event.metadata.graph_data);
         break;
@@ -412,7 +454,10 @@ export class ChatService {
     callbacks: ChatServiceCallbacks,
     files?: File[]
   ): Promise<void> {
-    console.log('🖼️ CHAT_SERVICE: Starting multimodal message');
+    console.log('🖼️ CHAT_SERVICE: Starting multimodal message', {
+      hasFiles: !!files,
+      fileCount: files?.length || 0
+    });
     
     // TODO: 实现多模态文件上传逻辑
     // 目前复用text chat逻辑

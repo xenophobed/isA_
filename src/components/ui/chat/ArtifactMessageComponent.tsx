@@ -100,7 +100,7 @@ export const ArtifactMessageComponent: React.FC<ArtifactMessageComponentProps> =
         )}
         
         {/* Search Results content - Parse JSON and display */}
-        {artifact.contentType === 'data' && artifact.content !== 'Loading...' && (
+        {(artifact.contentType === 'data' || artifact.contentType === 'analysis' || artifact.contentType === 'search_results') && artifact.content !== 'Loading...' && (
           <div>
             <ContentRenderer
               content={artifact.content}
@@ -199,7 +199,7 @@ export const ArtifactMessageComponent: React.FC<ArtifactMessageComponentProps> =
         
         {/* Fallback for unknown content types or empty content */}
         {artifact.content !== 'Loading...' && 
-         !['image', 'data', 'text', 'analysis', 'knowledge'].includes(artifact.contentType) && (
+         !['image', 'data', 'text', 'analysis', 'knowledge', 'search_results'].includes(artifact.contentType) && (
           <div className="text-center py-4">
             <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
               Unknown content type: {artifact.contentType}

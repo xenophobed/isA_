@@ -20,7 +20,7 @@ export const SimpleAPITester: React.FC = () => {
   const [testSteps, setTestSteps] = useState<TestStep[]>([]);
   const [testMessage, setTestMessage] = useState('请生成一个关于AI的简短介绍');
   
-  const { sendMessage, messages, chatLoading } = useChatStore();
+  const { messages, chatLoading } = useChatStore();
 
   const addTestStep = (step: string, data: any, success: boolean = true) => {
     const testStep: TestStep = {
@@ -71,10 +71,20 @@ export const SimpleAPITester: React.FC = () => {
         }
       }, 500);
 
-      // 发送消息
-      await sendMessage(testMessage, {
-        session_id: 'debug_test_session',
-        user_id: 'debug_user'
+      // 发送消息 - 使用 addMessage 而不是已删除的 sendMessage
+      const { addMessage } = useChatStore.getState();
+      addMessage({
+        id: `debug-${Date.now()}`,
+        type: 'regular' as const,
+        role: 'user' as const,
+        content: testMessage,
+        timestamp: new Date().toISOString(),
+        sessionId: 'debug_test_session',
+        metadata: {
+          session_id: 'debug_test_session',
+          user_id: 'debug_user'
+        },
+        processed: false
       });
 
       // 停止监听

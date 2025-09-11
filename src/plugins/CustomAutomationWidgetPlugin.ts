@@ -110,16 +110,22 @@ export class CustomAutomationWidgetPlugin implements WidgetPlugin {
         success: true
       });
 
-      return {
-        success: true,
-        data: result,
+      const output: PluginOutput = {
+        id: `automation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: 'analysis', // Changed from data to analysis for proper artifact rendering
+        content: result,
         metadata: {
-          executionTime,
+          processingTime: executionTime,
+          version: 1,
+          prompt: input.prompt,
+          generatedAt: new Date().toISOString(),
+          pluginVersion: this.version,
           templateUsed: automationIntent.templateId,
-          stepsCompleted: result.stepsCompleted || 0,
-          timestamp: new Date().toISOString()
+          stepsCompleted: result.stepsCompleted || 0
         }
       };
+
+      return output;
 
     } catch (error) {
       const executionTime = Date.now() - startTime;
@@ -129,14 +135,7 @@ export class CustomAutomationWidgetPlugin implements WidgetPlugin {
         executionTime
       });
 
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown automation error',
-        metadata: {
-          executionTime,
-          timestamp: new Date().toISOString()
-        }
-      };
+      throw new Error(`Custom automation failed: ${error instanceof Error ? error.message : 'Unknown automation error'}`);
     }
   }
 

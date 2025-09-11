@@ -174,27 +174,44 @@ export class OmniWidgetPlugin implements WidgetPlugin {
 
         let completeContent = '';
         let messageCount = 0;
-        let lastMessage = '';
+        let accumulatedContent = '';
 
         const callbacks = {
-          onMessageComplete: (message?: string) => {
+          onStreamContent: (contentChunk: string) => {
+            console.log(`⚡ OMNI_PLUGIN: onStreamContent chunk:`, contentChunk?.substring(0, 50) + '...');
+            accumulatedContent += contentChunk;
+          },
+          
+          onStreamComplete: (finalContent?: string) => {
             messageCount++;
-            console.log(`⚡ OMNI_PLUGIN: onMessageComplete #${messageCount}:`, message?.substring(0, 100) + '...');
+            console.log(`⚡ OMNI_PLUGIN: onStreamComplete - Final message (${messageCount} total):`, finalContent?.substring(0, 100) + '...');
             
-            if (message && message.trim()) {
-              lastMessage = message;
-              completeContent = message;
+            // Only process on [DONE] or when we have substantial accumulated content
+            if (finalContent === '[DONE]' || accumulatedContent.length > 100) {
+              clearTimeout(timeout);
               
-              // 不要立即resolve，等待可能的后续消息
-              // 使用较短的延迟等待，如果没有新消息就resolve
-              setTimeout(() => {
-                if (lastMessage === message) { // 确认这是最后一条消息
-                  clearTimeout(timeout);
-                  console.log(`⚡ OMNI_PLUGIN: Final message selected (${messageCount} total):`, message.substring(0, 100) + '...');
-                  resolve(message);
-                }
-              }, 500); // 500ms延迟，等待可能的后续消息
+              // Use accumulated streaming content as the real result
+              const completeMessage = accumulatedContent.trim();
+              console.log(`⚡ OMNI_PLUGIN: Processing final result with accumulated content (${completeMessage.length} chars):`, completeMessage.substring(0, 100) + '...');
+            
+              if (completeMessage) {
+                resolve(completeMessage);
+              } else {
+                // No substantial content accumulated
+                reject(new Error('No content generated'));
+              }
+            } else {
+              // Skip this onStreamComplete call - waiting for the final one
+              console.log(`⚡ OMNI_PLUGIN: Skipping intermediate completion (${finalContent}), waiting for [DONE] or substantial content...`);
             }
+          },
+          
+          onStreamStart: (messageId: string, status?: string) => {
+            console.log(`⚡ OMNI_PLUGIN: onStreamStart:`, { messageId, status });
+          },
+          
+          onStreamStatus: (status: string) => {
+            console.log(`⚡ OMNI_PLUGIN: onStreamStatus:`, status);
           },
           
           onArtifactCreated: (artifact: any) => {
@@ -208,12 +225,7 @@ export class OmniWidgetPlugin implements WidgetPlugin {
           onError: (error: any) => {
             clearTimeout(timeout);
             reject(error);
-          },
-          
-          // 其他回调保持空实现
-          onMessageStart: () => {},
-          onMessageContent: () => {},
-          onMessageStatus: () => {}
+          }
         };
 
         // 调用现有的 chatService

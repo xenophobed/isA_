@@ -166,7 +166,7 @@ export const templateBuilders = {
   search: (params: any) => ({
     template_id: 'hunt_general_prompt',
     prompt_args: {
-      query: params.query || params.prompt || 'Search for information',
+      query: params.query || params.prompt, // 不使用默认值，让用户输入为空时保持为空
       search_depth: params.search_depth || 'standard',
       result_format: params.result_format || 'summary'
     }

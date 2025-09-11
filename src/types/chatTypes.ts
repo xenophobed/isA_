@@ -64,7 +64,7 @@ export interface ArtifactMessage extends BaseMessage {
     widgetType: string; // 'dream', 'hunt', 'omni', etc.
     widgetName?: string; // 显示名称
     version: number;
-    contentType: 'image' | 'text' | 'data' | 'analysis' | 'knowledge';
+    contentType: 'image' | 'text' | 'data' | 'analysis' | 'knowledge' | 'search_results';
     content: any; // 工件的实际内容 - can be 'Loading...' during streaming
     metadata?: {
       originalInput?: string;

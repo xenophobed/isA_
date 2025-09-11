@@ -32,15 +32,17 @@
 import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { ChatLayout, ChatLayoutProps } from '../components/ui/chat/ChatLayout';
 import { RightPanel } from '../components/ui/chat/RightPanel';
+import { RightSidebarLayout } from '../components/ui/chat/RightSidebarLayout';
 import { AppId } from '../types/appTypes';
 import { useChat } from '../hooks/useChat';
-import { useChatActions, useChatStore } from '../stores/useChatStore';
+import { useChatStore } from '../stores/useChatStore';
 import { useAuth } from '../hooks/useAuth';
 import { useCurrentSession, useSessionActions } from '../stores/useSessionStore';
 import { logger, LogCategory } from '../utils/logger';
 import { useUserModule } from './UserModule';
 import { UpgradeModal } from '../components/ui/UpgradeModal';
-import { useAppActions } from '../stores/useAppStore';
+import { useAppActions, useAppStore } from '../stores/useAppStore';
+import { useHuntActions } from '../stores/useWidgetStores';
 import { ArtifactMessage } from '../types/chatTypes';
 import { detectPluginTrigger, executePlugin } from '../plugins';
 import { useTask } from '../hooks/useTask';
@@ -96,7 +98,6 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   
   // Widget system state (managed internally)
   const [currentWidgetMode, setCurrentWidgetMode] = useState<'half' | 'full' | null>(null);
-  const [selectedWidgetContent, setSelectedWidgetContent] = useState<React.ReactNode>(null);
 
   // 🆕 HIL (Human-in-the-Loop) 状态管理
   const [hilStatus, setHilStatus] = useState<HILExecutionStatusData | null>(null);
@@ -120,8 +121,33 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   const currentSession = useCurrentSession();
   const sessionActions = useSessionActions();
   
-  // Get chat actions from store
-  const chatActions = useChatActions();
+  // Get direct store access for state updates
+  const chatStore = useChatStore.getState();
+  
+  // Get ChatService for direct API calls
+  const getChatService = useCallback(async () => {
+    const { getChatServiceInstance } = await import('../hooks/useChatService');
+    let chatService = getChatServiceInstance();
+    
+    // 如果 ChatService 不可用，等待一下再重试
+    if (!chatService) {
+      console.warn('💬 CHAT_MODULE: ChatService not ready, waiting 500ms...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      chatService = getChatServiceInstance();
+      
+      if (!chatService) {
+        console.warn('💬 CHAT_MODULE: ChatService still not ready, waiting 1000ms...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        chatService = getChatServiceInstance();
+      }
+    }
+    
+    if (!chatService) {
+      throw new Error('ChatService not initialized after retries - AIProvider may have failed to initialize');
+    }
+    
+    return chatService;
+  }, []);
   
   // Get current tasks for status display
   const currentTasks = useChatStore(state => state.currentTasks);
@@ -131,6 +157,10 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   
   // Get app actions for navigation
   const { setCurrentApp } = useAppActions();
+  const { setShowRightSidebar, setTriggeredAppInput, currentApp: globalCurrentApp, showRightSidebar: globalShowRightSidebar, triggeredAppInput } = useAppStore();
+  
+  // Get widget actions for setting output data
+  const { setHuntSearchResults } = useHuntActions();
   
   // 🆕 Device detection and native app support
   const { isMobile, isTablet, deviceType } = useDeviceType();
@@ -184,6 +214,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
         // 🆕 设置全局Plugin模式标志，防止BaseWidgetStore重复创建artifact
         if (typeof window !== 'undefined') {
           (window as any).__CHAT_MODULE_PLUGIN_MODE__ = true;
+          (window as any).__CHAT_MODULE_EVENT_EMITTER__ = eventEmitterRef.current;
         }
         
         // 监听Widget请求事件
@@ -208,6 +239,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       // 🆕 清理全局Plugin模式标志
       if (typeof window !== 'undefined') {
         (window as any).__CHAT_MODULE_PLUGIN_MODE__ = false;
+        (window as any).__CHAT_MODULE_EVENT_EMITTER__ = null;
       }
     };
   }, []);
@@ -333,7 +365,23 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
               handleHILStatusChange(status);
             },
             onError: (error) => {
-              console.error('HIL monitoring error:', error);
+              // 区分网络错误和其他错误
+              const isNetworkError = error instanceof TypeError && 
+                (error.message.includes('Failed to fetch') || 
+                 error.message.includes('network_io_suspended') ||
+                 error.message.includes('socket_not_connected'));
+              
+              if (isNetworkError) {
+                logger.warn(LogCategory.CHAT_FLOW, 'HIL monitoring network error (will retry)', { 
+                  error: error.message,
+                  threadId: currentSession.id 
+                });
+              } else {
+                logger.error(LogCategory.CHAT_FLOW, 'HIL monitoring error', { 
+                  error: error.message,
+                  threadId: currentSession.id 
+                });
+              }
             }
           });
         } catch (error) {
@@ -371,7 +419,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     
     // 🆕 关键：停止当前的SSE流，让HIL接管
     console.log('🚨 CHAT_MODULE: Stopping current chat stream due to HIL interrupt');
-    chatActions.finishStreamingMessage(); // 完成当前流式消息，防止卡在processing状态
+    chatStore.finishStreamingMessage(); // 完成当前流式消息，防止卡在processing状态
     
     // 🆕 中断当前的聊天服务流
     try {
@@ -386,13 +434,13 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     }
     
     // 更新聊天状态显示
-    chatActions.updateStreamingStatus(`⏸️ Human intervention required: ${interrupt.title}`);
+    chatStore.updateStreamingStatus(`⏸️ Human intervention required: ${interrupt.title}`);
     
     logger.info(LogCategory.CHAT_FLOW, 'HIL interrupt detected and modal opened', {
       interruptId: interrupt.id,
       type: interrupt.type
     });
-  }, [chatActions]);
+  }, []);
 
   const handleHILCheckpoint = useCallback((checkpoint: HILCheckpointData) => {
     console.log('📍 CHAT_MODULE: HIL checkpoint created:', checkpoint);
@@ -400,13 +448,13 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     setHilCheckpoints(prev => [checkpoint, ...prev.slice(0, 19)]); // 保留最近20个检查点
     
     // 更新聊天状态显示
-    chatActions.updateStreamingStatus(`📍 Checkpoint saved: ${checkpoint.node}`);
+    chatStore.updateStreamingStatus(`📍 Checkpoint saved: ${checkpoint.node}`);
     
     logger.debug(LogCategory.CHAT_FLOW, 'HIL checkpoint created', {
       checkpointId: checkpoint.checkpoint_id,
       node: checkpoint.node
     });
-  }, [chatActions]);
+  }, []);
 
   const handleHILStatusChange = useCallback((status: HILExecutionStatusData) => {
     // console.log('📊 CHAT_MODULE: HIL status changed:', status); // 删除干扰日志
@@ -441,18 +489,18 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
 
   const handleExecutionStarted = useCallback((event: any) => {
     console.log('🚀 CHAT_MODULE: Execution started:', event);
-    chatActions.updateStreamingStatus('🚀 Execution started...');
-  }, [chatActions]);
+    chatStore.updateStreamingStatus('🚀 Execution started...');
+  }, []);
 
   const handleExecutionFinished = useCallback((event: any) => {
     console.log('🎉 CHAT_MODULE: Execution finished:', event);
-    chatActions.updateStreamingStatus('🎉 Execution completed');
-  }, [chatActions]);
+    chatStore.updateStreamingStatus('🎉 Execution completed');
+  }, []);
 
   const handleExecutionError = useCallback((event: any) => {
     console.log('❌ CHAT_MODULE: Execution error:', event);
-    chatActions.updateStreamingStatus(`❌ Execution error: ${event.error?.message || 'Unknown error'}`);
-  }, [chatActions]);
+    chatStore.updateStreamingStatus(`❌ Execution error: ${event.error?.message || 'Unknown error'}`);
+  }, []);
 
   // 🆕 HIL操作处理函数
   const handleHILApprove = useCallback(async (interruptId: string, data?: any) => {
@@ -480,12 +528,12 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       
       // 重新启动流式消息处理，将HIL恢复流作为新的AI回复
       const resumeMessageId = `resume-${Date.now()}`;
-      chatActions.startStreamingMessage(resumeMessageId, '🔄 Resuming execution...');
+      chatStore.startStreamingMessage(resumeMessageId, '🔄 Resuming execution...');
       
       await executionControlService.resumeExecutionStream(resumeRequest, {
         onResumeStart: (data) => {
           console.log('🔄 HIL_RESUME: Resume started:', data);
-          chatActions.updateStreamingStatus('🔄 Processing your input...');
+          chatStore.updateStreamingStatus('🔄 Processing your input...');
         },
         onMessageStream: (data) => {
           console.log('📨 HIL_RESUME: Message stream event:', data);
@@ -503,20 +551,20 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
               
               // 只有当有实际内容时才添加到流式消息
               if (messageContent && messageContent.trim() && !messageContent.includes('tool_calls')) {
-                chatActions.appendToStreamingMessage(messageContent);
+                chatStore.appendToStreamingMessage(messageContent);
               }
             }
           }
         },
         onResumeEnd: (data) => {
           console.log('✅ HIL_RESUME: Resume completed:', data);
-          chatActions.updateStreamingStatus('✅ Response completed');
-          chatActions.finishStreamingMessage(); // 完成流式消息
+          chatStore.updateStreamingStatus('✅ Response completed');
+          chatStore.finishStreamingMessage(); // 完成流式消息
         },
         onError: (error) => {
           console.error('❌ HIL_RESUME: Resume failed:', error);
-          chatActions.updateStreamingStatus(`❌ Failed to resume: ${error.message}`);
-          chatActions.finishStreamingMessage(); // 即使出错也要完成流式消息
+          chatStore.updateStreamingStatus(`❌ Failed to resume: ${error.message}`);
+          chatStore.finishStreamingMessage(); // 即使出错也要完成流式消息
         }
       });
       
@@ -527,11 +575,11 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       
     } catch (error) {
       console.error('Failed to approve HIL action:', error);
-      chatActions.updateStreamingStatus(`❌ Failed to approve action: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      chatStore.updateStreamingStatus(`❌ Failed to approve action: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessingHilAction(false);
     }
-  }, [currentSession, chatActions, executionControlService]);
+  }, [currentSession, executionControlService]);
 
   const handleHILReject = useCallback(async (interruptId: string, reason?: string) => {
     if (!currentSession) return;
@@ -554,7 +602,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       const result = await executionControlService.resumeExecution(resumeRequest);
       
       if (result.success) {
-        chatActions.updateStreamingStatus('❌ Action rejected by user');
+        chatStore.updateStreamingStatus('❌ Action rejected by user');
         setShowInterruptModal(false);
         setCurrentInterrupt(null);
         
@@ -565,11 +613,11 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       
     } catch (error) {
       console.error('Failed to reject HIL action:', error);
-      chatActions.updateStreamingStatus(`❌ Failed to reject action: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      chatStore.updateStreamingStatus(`❌ Failed to reject action: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessingHilAction(false);
     }
-  }, [currentSession, chatActions, executionControlService]);
+  }, [currentSession, executionControlService]);
 
   const handleHILEdit = useCallback(async (interruptId: string, editedContent: any) => {
     // Edit操作实际上是approve with modifications
@@ -590,7 +638,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       const result = await executionControlService.rollbackToCheckpoint(currentSession.id, checkpointId);
       
       if (result.success) {
-        chatActions.updateStreamingStatus(`🔄 Rolled back to: ${result.restored_state.node}`);
+        chatStore.updateStreamingStatus(`🔄 Rolled back to: ${result.restored_state.node}`);
         
         // 更新状态
         await executionControlService.getExecutionStatus(currentSession.id)
@@ -610,9 +658,9 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       
     } catch (error) {
       console.error('Failed to rollback:', error);
-      chatActions.updateStreamingStatus(`❌ Rollback failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      chatStore.updateStreamingStatus(`❌ Rollback failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }, [currentSession, chatActions, executionControlService]);
+  }, [currentSession, executionControlService]);
 
   const handleHILPauseExecution = useCallback(async () => {
     if (!currentSession) return;
@@ -620,12 +668,12 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     try {
       // HIL暂停通常通过中断机制实现
       console.log('⏸️ CHAT_MODULE: Pausing execution for thread:', currentSession.id);
-      chatActions.updateStreamingStatus('⏸️ Execution paused by user');
+      chatStore.updateStreamingStatus('⏸️ Execution paused by user');
       
     } catch (error) {
       console.error('Failed to pause execution:', error);
     }
-  }, [currentSession, chatActions]);
+  }, [currentSession]);
 
   const handleHILResumeExecution = useCallback(async () => {
     if (!currentSession) return;
@@ -645,16 +693,16 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       const result = await executionControlService.resumeExecution(resumeRequest);
       
       if (result.success) {
-        chatActions.updateStreamingStatus('▶️ Execution resumed');
+        chatStore.updateStreamingStatus('▶️ Execution resumed');
       } else {
         throw new Error(result.message || 'Resume failed');
       }
       
     } catch (error) {
       console.error('Failed to resume execution:', error);
-      chatActions.updateStreamingStatus(`❌ Resume failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      chatStore.updateStreamingStatus(`❌ Resume failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }, [currentSession, chatActions, executionControlService]);
+  }, [currentSession, executionControlService]);
 
   const handleViewInterrupt = useCallback((interrupt: HILInterruptData) => {
     setCurrentInterrupt(interrupt);
@@ -662,12 +710,12 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
   }, []);
 
   // 🆕 Helper方法：映射Plugin输出类型到Artifact内容类型
-  const mapPluginTypeToContentType = useCallback((pluginType: string): 'image' | 'text' | 'data' | 'analysis' | 'knowledge' => {
+  const mapPluginTypeToContentType = useCallback((pluginType: string): 'image' | 'text' | 'data' | 'analysis' | 'knowledge' | 'search_results' => {
     switch (pluginType) {
       case 'image': return 'image';
-      case 'data': return 'data';
-      case 'search_results': return 'analysis';
-      case 'search': return 'analysis';
+      case 'data': return 'search_results'; // Hunt Plugin 的 data 类型映射为 search_results
+      case 'search_results': return 'search_results';
+      case 'search': return 'search_results';
       case 'knowledge': return 'knowledge';
       case 'text':
       default: return 'text';
@@ -681,7 +729,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     const { widgetType, params, requestId } = eventData;
     
     // 🆕 设置Chat loading状态
-    chatActions.setChatLoading(true);
+    chatStore.setChatLoading(true);
     
     // CRITICAL: Check user credits before processing widget request
     console.log('💳 CHAT_MODULE: Credit check details:', {
@@ -743,12 +791,18 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     };
     
     console.log('📨 CHAT_MODULE: Adding widget user message to chat');
-    chatActions.addMessage(userMessage);
+    chatStore.addMessage(userMessage);
     
     // 通过PluginManager处理Widget请求
     try {
+      // For Hunt widget, use params.query as the actual user input
+      const actualUserInput = widgetType === 'hunt' ? params.query : params.prompt;
+      if (!actualUserInput) {
+        throw new Error(`${widgetType} widget requires user input`);
+      }
+
       const pluginResult = await executePlugin(widgetType, {
-        prompt: params.prompt || `Generate ${widgetType} content`,
+        prompt: actualUserInput,
         options: params,
         context: {
           sessionId: activeSessionId,
@@ -760,13 +814,91 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       
       if (pluginResult.success && pluginResult.output) {
         // 🆕 创建Artifact消息而不是普通消息
+        // 为不同类型的 Widget 创建用户友好的内容摘要
+        let displayContent: string;
+        let artifactContent: any;
+        
+        if (widgetType === 'hunt' && Array.isArray(pluginResult.output.content)) {
+          // Hunt Widget: 创建搜索结果摘要和传递原始数组
+          const results = pluginResult.output.content;
+          if (results.length > 0) {
+            const firstResult = results[0];
+            displayContent = `Search Results: ${firstResult.title || 'Found information'} - ${firstResult.content?.substring(0, 150) || ''}...`;
+            // 🆕 For Artifact ContentRenderer, pass the original array
+            artifactContent = results; // 传递原始搜索结果数组
+          } else {
+            displayContent = 'No search results found';
+            artifactContent = [];
+          }
+        } else if (widgetType === 'dream' && pluginResult.output.type === 'image') {
+          // Dream Widget: 处理图像生成结果
+          const imageContent = pluginResult.output.content;
+          if (typeof imageContent === 'string' && imageContent.startsWith('http')) {
+            displayContent = `Generated Image: ${actualUserInput.substring(0, 100)}...`;
+            artifactContent = imageContent; // 传递图像URL
+          } else {
+            displayContent = 'Image generation completed';
+            artifactContent = imageContent;
+          }
+        } else if (widgetType === 'omni' && pluginResult.output.type === 'text') {
+          // Omni Widget: 处理文本内容生成结果
+          const textContent = pluginResult.output.content;
+          if (typeof textContent === 'string' && textContent.length > 0) {
+            displayContent = `Generated Content: ${textContent.substring(0, 150)}...`;
+            artifactContent = textContent; // 传递完整文本内容
+          } else {
+            displayContent = 'Content generation completed';
+            artifactContent = textContent;
+          }
+        } else if (widgetType === 'data_scientist' && pluginResult.output.type === 'analysis') {
+          // Data Scientist Widget: 处理数据分析结果
+          const analysisContent = pluginResult.output.content;
+          if (typeof analysisContent === 'object' && analysisContent.analysis) {
+            displayContent = `Data Analysis: ${analysisContent.analysis.summary?.substring(0, 150) || 'Analysis completed'}...`;
+            artifactContent = analysisContent; // 传递完整分析结果
+          } else if (typeof analysisContent === 'string') {
+            displayContent = `Data Analysis: ${analysisContent.substring(0, 150)}...`;
+            artifactContent = analysisContent;
+          } else {
+            displayContent = 'Data analysis completed';
+            artifactContent = analysisContent;
+          }
+        } else if (widgetType === 'knowledge' && pluginResult.output.type === 'knowledge') {
+          // Knowledge Widget: 处理知识分析结果
+          const knowledgeContent = pluginResult.output.content;
+          if (typeof knowledgeContent === 'string' && knowledgeContent.length > 0) {
+            displayContent = `Knowledge Analysis: ${knowledgeContent.substring(0, 150)}...`;
+            artifactContent = knowledgeContent; // 传递完整知识内容
+          } else {
+            displayContent = 'Knowledge analysis completed';
+            artifactContent = knowledgeContent;
+          }
+        } else if (widgetType === 'custom_automation' && pluginResult.output.type === 'analysis') {
+          // Custom Automation Widget: 处理自动化结果
+          const automationContent = pluginResult.output.content;
+          if (typeof automationContent === 'object' && automationContent.summary) {
+            displayContent = `Automation Completed: ${automationContent.summary.substring(0, 150)}...`;
+            artifactContent = automationContent; // 传递完整自动化结果
+          } else if (typeof automationContent === 'string') {
+            displayContent = `Automation Completed: ${automationContent.substring(0, 150)}...`;
+            artifactContent = automationContent;
+          } else {
+            displayContent = 'Automation process completed';
+            artifactContent = automationContent;
+          }
+        } else {
+          // 其他 Widget 类型的默认处理
+          displayContent = typeof pluginResult.output.content === 'string' 
+            ? pluginResult.output.content 
+            : JSON.stringify(pluginResult.output.content);
+          artifactContent = displayContent;
+        }
+        
         const artifactMessage = {
           id: `assistant-widget-${requestId}`,
           type: 'artifact' as const,
           role: 'assistant' as const,
-          content: typeof pluginResult.output.content === 'string' 
-            ? pluginResult.output.content 
-            : JSON.stringify(pluginResult.output.content),
+          content: displayContent,
           timestamp: new Date().toISOString(),
           sessionId: activeSessionId,
           userPrompt: params.prompt || `${widgetType} request`,
@@ -776,9 +908,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
             widgetName: widgetType.charAt(0).toUpperCase() + widgetType.slice(1),
             version: 1,
             contentType: mapPluginTypeToContentType(pluginResult.output.type || 'text'),
-            content: typeof pluginResult.output.content === 'string' 
-              ? pluginResult.output.content 
-              : JSON.stringify(pluginResult.output.content),
+            content: artifactContent,
             thumbnail: (pluginResult.output as any).thumbnail,
             metadata: {
               processingTime: pluginResult.executionTime,
@@ -788,10 +918,10 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
           }
         };
         
-        chatActions.addMessage(artifactMessage);
+        chatStore.addMessage(artifactMessage);
         
         // 🆕 清除Chat loading状态
-        chatActions.setChatLoading(false);
+        chatStore.setChatLoading(false);
         
         // 🆕 将结果通过事件系统返回给Widget UI
         console.log('🔌 CHAT_MODULE: Emitting widget:result event:', {
@@ -814,7 +944,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
         console.error('❌ CHAT_MODULE: Widget plugin execution failed:', pluginResult.error);
         
         // 🆕 清除Chat loading状态
-        chatActions.setChatLoading(false);
+        chatStore.setChatLoading(false);
         
         // 🆕 发出错误事件
         eventEmitterRef.current.emit('widget:result', {
@@ -829,7 +959,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       console.error('❌ CHAT_MODULE: Widget request processing failed:', error);
       
       // 🆕 清除Chat loading状态
-      chatActions.setChatLoading(false);
+      chatStore.setChatLoading(false);
       
       // 🆕 发出错误事件
       eventEmitterRef.current.emit('widget:result', {
@@ -840,7 +970,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       });
     }
     
-  }, [chatActions, auth0User, currentSession, sessionActions, userModule, setShowUpgradeModal, mapPluginTypeToContentType]);
+  }, [auth0User, currentSession, sessionActions, userModule, setShowUpgradeModal, mapPluginTypeToContentType]);
 
   // ================================================================================
   // 聊天控制业务逻辑 - New Chat and Session Management
@@ -911,7 +1041,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     };
     
     // Adding user message to store
-    chatActions.addMessage(userMessage);
+    chatStore.addMessage(userMessage);
     
     // ✅ STEP 2: Check if message triggers a plugin
     const pluginTrigger = detectPluginTrigger(content);
@@ -938,7 +1068,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
           }
         };
         
-        chatActions.addMessage(processingMessage);
+        chatStore.addMessage(processingMessage);
         
         // Execute plugin
         const pluginInput = {
@@ -969,7 +1099,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
             }
           };
           
-          chatActions.addMessage(completedMessage);
+          chatStore.addMessage(completedMessage);
           console.log('✅ CHAT_MODULE: Plugin execution completed successfully');
           
         } else {
@@ -985,7 +1115,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
             }
           };
           
-          chatActions.addMessage(errorMessage);
+          chatStore.addMessage(errorMessage);
           console.error('❌ CHAT_MODULE: Plugin execution failed:', pluginResult.error);
         }
         
@@ -1000,9 +1130,36 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       
       try {
         const token = await userModule.getAccessToken();
+        const chatService = await getChatService();
         
-        await chatActions.sendMessage(content, enrichedMetadata, token);
-        // Regular chat message sent successfully
+        // 直接调用 ChatService 并处理回调
+        await chatService.sendMessage(content, enrichedMetadata, token, {
+          onStreamStart: (messageId: string, status?: string) => {
+            chatStore.startStreamingMessage(messageId, status);
+            chatStore.setExecutingPlan(true);
+          },
+          onStreamContent: (contentChunk: string) => {
+            chatStore.appendToStreamingMessage(contentChunk);
+          },
+          onStreamStatus: (status: string) => {
+            chatStore.updateStreamingStatus(status);
+          },
+          onStreamComplete: () => {
+            chatStore.finishStreamingMessage();
+            chatStore.setChatLoading(false);
+            chatStore.setIsTyping(false);
+            chatStore.setExecutingPlan(false);
+            logger.info(LogCategory.CHAT_FLOW, 'Message sending completed successfully');
+          },
+          onError: (error: Error) => {
+            logger.error(LogCategory.CHAT_FLOW, 'Message sending failed', { error: error.message });
+            chatStore.setChatLoading(false);
+            chatStore.setIsTyping(false);
+            chatStore.setExecutingPlan(false);
+          }
+        });
+        
+        console.log('✅ CHAT_MODULE: Regular chat message sent successfully via direct ChatService call');
         
       } catch (error) {
         console.error('❌ CHAT_MODULE: Failed to send regular chat message:', error);
@@ -1010,7 +1167,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       }
     }
     
-  }, [chatActions, auth0User, currentSession, sessionActions, userModule]);
+  }, [auth0User, currentSession, sessionActions, userModule, getChatService]);
 
   // Business logic: Handle multimodal message sending
   const handleSendMultimodal = useCallback(async (content: string, files: File[], metadata?: Record<string, any>) => {
@@ -1068,7 +1225,7 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     };
     
     console.log('📨 CHAT_MODULE: Adding multimodal user message to store');
-    chatActions.addMessage(userMessage);
+    chatStore.addMessage(userMessage);
     
     // 直接调用 sendMessage API (multimodal is handled by metadata)
     console.log('📨 CHAT_MODULE: Calling sendMessage API for multimodal content');
@@ -1076,15 +1233,43 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     try {
       // 获取用户token用于API认证
       const token = await userModule.getAccessToken();
+      const chatService = await getChatService();
       console.log('🔑 CHAT_MODULE: Retrieved access token for multimodal API call');
       
-      await chatActions.sendMessage(content, enrichedMetadata, token);
-      console.log('✅ CHAT_MODULE: Multimodal message sent successfully');
+      // 直接调用 ChatService multimodal 方法
+      await chatService.sendMultimodalMessage(content, enrichedMetadata, token, {
+        onStreamStart: (messageId: string, status?: string) => {
+          chatStore.startStreamingMessage(messageId, status);
+          chatStore.setExecutingPlan(true);
+        },
+        onStreamContent: (contentChunk: string) => {
+          chatStore.appendToStreamingMessage(contentChunk);
+        },
+        onStreamStatus: (status: string) => {
+          chatStore.updateStreamingStatus(status);
+        },
+        onStreamComplete: () => {
+          chatStore.finishStreamingMessage();
+          chatStore.setChatLoading(false);
+          chatStore.setIsTyping(false);
+          chatStore.setExecutingPlan(false);
+          logger.info(LogCategory.CHAT_FLOW, 'Multimodal message sending completed successfully');
+        },
+        onError: (error: Error) => {
+          logger.error(LogCategory.CHAT_FLOW, 'Multimodal message sending failed', { error: error.message });
+          chatStore.setChatLoading(false);
+          chatStore.setIsTyping(false);
+          chatStore.setExecutingPlan(false);
+        }
+      }, files);
+      console.log('✅ CHAT_MODULE: Multimodal message sent successfully via direct ChatService call');
     } catch (error) {
       console.error('❌ CHAT_MODULE: Failed to send multimodal message:', error);
       throw error;
     }
-  }, [chatActions, auth0User, userModule]);
+  }, [auth0User, userModule, getChatService]);
+
+  // 🆕 Note: triggeredAppInput is now managed by useAppStore globally
 
   // Handle message click for artifact navigation
   const handleMessageClick = useCallback((message: any) => {
@@ -1107,12 +1292,33 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       const appId = widgetToAppMap[widgetType as keyof typeof widgetToAppMap];
       if (appId) {
         console.log(`🔄 CHAT_MODULE: Navigating to ${appId} widget for artifact:`, artifactMessage.artifact.id);
+        
+        // 🆕 Parse artifact content and set to widget store for display
+        const artifactContent = artifactMessage.artifact.content;
+        
+        if (appId === 'hunt' && artifactContent) {
+          try {
+            // Parse JSON content and set to hunt store
+            const searchResults = typeof artifactContent === 'string' ? JSON.parse(artifactContent) : artifactContent;
+            if (Array.isArray(searchResults)) {
+              console.log(`🔍 CHAT_MODULE: Setting hunt search results:`, searchResults.length, 'items');
+              setHuntSearchResults(searchResults);
+            }
+          } catch (e) {
+            console.warn('🔍 CHAT_MODULE: Could not parse hunt artifact content:', e);
+          }
+        }
+        
+        // 🆕 完整的导航逻辑：设置app和显示侧边栏
         setCurrentApp(appId as AppId);
+        setShowRightSidebar(true);
+        
+        console.log(`✅ CHAT_MODULE: Navigation completed - App: ${appId}, Sidebar: true`);
       } else {
         console.warn('💬 CHAT_MODULE: Unknown widget type for navigation:', widgetType);
       }
     }
-  }, [setCurrentApp]);
+  }, [setCurrentApp, setShowRightSidebar, setTriggeredAppInput, setHuntSearchResults]);
 
 
   // Handle upgrade modal actions
@@ -1143,40 +1349,29 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
       (window as any).__CHAT_MODULE_PLUGIN_MODE__ = true;
     }
     
-    // 导入RightSidebarLayout来显示真正的widget
-    import('../components/ui/chat/RightSidebarLayout').then(({ RightSidebarLayout }) => {
-      const widgetContent = (
-        <RightSidebarLayout
-          currentApp={widgetId}
-          showRightSidebar={true}
-          triggeredAppInput=""
-          onCloseApp={handleCloseWidget}
-          onToggleMode={handleToggleWidgetMode}
-          onAppSelect={(appId) => {
-            console.log('Widget app selected:', appId);
-          }}
-        />
-      );
-      
-      setCurrentWidgetMode(mode);
-      setSelectedWidgetContent(widgetContent);
-    });
+    // 设置全局状态，触发useEffect同步到local state
+    setCurrentApp(widgetId as AppId);
+    setShowRightSidebar(true);
     
     // Close widget selector through parent callback
     if (onCloseWidgetSelector) {
       onCloseWidgetSelector();
     }
-  }, [onCloseWidgetSelector]);
+  }, [onCloseWidgetSelector, setCurrentApp, setShowRightSidebar]);
 
   const handleCloseWidget = useCallback(() => {
     setCurrentWidgetMode(null);
-    setSelectedWidgetContent(null);
+    
+    // 清理全局状态
+    setCurrentApp(null);
+    setShowRightSidebar(false);
     
     // ✅ 清理Plugin模式标志
     if (typeof window !== 'undefined') {
       (window as any).__CHAT_MODULE_PLUGIN_MODE__ = false;
     }
-  }, []);
+    // Note: triggeredAppInput is managed by global store and cleared by AppModule
+  }, [setCurrentApp, setShowRightSidebar]);
 
   // 🆕 处理模式切换 (half ↔ full)
   const handleToggleWidgetMode = useCallback(() => {
@@ -1187,6 +1382,26 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
     
     console.log('🔄 CHAT_MODULE: Widget mode toggled:', { from: currentWidgetMode, to: newMode });
   }, [currentWidgetMode]);
+
+  // 🆕 监听全局 App Store 状态变化，同步到本地 widget 模式
+  useEffect(() => {
+    if (globalCurrentApp && globalShowRightSidebar) {
+      // 从artifact打开widget时，默认使用half模式
+      if (!currentWidgetMode) {
+        console.log('🔄 CHAT_MODULE: Syncing from global store - setting widget mode to half for app:', globalCurrentApp);
+        setCurrentWidgetMode('half');
+        
+        // 设置Plugin模式标志
+        if (typeof window !== 'undefined') {
+          (window as any).__CHAT_MODULE_PLUGIN_MODE__ = true;
+        }
+      }
+    } else if (!globalShowRightSidebar && currentWidgetMode) {
+      // 当全局状态关闭右侧栏时，清理本地状态
+      console.log('🔄 CHAT_MODULE: Global sidebar closed - clearing local widget mode');
+      setCurrentWidgetMode(null);
+    }
+  }, [globalCurrentApp, globalShowRightSidebar, currentWidgetMode]);
 
 
   // Pass all data and business logic callbacks as props to pure UI component
@@ -1240,12 +1455,32 @@ export const ChatModule: React.FC<ChatModuleProps> = (props) => {
         
         // Half-screen widget mode
         showRightSidebar={currentWidgetMode === 'half'}
-        rightSidebarContent={selectedWidgetContent}
+        rightSidebarContent={
+          globalCurrentApp && currentWidgetMode === 'half' ? (
+            <RightSidebarLayout
+              currentApp={globalCurrentApp}
+              showRightSidebar={true}
+              triggeredAppInput=""
+              onCloseApp={handleCloseWidget}
+              onToggleMode={handleToggleWidgetMode}
+            />
+          ) : null
+        }
         rightSidebarMode="half"
         
         // Full-screen widget mode  
         showFullScreenWidget={currentWidgetMode === 'full'}
-        fullScreenWidget={selectedWidgetContent}
+        fullScreenWidget={
+          globalCurrentApp && currentWidgetMode === 'full' ? (
+            <RightSidebarLayout
+              currentApp={globalCurrentApp}
+              showRightSidebar={true}
+              triggeredAppInput=""
+              onCloseApp={handleCloseWidget}
+              onToggleMode={handleToggleWidgetMode}
+            />
+          ) : null
+        }
         onCloseFullScreenWidget={handleCloseWidget}
       />
       

@@ -45,7 +45,6 @@ import { UserPortal } from '../components/ui/user/UserPortal';
 import { useChat } from '../hooks/useChat';
 import { useArtifactLogic } from './ArtifactModule';
 import { useAppStore } from '../stores/useAppStore';
-import { useChatActions } from '../stores/useChatStore';
 import { widgetHandler } from '../components/core/WidgetHandler';
 import { logger, LogCategory } from '../utils/logger';
 import { AppId } from '../types/appTypes';

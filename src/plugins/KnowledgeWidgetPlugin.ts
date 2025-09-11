@@ -172,35 +172,45 @@ export class KnowledgeWidgetPlugin implements WidgetPlugin {
 
         let knowledgeResult: any = null;
         let messageCount = 0;
-        let lastMessage = '';
+        let accumulatedContent = '';
 
         const callbacks = {
-          onMessageComplete: (message?: string) => {
+          onStreamContent: (contentChunk: string) => {
+            console.log(`🧠 KNOWLEDGE_PLUGIN: onStreamContent chunk:`, contentChunk?.substring(0, 50) + '...');
+            accumulatedContent += contentChunk;
+          },
+          
+          onStreamComplete: (finalContent?: string) => {
             messageCount++;
-            console.log(`🧠 KNOWLEDGE_PLUGIN: onMessageComplete #${messageCount}:`, message?.substring(0, 100) + '...');
+            console.log(`🧠 KNOWLEDGE_PLUGIN: onStreamComplete - Final message (${messageCount} total):`, finalContent?.substring(0, 100) + '...');
             
-            if (message && message.trim()) {
-              lastMessage = message;
-              knowledgeResult = message;
+            // Only process on [DONE] or when we have substantial accumulated content
+            if (finalContent === '[DONE]' || accumulatedContent.length > 100) {
+              clearTimeout(timeout);
               
-              // 不要立即resolve，等待可能的后续消息
-              // 使用较短的延迟等待，如果没有新消息就resolve
-              setTimeout(() => {
-                if (lastMessage === message) { // 确认这是最后一条消息
-                  clearTimeout(timeout);
-                  console.log(`🧠 KNOWLEDGE_PLUGIN: Final message selected (${messageCount} total):`, message.substring(0, 100) + '...');
-                  resolve(message);
-                }
-              }, 500); // 500ms延迟，等待可能的后续消息
+              // Use accumulated streaming content as the real result
+              const completeMessage = accumulatedContent.trim();
+              console.log(`🧠 KNOWLEDGE_PLUGIN: Processing final result with accumulated content (${completeMessage.length} chars):`, completeMessage.substring(0, 100) + '...');
+            
+              if (completeMessage) {
+                knowledgeResult = completeMessage;
+                resolve(completeMessage);
+              } else {
+                // No substantial content accumulated
+                reject(new Error('No knowledge analysis result generated'));
+              }
             } else {
-              // 如果没有有效消息，等待一下再决定
-              setTimeout(() => {
-                if (!knowledgeResult) {
-                  clearTimeout(timeout);
-                  reject(new Error('No knowledge analysis result generated'));
-                }
-              }, 500);
+              // Skip this onStreamComplete call - waiting for the final one
+              console.log(`🧠 KNOWLEDGE_PLUGIN: Skipping intermediate completion (${finalContent}), waiting for [DONE] or substantial content...`);
             }
+          },
+          
+          onStreamStart: (messageId: string, status?: string) => {
+            console.log(`🧠 KNOWLEDGE_PLUGIN: onStreamStart:`, { messageId, status });
+          },
+          
+          onStreamStatus: (status: string) => {
+            console.log(`🧠 KNOWLEDGE_PLUGIN: onStreamStatus:`, status);
           },
           
           onArtifactCreated: (artifact: any) => {
@@ -214,12 +224,7 @@ export class KnowledgeWidgetPlugin implements WidgetPlugin {
           onError: (error: any) => {
             clearTimeout(timeout);
             reject(error);
-          },
-          
-          // 其他回调保持空实现
-          onMessageStart: () => {},
-          onMessageContent: () => {},
-          onMessageStatus: () => {}
+          }
         };
 
         // 调用现有的 chatService

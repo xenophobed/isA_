@@ -175,53 +175,82 @@ export class HuntWidgetPlugin implements WidgetPlugin {
         let messageCount = 0;
         let lastMessage = '';
 
+        let accumulatedContent = '';
+        
         const callbacks = {
-          onMessageComplete: (message?: string) => {
+          onStreamContent: (contentChunk: string) => {
+            console.log(`🔍 HUNT_PLUGIN: onStreamContent chunk:`, contentChunk?.substring(0, 50) + '...');
+            accumulatedContent += contentChunk;
+          },
+          
+          onStreamComplete: (finalContent?: string) => {
             messageCount++;
-            console.log(`🔍 HUNT_PLUGIN: onMessageComplete #${messageCount}:`, message?.substring(0, 100) + '...');
+            console.log(`🔍 HUNT_PLUGIN: onStreamComplete - Final message (${messageCount} total):`, finalContent?.substring(0, 100) + '...');
             
-            if (message && message.trim()) {
-              lastMessage = message;
+            // Only process on [DONE] or when we have substantial accumulated content
+            // Skip system messages like "Chat processing completed"
+            if (finalContent === '[DONE]' || accumulatedContent.length > 100) {
+              clearTimeout(timeout);
               
-              // 等待可能的后续消息
-              setTimeout(() => {
-                if (lastMessage === message) { // 确认这是最后一条消息
-                  clearTimeout(timeout);
-                  console.log(`🔍 HUNT_PLUGIN: Final message selected (${messageCount} total):`, message.substring(0, 100) + '...');
-                  
-                  try {
-                    // Try to parse JSON results from message
-                    const results = JSON.parse(message);
-                    if (Array.isArray(results)) {
-                      searchResults = results;
-                      resolve(results);
-                    } else {
-                      // Fallback: create a single result from the message
-                      const fallbackResult = {
-                        title: `Search Results for: ${query}`,
-                        description: message,
-                        content: message,
-                        query: query,
-                        timestamp: new Date().toISOString(),
-                        type: 'search_response'
-                      };
-                      resolve([fallbackResult]);
-                    }
-                  } catch (parseError) {
-                    // If parsing fails, create a single result
-                    const fallbackResult = {
-                      title: `Search Results for: ${query}`,
-                      description: message,
-                      content: message,
-                      query: query,
-                      timestamp: new Date().toISOString(),
-                      type: 'search_response'
-                    };
-                    resolve([fallbackResult]);
-                  }
+              // Use accumulated streaming content as the real search result
+              const completeMessage = accumulatedContent.trim();
+              console.log(`🔍 HUNT_PLUGIN: Processing final result with accumulated content (${completeMessage.length} chars):`, completeMessage.substring(0, 100) + '...');
+            
+              if (completeMessage) {
+              try {
+                // Try to parse JSON results from message
+                const results = JSON.parse(completeMessage);
+                if (Array.isArray(results)) {
+                  searchResults = results;
+                  resolve(results);
+                } else {
+                  // Fallback: create a single result from the message
+                  const fallbackResult = {
+                    title: `Search Results for: ${query}`,
+                    description: completeMessage,
+                    content: completeMessage,
+                    query: query,
+                    timestamp: new Date().toISOString(),
+                    type: 'search_response'
+                  };
+                  resolve([fallbackResult]);
                 }
-              }, 500); // 500ms延迟，等待可能的后续消息
+              } catch (parseError) {
+                // If parsing fails, create a single result
+                const fallbackResult = {
+                  title: `Search Results for: ${query}`,
+                  description: completeMessage,
+                  content: completeMessage,
+                  query: query,
+                  timestamp: new Date().toISOString(),
+                  type: 'search_response'
+                };
+                resolve([fallbackResult]);
+              }
+              } else {
+                // No substantial content accumulated
+                const placeholderResult = {
+                  title: `Search Results for: ${query}`,
+                  description: 'Search completed but no content was returned.',
+                  content: 'Search completed but no content was returned.',
+                  query: query,
+                  timestamp: new Date().toISOString(),
+                  type: 'search_response'
+                };
+                resolve([placeholderResult]);
+              }
+            } else {
+              // Skip this onStreamComplete call - waiting for the final one
+              console.log(`🔍 HUNT_PLUGIN: Skipping intermediate completion (${finalContent}), waiting for [DONE] or substantial content...`);
             }
+          },
+          
+          onStreamStart: (messageId: string, status?: string) => {
+            console.log(`🔍 HUNT_PLUGIN: onStreamStart:`, { messageId, status });
+          },
+          
+          onStreamStatus: (status: string) => {
+            console.log(`🔍 HUNT_PLUGIN: onStreamStatus:`, status);
           },
           
           onArtifactCreated: (artifact: any) => {
@@ -235,12 +264,7 @@ export class HuntWidgetPlugin implements WidgetPlugin {
           onError: (error: any) => {
             clearTimeout(timeout);
             reject(error);
-          },
-          
-          // 其他回调保持空实现
-          onMessageStart: () => {},
-          onMessageContent: () => {},
-          onMessageStatus: () => {}
+          }
         };
 
         // 调用现有的 chatService

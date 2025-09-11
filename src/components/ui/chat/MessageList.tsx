@@ -229,7 +229,6 @@ export const MessageList = memo<MessageListProps>(({
       return (
         <div 
           className="mb-6"
-          onClick={() => onMessageClick?.(message)}
           style={{ width: '100%', display: 'flex', justifyContent: 'flex-start' }}
         >
           <div style={{ width: '100%', maxWidth: '100%' }}>
@@ -280,7 +279,6 @@ export const MessageList = memo<MessageListProps>(({
       return (
         <div 
           className="mb-6"
-          onClick={() => onMessageClick?.(message)}
           style={{ width: '100%', display: 'flex', justifyContent: 'flex-start' }}
         >
           <div style={{ width: '100%', maxWidth: '100%' }}>

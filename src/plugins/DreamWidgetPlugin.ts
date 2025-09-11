@@ -177,52 +177,70 @@ export class DreamWidgetPlugin implements WidgetPlugin {
 
         let messageCount = 0;
         let lastMessage = '';
+        let accumulatedContent = '';
 
         const callbacks = {
-          onArtifactCreated: (artifact: any) => {
-            clearTimeout(timeout);
-            if (artifact.type === 'image' && artifact.content) {
-              resolve(artifact.content);
+          onStreamContent: (contentChunk: string) => {
+            console.log(`🎨 DREAM_PLUGIN: onStreamContent chunk:`, contentChunk?.substring(0, 50) + '...');
+            accumulatedContent += contentChunk;
+          },
+          
+          onStreamComplete: (finalContent?: string) => {
+            messageCount++;
+            console.log(`🎨 DREAM_PLUGIN: onStreamComplete - Final message (${messageCount} total):`, finalContent?.substring(0, 100) + '...');
+            
+            // Only process on [DONE] or when we have substantial accumulated content
+            if (finalContent === '[DONE]' || accumulatedContent.length > 50) {
+              clearTimeout(timeout);
+              
+              // Use accumulated streaming content as the real result
+              const completeMessage = accumulatedContent.trim();
+              console.log(`🎨 DREAM_PLUGIN: Processing final result with accumulated content (${completeMessage.length} chars):`, completeMessage.substring(0, 100) + '...');
+            
+              if (completeMessage) {
+                // Extract image URL from the message
+                const imageUrlMatch = completeMessage.match(/https:\/\/[^\s\)]+\.jpg|https:\/\/[^\s\)]+\.png|https:\/\/[^\s\)]+\.webp/);
+                if (imageUrlMatch) {
+                  resolve(imageUrlMatch[0]);
+                } else {
+                  // Fallback: create a result from the message
+                  const fallbackResult = {
+                    content: completeMessage,
+                    type: 'image_description',
+                    timestamp: new Date().toISOString()
+                  };
+                  resolve(JSON.stringify(fallbackResult));
+                }
+              } else {
+                // No substantial content accumulated
+                reject(new Error('No image content generated'));
+              }
             } else {
-              reject(new Error('Invalid artifact received'));
+              // Skip this onStreamComplete call - waiting for the final one
+              console.log(`🎨 DREAM_PLUGIN: Skipping intermediate completion (${finalContent}), waiting for [DONE] or substantial content...`);
             }
           },
           
-          onMessageComplete: (message?: string) => {
-            messageCount++;
-            console.log(`🎨 DREAM_PLUGIN: onMessageComplete #${messageCount}:`, message?.substring(0, 100) + '...');
-            
-            if (message && message.trim()) {
-              lastMessage = message;
-              
-              // Extract image URL from the message
-              const imageUrlMatch = message.match(/https:\/\/[^\s\)]+\.jpg|https:\/\/[^\s\)]+\.png|https:\/\/[^\s\)]+\.webp/);
-              if (imageUrlMatch) {
-                // 不要立即resolve，等待可能的后续消息
-                // 使用较短的延迟等待，如果没有新消息就resolve
-                setTimeout(() => {
-                  if (lastMessage === message) { // 确认这是最后一条消息
-                    clearTimeout(timeout);
-                    console.log(`🎨 DREAM_PLUGIN: Final message selected (${messageCount} total):`, message.substring(0, 100) + '...');
-                    resolve(imageUrlMatch[0]);
-                  }
-                }, 500); // 500ms延迟，等待可能的后续消息
-              } else {
-                // If no image URL found in message, wait for artifact or check later
-                console.warn('🎨 Dream Plugin: No image URL found in message, waiting for artifact...');
-              }
+          onStreamStart: (messageId: string, status?: string) => {
+            console.log(`🎨 DREAM_PLUGIN: onStreamStart:`, { messageId, status });
+          },
+          
+          onStreamStatus: (status: string) => {
+            console.log(`🎨 DREAM_PLUGIN: onStreamStatus:`, status);
+          },
+          
+          onArtifactCreated: (artifact: any) => {
+            // Handle artifacts if they're created
+            if (artifact.content && artifact.type === 'image') {
+              clearTimeout(timeout);
+              resolve(artifact.content);
             }
           },
           
           onError: (error: any) => {
             clearTimeout(timeout);
             reject(error);
-          },
-          
-          // 其他回调保持空实现
-          onMessageStart: () => {},
-          onMessageContent: () => {},
-          onMessageStatus: () => {}
+          }
         };
 
         // 调用现有的 chatService

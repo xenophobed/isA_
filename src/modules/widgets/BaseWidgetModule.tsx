@@ -21,7 +21,7 @@ import { useWidget, useWidgetActions } from '../../hooks/useWidget';
 import { logger, LogCategory } from '../../utils/logger';
 import { WidgetType } from '../../types/widgetTypes';
 import { getChatServiceInstance } from '../../hooks/useChatService';
-import { useChatActions } from '../../stores/useChatStore';
+import widgetHandler from '../../components/core/WidgetHandler';
 import { 
   BaseWidget, 
   OutputHistoryItem, 
@@ -200,17 +200,279 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
   const startProcessing = useCallback(async (params: TParams): Promise<void> => {
     console.log(`🚀 ${config.type.toUpperCase()}_MODULE: Starting processing with params:`, params);
     
+    // 🆕 检查是否在Plugin模式中运行
+    const isPluginMode = typeof window !== 'undefined' && (window as any).__CHAT_MODULE_PLUGIN_MODE__;
+    
+    if (isPluginMode) {
+      console.log(`🔌 ${config.type.toUpperCase()}_MODULE: Plugin mode detected - delegating to ChatModule via WidgetHandler event`);
+      
+      setIsProcessing(true);
+      setIsStreaming(true);
+      setStreamingContent('Processing request...');
+      
+      // Add initial output item
+      const outputItem = addToHistory({
+        type: 'text',
+        title: `Processing ${config.type} request...`,
+        content: 'Starting processing...',
+        params,
+        isStreaming: true
+      });
+      
+      // Call start callback
+      config.onProcessStart?.(params);
+      
+      // In Plugin mode, directly emit event to ChatModule - skip WidgetHandler to avoid double processing
+      try {
+        console.log('🔌 BaseWidgetModule: Emitting widget:request directly to ChatModule');
+        
+        // Get ChatModule's event emitter
+        const eventEmitter = (window as any).__CHAT_MODULE_EVENT_EMITTER__;
+        if (!eventEmitter) {
+          throw new Error('ChatModule event emitter not found');
+        }
+        
+        const requestId = `${config.type}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        
+        // Listen for result from ChatModule
+        const resultPromise = new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            eventEmitter.off('widget:result', resultHandler);
+            reject(new Error('Widget request timeout'));
+          }, 60000);
+          
+          const resultHandler = (eventData: any) => {
+            if (eventData.requestId === requestId) {
+              clearTimeout(timeout);
+              eventEmitter.off('widget:result', resultHandler);
+              
+              if (eventData.success) {
+                resolve(eventData.result);
+              } else {
+                reject(new Error(eventData.error || 'Plugin execution failed'));
+              }
+            }
+          };
+          
+          eventEmitter.on('widget:result', resultHandler);
+          
+          // Emit request directly to ChatModule
+          eventEmitter.emit('widget:request', {
+            widgetType: config.type,
+            action: 'process',
+            params,
+            requestId,
+            sessionId: `${config.sessionIdPrefix}_${Date.now()}`,
+            userId: 'widget_user'
+          });
+        });
+        
+        // Wait for result
+        const result = await resultPromise;
+        console.log('🔌 BaseWidgetModule: Received result from ChatModule:', result);
+        
+        // Update UI state after receiving result
+        setIsProcessing(false);
+        setIsStreaming(false);
+        setStreamingContent('');
+        
+        // Update current output with the result - use proper formatting for different widget types
+        if (result && result.content) {
+          let formattedContent: string;
+          let displayTitle: string;
+          
+          // Handle Hunt widget search results properly
+          if (config.type === 'hunt' && Array.isArray(result.content)) {
+            // For Hunt widget, format search results properly
+            const searchResults = result.content as any[];
+            if (searchResults.length > 0) {
+              const firstResult = searchResults[0];
+              formattedContent = firstResult?.content || firstResult?.description || 'Search result';
+              displayTitle = firstResult?.title || `Search Results (${searchResults.length} found)`;
+              
+              // Add all results to history
+              searchResults.forEach((searchResult: any, index: number) => {
+                addToHistory({
+                  type: 'text',
+                  title: searchResult?.title || `Search Result ${index + 1}`,
+                  content: searchResult?.content || searchResult?.description || 'Search result',
+                  params: {
+                    query: searchResult?.query,
+                    originalType: searchResult?.type || 'search_response',
+                    url: searchResult?.url
+                  }
+                });
+              });
+            } else {
+              formattedContent = 'No search results found';
+              displayTitle = 'Search completed';
+            }
+          } else if (config.type === 'dream' && result.type === 'image') {
+            // Handle Dream widget image results
+            if (typeof result.content === 'string' && result.content.startsWith('http')) {
+              formattedContent = result.content; // Keep the image URL
+              displayTitle = `Generated Image`;
+              
+              // Add to history with image type
+              addToHistory({
+                type: 'image',
+                title: `Generated Image`,
+                content: result.content,
+                params: {
+                  prompt: result.metadata?.prompt,
+                  originalType: 'dream_image',
+                  imageUrl: result.content
+                }
+              });
+            } else {
+              formattedContent = 'Image generation completed';
+              displayTitle = 'Dream completed';
+            }
+          } else if (config.type === 'omni' && result.type === 'text') {
+            // Handle Omni widget text results
+            if (typeof result.content === 'string' && result.content.length > 0) {
+              formattedContent = result.content;
+              displayTitle = `Generated Content`;
+              
+              // Add to history with text type
+              addToHistory({
+                type: 'text',
+                title: `Generated Content`,
+                content: result.content,
+                params: {
+                  prompt: result.metadata?.prompt,
+                  originalType: 'omni_content'
+                }
+              });
+            } else {
+              formattedContent = 'Content generation completed';
+              displayTitle = 'Omni completed';
+            }
+          } else if (config.type === 'data_scientist' && result.type === 'analysis') {
+            // Handle Data Scientist widget analysis results
+            const analysisContent = result.content;
+            if (typeof analysisContent === 'object' && analysisContent.analysis) {
+              formattedContent = analysisContent.analysis.summary || 'Analysis completed';
+              displayTitle = `Data Analysis Results`;
+              
+              // Add to history with analysis type
+              addToHistory({
+                type: 'analysis',
+                title: `Data Analysis Results`,
+                content: JSON.stringify(analysisContent, null, 2),
+                params: {
+                  prompt: result.metadata?.prompt,
+                  originalType: 'data_analysis',
+                  analysisType: analysisContent.analysis?.type || 'general'
+                }
+              });
+            } else if (typeof analysisContent === 'string') {
+              formattedContent = analysisContent;
+              displayTitle = `Data Analysis Results`;
+              
+              // Add to history with analysis type
+              addToHistory({
+                type: 'analysis',
+                title: `Data Analysis Results`,
+                content: analysisContent,
+                params: {
+                  prompt: result.metadata?.prompt,
+                  originalType: 'data_analysis'
+                }
+              });
+            } else {
+              formattedContent = 'Data analysis completed';
+              displayTitle = 'Data Scientist completed';
+            }
+          } else if (config.type === 'knowledge' && result.type === 'knowledge') {
+            // Handle Knowledge widget results
+            if (typeof result.content === 'string' && result.content.length > 0) {
+              formattedContent = result.content;
+              displayTitle = `Knowledge Analysis Results`;
+              
+              // Add to history with knowledge type
+              addToHistory({
+                type: 'text',
+                title: `Knowledge Analysis Results`,
+                content: result.content,
+                params: {
+                  prompt: result.metadata?.prompt,
+                  originalType: 'knowledge_analysis'
+                }
+              });
+            } else {
+              formattedContent = 'Knowledge analysis completed';
+              displayTitle = 'Knowledge completed';
+            }
+          } else if (config.type === 'custom_automation' && result.type === 'analysis') {
+            // Handle Custom Automation widget results
+            const automationContent = result.content;
+            if (typeof automationContent === 'object' && automationContent.summary) {
+              formattedContent = automationContent.summary;
+              displayTitle = `Automation Results`;
+              
+              // Add to history with automation type
+              addToHistory({
+                type: 'analysis',
+                title: `Automation Results`,
+                content: JSON.stringify(automationContent, null, 2),
+                params: {
+                  prompt: result.metadata?.prompt,
+                  originalType: 'automation_result',
+                  templateUsed: automationContent.templateUsed || 'generic'
+                }
+              });
+            } else if (typeof automationContent === 'string') {
+              formattedContent = automationContent;
+              displayTitle = `Automation Results`;
+              
+              // Add to history with automation type
+              addToHistory({
+                type: 'analysis',
+                title: `Automation Results`,
+                content: automationContent,
+                params: {
+                  prompt: result.metadata?.prompt,
+                  originalType: 'automation_result'
+                }
+              });
+            } else {
+              formattedContent = 'Automation process completed';
+              displayTitle = 'Custom Automation completed';
+            }
+          } else {
+            // Default handling for other widget types
+            formattedContent = Array.isArray(result.content) ? JSON.stringify(result.content, null, 2) : String(result.content);
+            displayTitle = `${config.type} completed`;
+          }
+          
+          updateCurrentOutput({
+            content: formattedContent,
+            title: displayTitle,
+            isStreaming: false
+          });
+        }
+        
+        // Call completion callback
+        config.onProcessComplete?.(result);
+        
+        console.log('🔌 BaseWidgetModule: Plugin mode processing completed, UI updated');
+        return;
+        
+      } catch (error) {
+        console.error('❌ BaseWidgetModule: Failed to communicate with ChatModule:', error);
+        setIsProcessing(false);
+        setIsStreaming(false);
+        throw error;
+      }
+    }
+    
+    // Independent mode - process directly  
+    console.log(`🔧 ${config.type.toUpperCase()}_MODULE: Independent mode - processing directly`);
+    
     setIsProcessing(true);
     setIsStreaming(true);
     setStreamingContent('');
-    
-    // Create unique message IDs to prevent duplicates
-    const timestamp = Date.now();
-    const uniqueId = `${config.type}_${timestamp}_${Math.random().toString(36).substring(2, 11)}`;
-    
-    // ❌ REMOVED: Message creation logic moved to ChatModule
-    // Widget modules should NOT create messages directly
-    // All message creation is now handled by ChatModule via PluginManager
     
     // Add initial output item
     const outputItem = addToHistory({
@@ -226,12 +488,12 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
     
     try {
       // Use WidgetHandler to route request with streaming callbacks
-      console.log('🔥MODULE_DATA_FLOW🔥 BaseWidgetModule 转发数据到 WidgetHandler:', {
+      console.log('🔥MODULE_DATA_FLOW🔥 BaseWidgetModule 转发数据到 WidgetHandler (Independent mode):', {
         type: config.type,
         params,
         sessionId: `${config.sessionIdPrefix}_${Date.now()}`
       });
-      logger.info(LogCategory.ARTIFACT_CREATION, `${config.type} module routing request via WidgetHandler`, { params });
+      logger.info(LogCategory.ARTIFACT_CREATION, `${config.type} module routing request via WidgetHandler (Independent mode)`, { params });
       
       // 🆕 等待Plugin结果时显示loading状态
       setIsStreaming(true);
@@ -250,12 +512,35 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
       if (pluginResult && pluginResult.content) {
         console.log(`🔌 ${config.type.toUpperCase()}_MODULE: Received Plugin result:`, pluginResult);
         
+        // 处理不同类型的Plugin返回格式
+        let processedContent = pluginResult.content;
+        let title = `${config.type} completed`;
+        
+        // 对于Hunt Plugin，content是搜索结果数组
+        if (config.type === 'hunt' && Array.isArray(pluginResult.content)) {
+          const results = pluginResult.content;
+          if (results.length > 0) {
+            // 使用第一个结果的内容作为显示内容
+            processedContent = results[0].content || results[0].description || JSON.stringify(results[0]);
+            title = `Search Results (${results.length} found)`;
+            
+            console.log(`🔍 ${config.type.toUpperCase()}_MODULE: Processed Hunt results:`, {
+              resultCount: results.length,
+              firstResultPreview: processedContent.substring(0, 100) + '...'
+            });
+          } else {
+            processedContent = 'No search results found';
+            title = 'Search completed - No results';
+          }
+        }
+        
         // 更新Widget的output显示
         const outputUpdate = {
-          type: pluginResult.type || 'text', // 使用Plugin返回的实际类型
-          title: `${config.type} completed`,
-          content: pluginResult.content,
-          timestamp: new Date()
+          type: pluginResult.type === 'data' ? 'search' : (pluginResult.type || 'text'),
+          title: title,
+          content: processedContent,
+          timestamp: new Date(),
+          metadata: pluginResult.metadata
         };
         
         console.log(`🔌 ${config.type.toUpperCase()}_MODULE: Updating currentOutput with:`, outputUpdate);
@@ -512,10 +797,16 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
   }
   
   // Direct children pattern - wrap with BaseWidget
+  // 🆕 检测运行模式
+  const currentMode = typeof window !== 'undefined' && (window as any).__CHAT_MODULE_PLUGIN_MODE__ 
+    ? 'plugin' 
+    : 'independent';
+    
   return (
     <BaseWidget
       title={config.title}
       icon={config.icon}
+      mode={currentMode}
       isProcessing={isProcessing}
       outputHistory={outputHistory}
       currentOutput={currentOutput}
@@ -525,6 +816,7 @@ export const BaseWidgetModule = <TParams extends BaseWidgetParams, TResult exten
       managementActions={managementActions}
       onSelectOutput={handleSelectOutput}
       onClearHistory={handleClearHistory}
+      chatIntegration={currentMode === 'plugin' ? { enabled: true } : undefined}
     >
       {children}
     </BaseWidget>

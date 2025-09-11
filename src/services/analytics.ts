@@ -1,3 +1,4 @@
+
 import { RudderAnalytics } from '@rudderstack/analytics-js';
 
 interface AnalyticsConfig {

@@ -479,12 +479,17 @@ export class AGUIEventParser extends BaseParser<string | LegacySSEEvent, AGUIEve
         
       case 'custom_event':
       case 'message_stream':
-        if (legacyEvent.custom_llm_chunk || legacyEvent.delta) {
+        // 检查多种可能的token数据位置 - 适配后端实际数据结构
+        const customLLMChunk = legacyEvent.custom_llm_chunk || 
+                               legacyEvent.metadata?.raw_chunk?.custom_llm_chunk ||
+                               legacyEvent.delta;
+                               
+        if (customLLMChunk) {
           return {
             ...baseEvent,
             type: 'text_message_content' as const,
             message_id: legacyEvent.message_id || `msg_${Date.now()}`,
-            delta: legacyEvent.custom_llm_chunk || legacyEvent.delta || ''
+            delta: customLLMChunk
           };
         } else {
           return {
@@ -502,7 +507,7 @@ export class AGUIEventParser extends BaseParser<string | LegacySSEEvent, AGUIEve
           type: 'text_message_content' as const,
           message_id: legacyEvent.message_id || `msg_${Date.now()}`,
           delta: legacyEvent.custom_llm_chunk || 
-                 (legacyEvent.content && typeof legacyEvent.content === 'object' && legacyEvent.content.custom_llm_chunk) ||
+                 (legacyEvent.content && typeof legacyEvent.content === 'object' && (legacyEvent.content as any).custom_llm_chunk) ||
                  legacyEvent.content || 
                  legacyEvent.delta || 
                  ''
@@ -597,7 +602,8 @@ export class AGUIEventParser extends BaseParser<string | LegacySSEEvent, AGUIEve
           tool_call_id: legacyEvent.tool_call_id || `tool_${Date.now()}`,
           tool_name: legacyEvent.tool_name || 'unknown_tool',
           result: legacyEvent.result,
-          error: legacyEvent.error,
+          error: typeof legacyEvent.error === 'string' ? legacyEvent.error : 
+                 (typeof legacyEvent.error === 'object' && legacyEvent.error?.message) || undefined,
           duration_ms: legacyEvent.duration_ms
         };
         
